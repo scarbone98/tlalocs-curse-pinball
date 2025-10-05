@@ -1,0 +1,7 @@
+[gd_resource type="Resource" script_class="PlaySoundAction" load_steps=2 format=3 uid="uid://7571vq3or8cl"]
+
+[ext_resource type="Script" uid="uid://b0xlis15d6inm" path="res://TriggerActions/PlaySoundAction.gd" id="1_0btxc"]
+
+[resource]
+script = ExtResource("1_0btxc")
+metadata/_custom_type_script = "uid://b0xlis15d6inm"

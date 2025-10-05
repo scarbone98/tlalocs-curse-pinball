@@ -1,0 +1,7 @@
+[gd_scene load_steps=2 format=3 uid="uid://58owr4px6bcx"]
+
+[ext_resource type="Script" uid="uid://buosupcelsaqc" path="res://toggle_layers_trigger.gd" id="1_sjb61"]
+
+[node name="Area2D" type="Area2D"]
+script = ExtResource("1_sjb61")
+target_group = "ball"

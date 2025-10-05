@@ -1,0 +1,8 @@
+[gd_resource type="Resource" script_class="BumperKickAction" load_steps=2 format=3 uid="uid://dk4eiaep15bwn"]
+
+[ext_resource type="Script" uid="uid://b1vxe1lhs6tew" path="res://TriggerActions/KickAction.gd" id="1_y0jiy"]
+
+[resource]
+script = ExtResource("1_y0jiy")
+base_impulse = 600.0
+metadata/_custom_type_script = "uid://b1vxe1lhs6tew"
