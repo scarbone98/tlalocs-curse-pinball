@@ -1,7 +1,9 @@
-[gd_resource type="Resource" script_class="PlaySoundAction" load_steps=2 format=3 uid="uid://7571vq3or8cl"]
+[gd_resource type="Resource" script_class="PlaySoundAction" load_steps=3 format=3 uid="uid://7571vq3or8cl"]
 
 [ext_resource type="Script" uid="uid://b0xlis15d6inm" path="res://TriggerActions/PlaySoundAction.gd" id="1_0btxc"]
+[ext_resource type="AudioStream" uid="uid://c0ye2fsml04s" path="res://Audio/sfx/bumper.wav" id="2_4d7ne"]
 
 [resource]
 script = ExtResource("1_0btxc")
+sound = ExtResource("2_4d7ne")
 metadata/_custom_type_script = "uid://b0xlis15d6inm"

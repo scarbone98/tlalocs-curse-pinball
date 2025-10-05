@@ -2,16 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://bxel0lv5ky803"
-path="res://.godot/imported/map_f1.png-9e45de960227747696c10bbb94b7ac40.ctex"
+uid="uid://cp03adbw3ptnp"
+path="res://.godot/imported/tlclan.png-9eae91fb6ab654eb895866aa6eac4163.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://map_f1.png"
-dest_files=["res://.godot/imported/map_f1.png-9e45de960227747696c10bbb94b7ac40.ctex"]
+source_file="res://Sprites/tlclan.png"
+dest_files=["res://.godot/imported/tlclan.png-9eae91fb6ab654eb895866aa6eac4163.ctex"]
 
 [params]
 

@@ -1,22 +1,49 @@
-[gd_scene load_steps=43 format=3 uid="uid://cscmeg24j6nwy"]
+[gd_scene load_steps=51 format=3 uid="uid://cscmeg24j6nwy"]
 
-[ext_resource type="Script" uid="uid://s1m1784ldb4k" path="res://camera.gd" id="1_0hol4"]
-[ext_resource type="Script" uid="uid://bx3qt0dcuh56u" path="res://ball.gd" id="2_epypp"]
-[ext_resource type="Texture2D" uid="uid://bxel0lv5ky803" path="res://map_f1.png" id="2_hqns4"]
-[ext_resource type="Texture2D" uid="uid://cshp8ud3s3mye" path="res://map_f2.png" id="2_x0ka3"]
+[ext_resource type="Script" uid="uid://s1m1784ldb4k" path="res://Scripts/camera.gd" id="1_0hol4"]
+[ext_resource type="Script" uid="uid://bx3qt0dcuh56u" path="res://Scripts/ball.gd" id="2_epypp"]
+[ext_resource type="Texture2D" uid="uid://bxel0lv5ky803" path="res://Sprites/map_f1.png" id="2_hqns4"]
+[ext_resource type="Texture2D" uid="uid://cshp8ud3s3mye" path="res://Sprites/map_f2.png" id="2_x0ka3"]
 [ext_resource type="Script" uid="uid://c75buj1d1db2j" path="res://TriggerActions/trigger_area.gd" id="3_q6r6c"]
 [ext_resource type="Script" uid="uid://cbbvyakqgvued" path="res://TriggerActions/TriggerAction.gd" id="7_ta5nu"]
 [ext_resource type="Resource" uid="uid://dk4eiaep15bwn" path="res://TriggerActions/BumperActions/BumperKick.tres" id="8_flf07"]
 [ext_resource type="PackedScene" uid="uid://58owr4px6bcx" path="res://layer_toggler.tscn" id="9_0h7mo"]
-[ext_resource type="Script" uid="uid://0oiunbkicxhk" path="res://hud.gd" id="9_4d7sh"]
+[ext_resource type="Script" uid="uid://0oiunbkicxhk" path="res://Scripts/hud.gd" id="9_4d7sh"]
 [ext_resource type="Resource" uid="uid://rl78xh8h2dj3" path="res://TriggerActions/BumperActions/BumperPoints.tres" id="9_k73cj"]
 [ext_resource type="Resource" uid="uid://7571vq3or8cl" path="res://TriggerActions/BumperActions/BumperSound.tres" id="10_rjqkl"]
-[ext_resource type="Texture2D" uid="uid://b4s26bx1u6v7m" path="res://pinball_sprite.png" id="10_x0ka3"]
-[ext_resource type="Script" uid="uid://0i67cd53kj1" path="res://flipper.gd" id="11_hqns4"]
+[ext_resource type="Texture2D" uid="uid://b4s26bx1u6v7m" path="res://Sprites/pinball_sprite.png" id="10_x0ka3"]
+[ext_resource type="Script" uid="uid://0i67cd53kj1" path="res://Scripts/flipper.gd" id="11_hqns4"]
 [ext_resource type="Texture2D" uid="uid://dk4vt46dxpbfs" path="res://paddle_left.png" id="14_d2bti"]
 [ext_resource type="Texture2D" uid="uid://cu6m8pnvtwcow" path="res://paddle_right.png" id="15_ta5nu"]
 [ext_resource type="PackedScene" uid="uid://wmvd50gsnwwx" path="res://mushy.tscn" id="16_ta5nu"]
 [ext_resource type="Script" uid="uid://6wi2vvy83rni" path="res://mobile_controls.gd" id="17_flf07"]
+[ext_resource type="Texture2D" uid="uid://cp03adbw3ptnp" path="res://Sprites/tlclan.png" id="18_k73cj"]
+[ext_resource type="AudioStream" uid="uid://wuna01jbn5q6" path="res://Audio/background_music.ogg" id="19_rjqkl"]
+
+[sub_resource type="CircleShape2D" id="CircleShape2D_rjqkl"]
+radius = 33.24154
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_2hxjc"]
+atlas = ExtResource("18_k73cj")
+region = Rect2(0, 0, 64, 64)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_ebxd8"]
+atlas = ExtResource("18_k73cj")
+region = Rect2(64, 0, 64, 64)
+
+[sub_resource type="SpriteFrames" id="SpriteFrames_2u7jv"]
+animations = [{
+"frames": [{
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_2hxjc")
+}, {
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_ebxd8")
+}],
+"loop": true,
+"name": &"default",
+"speed": 5.0
+}]
 
 [sub_resource type="CircleShape2D" id="CircleShape2D_0e48y"]
 radius = 19.0
@@ -166,6 +193,12 @@ size = Vector2(45, 41)
 [sub_resource type="RectangleShape2D" id="RectangleShape2D_kdubu"]
 size = Vector2(115, 20)
 
+[sub_resource type="LabelSettings" id="LabelSettings_rjqkl"]
+font_size = 32
+
+[sub_resource type="LabelSettings" id="LabelSettings_fs4d3"]
+font_size = 32
+
 [node name="Node2D" type="Node2D"]
 
 [node name="Map" type="Node2D" parent="."]
@@ -186,7 +219,21 @@ offset_bottom = 1280.0
 texture = ExtResource("2_x0ka3")
 metadata/_edit_lock_ = true
 
+[node name="center_face" type="Area2D" parent="."]
+z_as_relative = false
+position = Vector2(337, 900)
+scale = Vector2(2, 2)
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="center_face"]
+shape = SubResource("CircleShape2D_rjqkl")
+metadata/_edit_lock_ = true
+
+[node name="AnimatedSprite2D" type="AnimatedSprite2D" parent="center_face"]
+sprite_frames = SubResource("SpriteFrames_2u7jv")
+metadata/_edit_lock_ = true
+
 [node name="ball" type="RigidBody2D" parent="." groups=["ball"]]
+z_as_relative = false
 position = Vector2(685, 1203)
 collision_layer = 5
 collision_mask = 5
@@ -293,6 +340,7 @@ polygon = PackedVector2Array(161, 324, 128, 364, 111, 403, 101, 449, 96, 484, 92
 polygon = PackedVector2Array(536, 740, 573, 612, 556, 592, 538, 598, 489, 687, 486, 675, 534, 581, 470, 590, 453, 630, 432, 621, 487, 509, 515, 420, 511, 355, 467, 328, 469, 292, 546, 356, 570, 414, 586, 509, 592, 598, 580, 660, 549, 742, 539, 753)
 
 [node name="layer_2_colliders" type="StaticBody2D" parent="."]
+visible = false
 collision_layer = 2
 collision_mask = 0
 
@@ -311,16 +359,16 @@ polygon = PackedVector2Array(486, 682, 577, 487, 639, 326, 658, 257, 660, 241, 6
 [node name="CollisionPolygon2D5" type="CollisionPolygon2D" parent="layer_2_colliders"]
 polygon = PackedVector2Array(257, 192, 267, 166, 255, 134, 206, 140, 116, 186, 53, 259, 28, 360, 41, 506, 83, 601, 169, 675, 0, 683, 3, 76, 319, 74, 305, 209, 188, 241, 114, 320, 94, 369, 98, 447, 115, 506, 148, 577, 123, 547, 109, 525, 85, 453, 84, 361, 116, 282, 165, 227)
 
-[node name="Gates" parent="." instance=ExtResource("9_0h7mo")]
+[node name="gates" parent="." instance=ExtResource("9_0h7mo")]
 position = Vector2(152, 625)
 collision_layer = 4
 collision_mask = 4
 active_z_index = 2
 
-[node name="CollisionShape2D" type="CollisionShape2D" parent="Gates"]
+[node name="CollisionShape2D" type="CollisionShape2D" parent="gates"]
 shape = SubResource("SegmentShape2D_0h7mo")
 
-[node name="CollisionShape2D2" type="CollisionShape2D" parent="Gates"]
+[node name="CollisionShape2D2" type="CollisionShape2D" parent="gates"]
 shape = SubResource("SegmentShape2D_nr8wp")
 
 [node name="start_zone" type="Area2D" parent="." groups=["launch_region"]]
@@ -339,25 +387,36 @@ position = Vector2(1.5, 0)
 shape = SubResource("RectangleShape2D_kdubu")
 metadata/_edit_lock_ = true
 
-[node name="CanvasLayer" type="CanvasLayer" parent="."]
+[node name="main_ui" type="CanvasLayer" parent="."]
 
-[node name="Control" type="Control" parent="CanvasLayer"]
+[node name="Control" type="Control" parent="main_ui"]
 layout_mode = 3
-anchors_preset = 0
-offset_right = 40.0
-offset_bottom = 40.0
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+size_flags_horizontal = 3
+size_flags_vertical = 3
 script = ExtResource("9_4d7sh")
 
-[node name="HBoxContainer" type="HBoxContainer" parent="CanvasLayer/Control"]
-layout_mode = 0
-offset_right = 40.0
-offset_bottom = 40.0
+[node name="HBoxContainer" type="HBoxContainer" parent="main_ui/Control"]
+layout_mode = 1
+anchors_preset = 10
+anchor_right = 1.0
+offset_bottom = 45.0
+grow_horizontal = 2
 
-[node name="ScoreLabel" type="Label" parent="CanvasLayer/Control/HBoxContainer"]
+[node name="ScoreLabel" type="Label" parent="main_ui/Control/HBoxContainer"]
 layout_mode = 2
+size_flags_horizontal = 3
+label_settings = SubResource("LabelSettings_rjqkl")
 
-[node name="LivesLabel" type="Label" parent="CanvasLayer/Control/HBoxContainer"]
+[node name="LivesLabel" type="Label" parent="main_ui/Control/HBoxContainer"]
 layout_mode = 2
+size_flags_horizontal = 3
+label_settings = SubResource("LabelSettings_fs4d3")
+horizontal_alignment = 2
 
 [node name="padels" type="Node2D" parent="."]
 
@@ -412,5 +471,10 @@ scale = Vector2(1.75, 1.75)
 position = Vector2(45.999996, -26.999998)
 scale = Vector2(1.75, 1.75)
 
-[node name="Mobile" type="CanvasLayer" parent="."]
+[node name="mobile_controls" type="CanvasLayer" parent="."]
 script = ExtResource("17_flf07")
+
+[node name="AudioStreamPlayer2D" type="AudioStreamPlayer2D" parent="."]
+stream = ExtResource("19_rjqkl")
+autoplay = true
+parameters/looping = true

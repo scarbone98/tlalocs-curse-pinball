@@ -1,8 +1,8 @@
 extends CanvasLayer
 class_name MobilePaddleInput
 
-@export var left_action: StringName = &"paddle_left"
-@export var right_action: StringName = &"paddle_right"
+@export var left_action: StringName = &"left_flipper"
+@export var right_action: StringName = &"right_flipper"
 @export var allow_drag_side_switch: bool = true  # dragging across center swaps paddle
 
 var _touch_side: Dictionary = {}  # touch index -> "left" | "right"

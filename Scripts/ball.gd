@@ -46,6 +46,7 @@ func _physics_process(_delta: float) -> void:
 func _input(event: InputEvent) -> void:
 	if event.is_action_pressed("ui_accept") and can_launch:
 		linear_velocity = Vector2(0.0, launch_speed)
+		AudioSfx.play("launch")
 
 func _on_start_region_body_entered(body: Node) -> void:
 	if body == self:

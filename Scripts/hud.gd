@@ -38,7 +38,7 @@ func _on_toast(message: String) -> void:
 	_tween.tween_interval(1.0)         # hold visible for a second
 
 func _render_score() -> void:
-	score_label.text = "SCORE: %06d" % GameManager.score
+	score_label.text = "SCORE: %d" % GameManager.score
 
 func _render_lives() -> void:
 	lives_label.text = "BALLS: %d" % GameManager.lives
