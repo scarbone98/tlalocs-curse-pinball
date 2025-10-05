@@ -1,12 +1,16 @@
-[gd_scene load_steps=38 format=3 uid="uid://cscmeg24j6nwy"]
+[gd_scene load_steps=42 format=3 uid="uid://cscmeg24j6nwy"]
 
 [ext_resource type="Script" uid="uid://s1m1784ldb4k" path="res://camera.gd" id="1_0hol4"]
 [ext_resource type="Script" uid="uid://bx3qt0dcuh56u" path="res://ball.gd" id="2_epypp"]
 [ext_resource type="Texture2D" uid="uid://bxel0lv5ky803" path="res://map_f1.png" id="2_hqns4"]
 [ext_resource type="Texture2D" uid="uid://cshp8ud3s3mye" path="res://map_f2.png" id="2_x0ka3"]
 [ext_resource type="Script" uid="uid://c75buj1d1db2j" path="res://TriggerActions/trigger_area.gd" id="3_q6r6c"]
+[ext_resource type="Script" uid="uid://cbbvyakqgvued" path="res://TriggerActions/TriggerAction.gd" id="7_ta5nu"]
+[ext_resource type="Resource" uid="uid://dk4eiaep15bwn" path="res://TriggerActions/BumperActions/BumperKick.tres" id="8_flf07"]
 [ext_resource type="PackedScene" uid="uid://58owr4px6bcx" path="res://layer_toggler.tscn" id="9_0h7mo"]
 [ext_resource type="Script" uid="uid://0oiunbkicxhk" path="res://hud.gd" id="9_4d7sh"]
+[ext_resource type="Resource" uid="uid://rl78xh8h2dj3" path="res://TriggerActions/BumperActions/BumperPoints.tres" id="9_k73cj"]
+[ext_resource type="Resource" uid="uid://7571vq3or8cl" path="res://TriggerActions/BumperActions/BumperSound.tres" id="10_rjqkl"]
 [ext_resource type="Texture2D" uid="uid://b4s26bx1u6v7m" path="res://pinball_sprite.png" id="10_x0ka3"]
 [ext_resource type="Script" uid="uid://0i67cd53kj1" path="res://flipper.gd" id="11_hqns4"]
 [ext_resource type="Texture2D" uid="uid://dk4vt46dxpbfs" path="res://paddle_left.png" id="14_d2bti"]
@@ -182,7 +186,7 @@ texture = ExtResource("2_x0ka3")
 metadata/_edit_lock_ = true
 
 [node name="ball" type="RigidBody2D" parent="." groups=["ball"]]
-position = Vector2(391, 313)
+position = Vector2(685, 1203)
 collision_layer = 5
 collision_mask = 5
 can_sleep = false
@@ -253,6 +257,7 @@ polygon = PackedVector2Array(16, -51, -40, 30, -39, 39, -33, 44, -22, 43, 24, 13
 [node name="left_bumper_green" type="Area2D" parent="layer_1_colliders"]
 position = Vector2(206, 1052)
 script = ExtResource("3_q6r6c")
+actions = Array[ExtResource("7_ta5nu")]([ExtResource("8_flf07"), ExtResource("9_k73cj"), ExtResource("10_rjqkl")])
 
 [node name="CollisionShape2D" type="CollisionShape2D" parent="layer_1_colliders/left_bumper_green"]
 shape = SubResource("SegmentShape2D_hqns4")
@@ -261,6 +266,7 @@ metadata/_edit_lock_ = true
 [node name="right_bumper_green" type="Area2D" parent="layer_1_colliders"]
 position = Vector2(466, 1054)
 script = ExtResource("3_q6r6c")
+actions = Array[ExtResource("7_ta5nu")]([ExtResource("8_flf07"), ExtResource("9_k73cj"), ExtResource("10_rjqkl")])
 
 [node name="CollisionShape2D" type="CollisionShape2D" parent="layer_1_colliders/right_bumper_green"]
 shape = SubResource("SegmentShape2D_x0ka3")
