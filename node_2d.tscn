@@ -1,4 +1,4 @@
-[gd_scene load_steps=51 format=3 uid="uid://cscmeg24j6nwy"]
+[gd_scene load_steps=49 format=3 uid="uid://cscmeg24j6nwy"]
 
 [ext_resource type="Script" uid="uid://s1m1784ldb4k" path="res://Scripts/camera.gd" id="1_0hol4"]
 [ext_resource type="Script" uid="uid://bx3qt0dcuh56u" path="res://Scripts/ball.gd" id="2_epypp"]
@@ -7,12 +7,12 @@
 [ext_resource type="Script" uid="uid://c75buj1d1db2j" path="res://TriggerActions/trigger_area.gd" id="3_q6r6c"]
 [ext_resource type="Script" uid="uid://cbbvyakqgvued" path="res://TriggerActions/TriggerAction.gd" id="7_ta5nu"]
 [ext_resource type="Resource" uid="uid://dk4eiaep15bwn" path="res://TriggerActions/BumperActions/BumperKick.tres" id="8_flf07"]
-[ext_resource type="PackedScene" uid="uid://58owr4px6bcx" path="res://layer_toggler.tscn" id="9_0h7mo"]
 [ext_resource type="Script" uid="uid://0oiunbkicxhk" path="res://Scripts/hud.gd" id="9_4d7sh"]
 [ext_resource type="Resource" uid="uid://rl78xh8h2dj3" path="res://TriggerActions/BumperActions/BumperPoints.tres" id="9_k73cj"]
 [ext_resource type="Resource" uid="uid://7571vq3or8cl" path="res://TriggerActions/BumperActions/BumperSound.tres" id="10_rjqkl"]
 [ext_resource type="Texture2D" uid="uid://b4s26bx1u6v7m" path="res://Sprites/pinball_sprite.png" id="10_x0ka3"]
 [ext_resource type="Script" uid="uid://0i67cd53kj1" path="res://Scripts/flipper.gd" id="11_hqns4"]
+[ext_resource type="PackedScene" uid="uid://cnguxsgqjkldv" path="res://gate.tscn" id="12_rjqkl"]
 [ext_resource type="Texture2D" uid="uid://dk4vt46dxpbfs" path="res://paddle_left.png" id="14_d2bti"]
 [ext_resource type="Texture2D" uid="uid://cu6m8pnvtwcow" path="res://paddle_right.png" id="15_ta5nu"]
 [ext_resource type="PackedScene" uid="uid://wmvd50gsnwwx" path="res://mushy.tscn" id="16_ta5nu"]
@@ -179,14 +179,6 @@ b = Vector2(43, 30)
 a = Vector2(14, -52)
 b = Vector2(-41, 27)
 
-[sub_resource type="SegmentShape2D" id="SegmentShape2D_0h7mo"]
-a = Vector2(335, 49)
-b = Vector2(300, 9)
-
-[sub_resource type="SegmentShape2D" id="SegmentShape2D_nr8wp"]
-a = Vector2(-9, -44)
-b = Vector2(-3, 34)
-
 [sub_resource type="RectangleShape2D" id="RectangleShape2D_0hol4"]
 size = Vector2(45, 41)
 
@@ -237,7 +229,7 @@ metadata/_edit_lock_ = true
 [node name="ball" type="RigidBody2D" parent="." groups=["ball"]]
 z_index = 1
 z_as_relative = false
-position = Vector2(685, 1156)
+position = Vector2(685, 1137)
 collision_layer = 5
 collision_mask = 5
 can_sleep = false
@@ -254,8 +246,8 @@ frame_progress = 0.4412861
 metadata/_edit_lock_ = true
 
 [node name="Camera2D" type="Camera2D" parent="."]
-position = Vector2(468, 677)
 zoom = Vector2(1.25, 1.25)
+process_callback = 0
 limit_left = 0
 limit_top = 0
 limit_right = 720
@@ -267,6 +259,7 @@ ball = NodePath("../ball")
 
 [node name="layer_1_colliders" type="StaticBody2D" parent="."]
 visible = false
+position = Vector2(1, 1)
 collision_mask = 0
 
 [node name="CollisionPolygon2D2" type="CollisionPolygon2D" parent="layer_1_colliders"]
@@ -361,18 +354,6 @@ polygon = PackedVector2Array(486, 682, 577, 487, 639, 326, 658, 257, 660, 241, 6
 
 [node name="CollisionPolygon2D5" type="CollisionPolygon2D" parent="layer_2_colliders"]
 polygon = PackedVector2Array(257, 192, 267, 166, 255, 134, 206, 140, 116, 186, 53, 259, 28, 360, 41, 506, 83, 601, 169, 675, 0, 683, 3, 76, 319, 74, 305, 209, 188, 241, 114, 320, 94, 369, 98, 447, 115, 506, 148, 577, 123, 547, 109, 525, 85, 453, 84, 361, 116, 282, 165, 227)
-
-[node name="gates" parent="." instance=ExtResource("9_0h7mo")]
-position = Vector2(152, 625)
-collision_layer = 4
-collision_mask = 4
-active_z_index = 2
-
-[node name="CollisionShape2D" type="CollisionShape2D" parent="gates"]
-shape = SubResource("SegmentShape2D_0h7mo")
-
-[node name="CollisionShape2D2" type="CollisionShape2D" parent="gates"]
-shape = SubResource("SegmentShape2D_nr8wp")
 
 [node name="start_zone" type="Area2D" parent="." groups=["launch_region"]]
 position = Vector2(674, 1202)
@@ -481,6 +462,14 @@ position = Vector2(45.999996, -26.999998)
 scale = Vector2(1.75, 1.75)
 
 [node name="AudioStreamPlayer2D" type="AudioStreamPlayer2D" parent="."]
+position = Vector2(25, 7)
 stream = ExtResource("19_rjqkl")
 autoplay = true
 parameters/looping = true
+
+[node name="gate_left" parent="." instance=ExtResource("12_rjqkl")]
+position = Vector2(142, 622)
+
+[node name="gate_right" parent="." instance=ExtResource("12_rjqkl")]
+position = Vector2(481, 655)
+rotation = 1.3303028
