@@ -1,0 +1,9 @@
+[gd_resource type="Resource" script_class="PlayAnimationAction" load_steps=2 format=3 uid="uid://7rawrm1nk7dp"]
+
+[ext_resource type="Script" uid="uid://cx4e450ifrntn" path="res://TriggerActions/PlayAnimationAction.gd" id="1_2ti8e"]
+
+[resource]
+script = ExtResource("1_2ti8e")
+animation_names = Array[String](["default"])
+target_paths = Array[NodePath]([NodePath("AnimatedSprite2D"), NodePath("particles")])
+metadata/_custom_type_script = "uid://cx4e450ifrntn"
