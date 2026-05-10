@@ -19,7 +19,7 @@ func _on_ball_drained():
 	lives -= 1
 	PinballEvents.lives_changed.emit(lives)
 
-	if lives < 0:
+	if lives <= 0:
 		_game_over()
 
 func _on_add_score(points: int):
@@ -28,8 +28,18 @@ func _on_add_score(points: int):
 	PinballEvents.set_score.emit(score)
 
 func _game_over():
+	var final_score := score
+	_submit_arcade_score(final_score)
+
 	# Here you can stop spawning balls, show restart UI, etc.
 	score = 0
 	lives = starting_lives
 	PinballEvents.set_score.emit(0) # optional, reset score at start
 	PinballEvents.lives_changed.emit(starting_lives)
+
+func _submit_arcade_score(final_score: int) -> void:
+	if not OS.has_feature("web"):
+		return
+
+	var script := "window.parent && window.parent.postMessage({ type: 'PLAYER_DIED', score: %d }, '*');" % final_score
+	JavaScriptBridge.eval(script)
