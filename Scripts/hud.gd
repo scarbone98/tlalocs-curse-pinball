@@ -2,6 +2,9 @@ extends Control
 
 # The table viewport is 720 wide, twice the 360 the shared theme was tuned for.
 const UI_SCALE := 2.0
+# Launch power that drops the ball into a top lane (see ball.gd); marked on the meter
+const SKILL_SHOT_POWER := Vector2(0.70, 0.78)
+const MIN_LAUNCH_POWER := 0.5
 
 @onready var score_label: Label       = $HBoxContainer/ScoreLabel
 @onready var lives_label: Label       = $HBoxContainer/LivesLabel
@@ -9,6 +12,9 @@ const UI_SCALE := 2.0
 var _tween: Tween
 var _toast_label: Label
 var _launch_button: Button
+var _launch_box: VBoxContainer
+var _power_meter: Control
+var _power_fill: ColorRect
 var _hint_label: Label
 
 func _ready() -> void:
@@ -25,6 +31,7 @@ func _ready() -> void:
 	PinballEvents.lives_changed.connect(_on_lives_changed)
 	PinballEvents.toast.connect(_on_toast)
 	PinballEvents.launch_available.connect(_on_launch_available)
+	PinballEvents.launch_power_changed.connect(_on_launch_power_changed)
 	PinballEvents.game_over.connect(_on_game_over)
 
 	_render_score()
@@ -58,19 +65,72 @@ func _build_toast() -> void:
 	add_child(_toast_label)
 
 func _build_launch_button() -> void:
+	# Meter sits above the button; both hide once the ball is in play
+	_launch_box = VBoxContainer.new()
+	_launch_box.set_anchors_preset(Control.PRESET_BOTTOM_RIGHT)
+	_launch_box.grow_horizontal = Control.GROW_DIRECTION_BEGIN
+	_launch_box.grow_vertical = Control.GROW_DIRECTION_BEGIN
+	# Sit just left of the plunger lane so the waiting ball stays visible
+	_launch_box.offset_right = -48 * UI_SCALE
+	_launch_box.offset_bottom = -28 * UI_SCALE
+	_launch_box.add_theme_constant_override("separation", int(6 * UI_SCALE))
+	_launch_box.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_launch_box.visible = false
+	add_child(_launch_box)
+
+	_power_meter = _build_power_meter()
+	_launch_box.add_child(_power_meter)
+
 	_launch_button = Button.new()
 	_launch_button.text = "Launch"
 	_launch_button.add_to_group("touch_block")
-	_launch_button.set_anchors_preset(Control.PRESET_BOTTOM_RIGHT)
-	_launch_button.grow_horizontal = Control.GROW_DIRECTION_BEGIN
-	_launch_button.grow_vertical = Control.GROW_DIRECTION_BEGIN
-	# Sit just left of the plunger lane so the waiting ball stays visible
-	_launch_button.offset_right = -48 * UI_SCALE
-	_launch_button.offset_bottom = -28 * UI_SCALE
 	_launch_button.focus_mode = Control.FOCUS_NONE
-	_launch_button.visible = false
-	_launch_button.pressed.connect(func(): PinballEvents.launch_requested.emit())
-	add_child(_launch_button)
+	_launch_button.button_down.connect(func(): PinballEvents.launch_pressed.emit())
+	_launch_button.button_up.connect(func(): PinballEvents.launch_released.emit())
+	_launch_box.add_child(_launch_button)
+
+func _build_power_meter() -> Control:
+	var meter := Panel.new()
+	meter.custom_minimum_size = Vector2(0, 22 * UI_SCALE)
+	meter.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	meter.modulate.a = 0.0
+	meter.add_theme_stylebox_override("panel", ScareathonTheme.pill_box(UI_SCALE))
+
+	var inset := 3 * UI_SCALE
+	_power_fill = ColorRect.new()
+	_power_fill.color = ScareathonTheme.BLOOD
+	_power_fill.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_power_fill.anchor_bottom = 1.0
+	_power_fill.offset_left = inset
+	_power_fill.offset_top = inset
+	_power_fill.offset_bottom = -inset
+	meter.add_child(_power_fill)
+
+	# Sweet-spot marker is an outline drawn over the fill so it stays visible while charging
+	var band := Panel.new()
+	var band_box := StyleBoxFlat.new()
+	band_box.draw_center = false
+	band_box.border_color = ScareathonTheme.AMBER
+	band_box.set_border_width_all(int(2 * UI_SCALE))
+	band_box.set_corner_radius_all(int(3 * UI_SCALE))
+	band.add_theme_stylebox_override("panel", band_box)
+	band.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	band.anchor_left = _power_to_meter(SKILL_SHOT_POWER.x)
+	band.anchor_right = _power_to_meter(SKILL_SHOT_POWER.y)
+	band.anchor_bottom = 1.0
+	band.offset_top = inset * 0.5
+	band.offset_bottom = -inset * 0.5
+	meter.add_child(band)
+	return meter
+
+func _power_to_meter(power: float) -> float:
+	return clampf((power - MIN_LAUNCH_POWER) / (1.0 - MIN_LAUNCH_POWER), 0.0, 1.0)
+
+func _on_launch_power_changed(power: float, charging: bool) -> void:
+	_power_meter.modulate.a = 1.0 if charging else 0.0
+	_power_fill.anchor_right = _power_to_meter(power)
+	var in_sweet_spot := power >= SKILL_SHOT_POWER.x and power <= SKILL_SHOT_POWER.y
+	_power_fill.color = ScareathonTheme.AMBER if in_sweet_spot else ScareathonTheme.BLOOD
 
 func _build_hint() -> void:
 	_hint_label = Label.new()
@@ -83,7 +143,7 @@ func _build_hint() -> void:
 	_hint_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_hint_label.add_theme_stylebox_override("normal", ScareathonTheme.pill_box(UI_SCALE))
 	# Touch laptops report a touchscreen too, so show both control schemes
-	_hint_label.text = "Flippers: tap sides or Left / Right\nLaunch: button or Space"
+	_hint_label.text = "Flippers: tap sides or Left / Right\nHold Launch, let go in the gold: skill shot"
 	add_child(_hint_label)
 
 func _on_set_score(_value: int) -> void:
@@ -93,7 +153,8 @@ func _on_lives_changed(_lives: int) -> void:
 	_render_lives()
 
 func _on_launch_available(available: bool) -> void:
-	_launch_button.visible = available
+	_launch_box.visible = available
+	_power_meter.modulate.a = 0.0
 	# The controls hint only matters until the first ball is in play
 	if not available and _hint_label.visible:
 		create_tween().tween_property(_hint_label, "modulate:a", 0.0, 0.4).finished.connect(_hint_label.hide)
@@ -111,7 +172,7 @@ func _on_toast(message: String) -> void:
 	_tween.tween_property(_toast_label, "modulate:a", 0.0, 0.4)
 
 func _on_game_over(final_score: int, is_new_best: bool) -> void:
-	_launch_button.visible = false
+	_launch_box.visible = false
 	_toast_label.modulate.a = 0.0
 
 	var dim := ColorRect.new()

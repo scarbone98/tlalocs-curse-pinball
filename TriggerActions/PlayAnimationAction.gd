@@ -72,18 +72,16 @@ func _play_on_animated_sprite(sprite: AnimatedSprite2D) -> void:
 
 		if play_once:
 			frames.set_animation_loop(anim, false)
-			if sprite.is_connected("animation_finished", Callable(self, "_on_sprite_finished")):
-				sprite.disconnect("animation_finished", Callable(self, "_on_sprite_finished"))
-			sprite.connect(
-				"animation_finished",
-				Callable(self, "_on_sprite_finished").bind(sprite, anim, original_loop),
-				CONNECT_ONE_SHOT
-			)
+			# Re-hits before the animation ends would otherwise double-connect the same callback
+			var on_finished := Callable(self, "_on_sprite_finished").bind(sprite, anim, original_loop)
+			if not sprite.is_connected("animation_finished", on_finished):
+				sprite.connect("animation_finished", on_finished, CONNECT_ONE_SHOT)
 
 		sprite.play(anim)
 
-func _on_sprite_finished(finished_anim: StringName, sprite: AnimatedSprite2D, expected_anim: StringName, restore_loop: bool) -> void:
-	if finished_anim != expected_anim:
+# AnimatedSprite2D.animation_finished passes no arguments, so check the current animation instead
+func _on_sprite_finished(sprite: AnimatedSprite2D, expected_anim: StringName, restore_loop: bool) -> void:
+	if sprite.animation != expected_anim:
 		return
 	sprite.stop()
 

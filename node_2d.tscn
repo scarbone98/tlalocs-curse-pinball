@@ -19,6 +19,7 @@
 [ext_resource type="Script" uid="uid://6wi2vvy83rni" path="res://mobile_controls.gd" id="17_flf07"]
 [ext_resource type="Texture2D" uid="uid://cp03adbw3ptnp" path="res://Sprites/tlclan.png" id="18_k73cj"]
 [ext_resource type="AudioStream" uid="uid://wuna01jbn5q6" path="res://Audio/background_music.ogg" id="19_rjqkl"]
+[ext_resource type="Script" path="res://Scripts/table_features.gd" id="30_feat"]
 
 [sub_resource type="CircleShape2D" id="CircleShape2D_rjqkl"]
 radius = 33.24154
@@ -212,6 +213,9 @@ offset_right = 720.0
 offset_bottom = 1280.0
 texture = ExtResource("2_x0ka3")
 metadata/_edit_lock_ = true
+
+[node name="TableFeatures" type="Node2D" parent="."]
+script = ExtResource("30_feat")
 
 [node name="center_face" type="Area2D" parent="."]
 z_as_relative = false

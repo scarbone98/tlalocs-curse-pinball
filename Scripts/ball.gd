@@ -1,6 +1,10 @@
 extends RigidBody2D
 
 @export var launch_speed: float = -2500.0
+## Holding launch sweeps power between this and full; a quick tap is always full power
+@export var min_launch_power: float = 0.5
+@export var tap_seconds: float = 0.15
+@export var sweep_seconds: float = 0.9
 @export var anim_min_speed_scale: float = 0
 
 var can_launch: bool = false
@@ -9,6 +13,8 @@ var _pending_respawn: bool = false
 var _restore_layers: int
 var _restore_mask: int
 var _cooldown_frames: int = 0
+var _charging := false
+var _charge_seconds := 0.0
 
 @onready var anim: AnimatedSprite2D = $AnimatedSprite2D
 
@@ -27,7 +33,8 @@ func _ready() -> void:
 		if area:
 			area.body_entered.connect(_on_death_zone_body_entered)
 
-	PinballEvents.launch_requested.connect(_launch)
+	PinballEvents.launch_pressed.connect(_begin_charge)
+	PinballEvents.launch_released.connect(_release_charge)
 
 	if anim:
 		anim.play()
@@ -45,15 +52,46 @@ func _physics_process(_delta: float) -> void:
 		else:
 			anim.speed_scale = 0
 
+func _process(delta: float) -> void:
+	if _charging:
+		_charge_seconds += delta
+		PinballEvents.launch_power_changed.emit(_current_power(), true)
+
 func _input(event: InputEvent) -> void:
 	if event.is_action_pressed("ui_accept"):
-		_launch()
+		_begin_charge()
+	elif event.is_action_released("ui_accept"):
+		_release_charge()
 
-func _launch() -> void:
+func _begin_charge() -> void:
+	if not can_launch or _charging:
+		return
+	_charging = true
+	_charge_seconds = 0.0
+
+func _release_charge() -> void:
+	if not _charging:
+		return
+	_charging = false
+	var power := _current_power()
+	PinballEvents.launch_power_changed.emit(power, false)
+	_launch(power)
+
+# Starts at full power, then sweeps down to min_launch_power and back while held
+func _current_power() -> float:
+	var held := _charge_seconds
+	if held < tap_seconds:
+		return 1.0
+	var t := fposmod((held - tap_seconds) / sweep_seconds, 2.0)
+	var sweep := t if t <= 1.0 else 2.0 - t
+	return lerpf(1.0, min_launch_power, sweep)
+
+func _launch(power: float = 1.0) -> void:
 	if not can_launch:
 		return
-	linear_velocity = Vector2(0.0, launch_speed)
+	linear_velocity = Vector2(0.0, launch_speed * power)
 	AudioSfx.play("launch")
+	PinballEvents.ball_launched.emit()
 
 func _on_start_region_body_entered(body: Node) -> void:
 	if body == self:
@@ -63,6 +101,7 @@ func _on_start_region_body_entered(body: Node) -> void:
 func _on_start_region_body_exited(body: Node) -> void:
 	if body == self:
 		can_launch = false
+		_charging = false
 		PinballEvents.launch_available.emit(false)
 
 func _on_death_zone_body_entered(body: Node) -> void:
