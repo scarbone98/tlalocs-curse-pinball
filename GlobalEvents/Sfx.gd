@@ -5,11 +5,11 @@ class_name Sfx
 # Use a non-const dictionary so we can register/override entries at runtime.
 static var LIB: Dictionary = {
 	"launch": preload("res://Audio/sfx/ball_launch.wav"),
-	"bumper": preload("res://Audio/sfx/ball_launch.wav"),
+	"bumper": preload("res://Audio/sfx/bumper.wav"),
 }
 
-const DEFAULT_BUS := "SFX"
-const UI_BUS := "UI"
+const DEFAULT_BUS := "Master"
+const UI_BUS := "Master"
 const MAX_SIMULTANEOUS_PER_KEY := 6
 const DEFAULT_PITCH_RANGE := Vector2(0.96, 1.04)
 const POOL_2D_SIZE := 16

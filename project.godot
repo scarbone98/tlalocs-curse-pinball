@@ -13,7 +13,9 @@ config_version=5
 config/name="scareathon-pinball"
 run/main_scene="uid://cscmeg24j6nwy"
 config/features=PackedStringArray("4.5", "GL Compatibility")
-config/icon="res://icon.svg"
+config/icon="res://ui/icon.png"
+boot_splash/bg_color=Color(0.07, 0.02, 0.12, 1)
+boot_splash/image="res://ui/splash.png"
 
 [autoload]
 

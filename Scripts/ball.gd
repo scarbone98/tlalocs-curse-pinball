@@ -27,6 +27,8 @@ func _ready() -> void:
 		if area:
 			area.body_entered.connect(_on_death_zone_body_entered)
 
+	PinballEvents.launch_requested.connect(_launch)
+
 	if anim:
 		anim.play()
 		anim.speed_scale = 1.0
@@ -44,17 +46,24 @@ func _physics_process(_delta: float) -> void:
 			anim.speed_scale = 0
 
 func _input(event: InputEvent) -> void:
-	if event.is_action_pressed("ui_accept") and can_launch:
-		linear_velocity = Vector2(0.0, launch_speed)
-		AudioSfx.play("launch")
+	if event.is_action_pressed("ui_accept"):
+		_launch()
+
+func _launch() -> void:
+	if not can_launch:
+		return
+	linear_velocity = Vector2(0.0, launch_speed)
+	AudioSfx.play("launch")
 
 func _on_start_region_body_entered(body: Node) -> void:
 	if body == self:
 		can_launch = true
+		PinballEvents.launch_available.emit(true)
 
 func _on_start_region_body_exited(body: Node) -> void:
 	if body == self:
 		can_launch = false
+		PinballEvents.launch_available.emit(false)
 
 func _on_death_zone_body_entered(body: Node) -> void:
 	if body == self and not _pending_respawn:
