@@ -192,6 +192,9 @@ font_size = 32
 [sub_resource type="LabelSettings" id="LabelSettings_fs4d3"]
 font_size = 32
 
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_outlane"]
+size = Vector2(44, 26)
+
 [node name="Node2D" type="Node2D"]
 
 [node name="Map" type="Node2D" parent="."]
@@ -237,6 +240,7 @@ position = Vector2(685, 1137)
 collision_layer = 5
 collision_mask = 5
 can_sleep = false
+continuous_cd = 2
 script = ExtResource("2_epypp")
 
 [node name="CollisionShape2D" type="CollisionShape2D" parent="ball"]
@@ -374,6 +378,29 @@ position = Vector2(335, 1272)
 position = Vector2(1.5, 0)
 shape = SubResource("RectangleShape2D_kdubu")
 metadata/_edit_lock_ = true
+
+[node name="outlane_drain_left" type="Area2D" parent="." groups=["death_zone"]]
+position = Vector2(90, 1180)
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="outlane_drain_left"]
+shape = SubResource("RectangleShape2D_outlane")
+
+[node name="outlane_drain_right" type="Area2D" parent="." groups=["death_zone"]]
+position = Vector2(586, 1183)
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="outlane_drain_right"]
+shape = SubResource("RectangleShape2D_outlane")
+
+[node name="ball_trap_plugs" type="StaticBody2D" parent="."]
+
+[node name="right" type="CollisionPolygon2D" parent="ball_trap_plugs"]
+polygon = PackedVector2Array(440, 1188, 456, 1188, 492, 1214, 486, 1219, 448, 1238, 436, 1210)
+
+[node name="left" type="CollisionPolygon2D" parent="ball_trap_plugs"]
+polygon = PackedVector2Array(242, 1188, 226, 1188, 190, 1214, 196, 1219, 234, 1238, 246, 1210)
+
+[node name="u_wall_top" type="CollisionPolygon2D" parent="ball_trap_plugs"]
+polygon = PackedVector2Array(539, 599, 557, 593, 574, 613, 565, 643, 516, 642)
 
 [node name="mobile_controls" type="CanvasLayer" parent="."]
 script = ExtResource("17_flf07")
