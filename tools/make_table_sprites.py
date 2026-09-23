@@ -118,6 +118,7 @@ BAR_LIT = [
 BAR_KEY = dict(LAMP_KEY, E=EMBER)
 
 # Arrow inserts: the small white rectangles that point at the orbits and ramps.
+# Obsidian when off, gold when lit, so they read on the Maya-blue temple floor
 ARROW_UNLIT = [
     ".ooo.",
     "oSSSo",
@@ -138,7 +139,10 @@ ARROW_LIT = [
     "oBbbo",
     ".ooo.",
 ]
-ARROW_KEY = {".": T, "o": OUTLINE, "S": STONE, "s": STONE_D, "w": WHITE, "B": BLUE, "b": BLUE_D}
+ARROW_KEY = {
+    ".": T, "o": (0x14, 0x0B, 0x18, 255), "S": (0x4A, 0x35, 0x60, 255), "s": (0x2A, 0x1B, 0x33, 255),
+    "w": (0xFF, 0xF1, 0xC2, 255), "B": GOLD, "b": ORANGE,
+}
 
 # Temple torch flames that sit on the three orange wall lamps.
 TORCH_FRAMES = [
