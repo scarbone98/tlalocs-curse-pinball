@@ -49,6 +49,12 @@ right_flipper={
 pointing/emulate_touch_from_mouse=true
 pointing/emulate_mouse_from_touch=false
 
+[physics]
+
+common/physics_ticks_per_second=120
+common/max_physics_steps_per_frame=16
+2d/default_gravity=620.0
+
 [rendering]
 
 renderer/rendering_method="gl_compatibility"

@@ -6,6 +6,15 @@ extends RigidBody2D
 @export var tap_seconds: float = 0.15
 @export var sweep_seconds: float = 0.9
 @export var anim_min_speed_scale: float = 0
+## Pokemon Pinball's ball never loses speed to friction or drag, only to what it hits, and
+## its speed is capped. That is what lets a good flip carry all the way up a ramp.
+@export var bounce: float = 0.3
+@export var max_speed: float = 2600.0
+## The side ramps are water channels (collision layer 2, switched on by the gates). Once
+## the ball is in one, the current carries it: speed never drops below ramp_min_speed, so
+## a ball that made it through the gate always finishes the loop.
+@export var ramp_entry_speed: float = 1300.0
+@export var ramp_min_speed: float = 950.0
 
 var can_launch: bool = false
 var spawn_xform: Transform2D
@@ -15,6 +24,8 @@ var _restore_mask: int
 var _cooldown_frames: int = 0
 var _charging := false
 var _charge_seconds := 0.0
+var _was_on_ramp := false
+var _ramp_trail: CPUParticles2D
 
 @onready var anim: AnimatedSprite2D = $AnimatedSprite2D
 
@@ -22,6 +33,15 @@ func _ready() -> void:
 	spawn_xform = global_transform
 	_restore_layers = collision_layer
 	_restore_mask = collision_mask
+	var mat := PhysicsMaterial.new()
+	mat.friction = 0.0
+	mat.bounce = bounce
+	physics_material_override = mat
+	linear_damp_mode = DAMP_MODE_REPLACE
+	linear_damp = 0.0
+	angular_damp_mode = DAMP_MODE_REPLACE
+	angular_damp = 0.0
+	_build_ramp_trail()
 
 	var start_region: Area2D = get_tree().get_first_node_in_group("launch_region") as Area2D
 	if start_region:
@@ -44,11 +64,11 @@ func _physics_process(_delta: float) -> void:
 	if anim:
 		anim.rotation = 0.0  # sprite stays upright
 
-		# drive animation speed from raw angular velocity
-		# use at least anim_min_speed_scale when spinning
-		var spin = angular_velocity
-		if spin != 0:
-			anim.speed_scale = max(abs(spin) * 0.1, anim_min_speed_scale) * sign(spin)
+		# the ball slides without friction, so it barely spins; animate from how fast it
+		# travels instead, turning the glyph the way it's heading
+		var roll := linear_velocity.x / 19.0 + angular_velocity
+		if absf(roll) > 0.5:
+			anim.speed_scale = max(absf(roll) * 0.1, anim_min_speed_scale) * signf(roll)
 		else:
 			anim.speed_scale = 0
 
@@ -124,3 +144,43 @@ func _integrate_forces(state: PhysicsDirectBodyState2D) -> void:
 			_pending_respawn = false
 			collision_layer = _restore_layers
 			collision_mask = _restore_mask
+		return
+
+	var v := state.linear_velocity
+	var on_ramp := (collision_mask & RAMP_LAYER_BIT) != 0
+	if on_ramp and v.length() > 1.0:
+		var floor_speed := ramp_entry_speed if not _was_on_ramp else ramp_min_speed
+		if v.length() < floor_speed:
+			v = v.normalized() * floor_speed
+	if on_ramp != _was_on_ramp:
+		_was_on_ramp = on_ramp
+		_ramp_trail.emitting = on_ramp
+	state.linear_velocity = v.limit_length(max_speed)
+
+const RAMP_LAYER_BIT := 2
+
+# Chunky turquoise droplets streaming off the ball while the channel current carries it
+func _build_ramp_trail() -> void:
+	var drop := Image.create(3, 3, false, Image.FORMAT_RGBA8)
+	drop.fill(Color.WHITE)
+	_ramp_trail = CPUParticles2D.new()
+	_ramp_trail.texture = ImageTexture.create_from_image(drop)
+	_ramp_trail.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+	_ramp_trail.emitting = false
+	_ramp_trail.amount = 24
+	_ramp_trail.lifetime = 0.35
+	_ramp_trail.local_coords = false
+	_ramp_trail.emission_shape = CPUParticles2D.EMISSION_SHAPE_SPHERE
+	_ramp_trail.emission_sphere_radius = 12.0
+	_ramp_trail.gravity = Vector2.ZERO
+	_ramp_trail.initial_velocity_min = 10.0
+	_ramp_trail.initial_velocity_max = 40.0
+	_ramp_trail.spread = 180.0
+	_ramp_trail.scale_amount_min = 1.0  # 3px squares = one table-art pixel
+	_ramp_trail.scale_amount_max = 1.0
+	var fade := Gradient.new()
+	fade.set_color(0, Color(0.55, 0.95, 0.9, 0.9))
+	fade.set_color(1, Color(0.2, 0.7, 0.85, 0.0))
+	_ramp_trail.color_ramp = fade
+	_ramp_trail.z_index = -1
+	add_child(_ramp_trail)
