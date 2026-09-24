@@ -14,6 +14,9 @@ const BONUS_BAR := preload("res://Sprites/table/bonus_bar.png")
 const ARROW_INSERT := preload("res://Sprites/table/arrow_insert.png")
 const TORCH := preload("res://Sprites/table/torch.png")
 const RAINDROP := preload("res://Sprites/table/raindrop.png")
+const RampShots := preload("res://Scripts/ramp_shots.gd")
+const Kickback := preload("res://Scripts/kickback.gd")
+const SpiritCapture := preload("res://Scripts/spirit_capture.gd")
 
 # Scene positions of the painted inserts (measured from Sprites/map_f1.png)
 const TOP_LANES := [Vector2(329, 305), Vector2(388, 305), Vector2(447, 305)]
@@ -37,6 +40,9 @@ const LANE_COOLDOWN := 0.8  # one bounce inside a rollover slot shouldn't score 
 const FACE_HITS_FOR_CURSE := 3
 const CURSE_SECONDS := 20.0
 const MAX_MULTIPLIER := 5
+const MULTIBALL_DELAY := 1.4  # Tlaloc spits out the extra ball after the curse toast
+const MULTIBALL_SPEED := 1300.0
+const MAX_BALLS := 2  # only from a single ball, so multiball can't feed more curses
 
 @export var face_path: NodePath = ^"../center_face"
 
@@ -68,6 +74,9 @@ func _ready() -> void:
 	_build_torches()
 	_build_storm()
 	_hook_face()
+	for mode in [RampShots.new(), Kickback.new(), SpiritCapture.new()]:
+		mode.features = self
+		add_child(mode)
 
 	var chase := Timer.new()
 	chase.wait_time = 0.18
@@ -272,6 +281,18 @@ func _start_curse() -> void:
 		_face_sprite.frame = 1
 	_strike_lightning()
 	_curse_timer.start(CURSE_SECONDS)
+	get_tree().create_timer(MULTIBALL_DELAY).timeout.connect(_release_extra_ball)
+
+# Multiball: Tlaloc spits a copy of the ball out of the face, straight up the table
+func _release_extra_ball() -> void:
+	var balls := get_tree().get_nodes_in_group("ball")
+	if balls.is_empty() or balls.size() >= MAX_BALLS or _face == null:
+		return
+	var from := _face.global_position + Vector2(0, -90)
+	var velocity := Vector2(randf_range(-250.0, 250.0), -MULTIBALL_SPEED)
+	balls[0].spawn_extra_ball(from, velocity)
+	PinballEvents.toast.emit("Multiball!")
+	AudioSfx.play("multiball")
 
 func _end_curse() -> void:
 	GameManager.set_curse_active(false)

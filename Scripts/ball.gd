@@ -21,6 +21,7 @@ var spawn_xform: Transform2D
 var _pending_respawn: bool = false
 var _restore_layers: int
 var _restore_mask: int
+var _restore_z: int
 var _cooldown_frames: int = 0
 var _charging := false
 var _charge_seconds := 0.0
@@ -33,6 +34,7 @@ func _ready() -> void:
 	spawn_xform = global_transform
 	_restore_layers = collision_layer
 	_restore_mask = collision_mask
+	_restore_z = z_index
 	var mat := PhysicsMaterial.new()
 	mat.friction = 0.0
 	mat.bounce = bounce
@@ -113,6 +115,24 @@ func _launch(power: float = 1.0) -> void:
 	AudioSfx.play("launch")
 	PinballEvents.ball_launched.emit()
 
+## Multiball: puts a copy of this ball into play at `from`. It shares the plunger spot,
+## so whichever ball is left last respawns there as usual.
+func spawn_extra_ball(from: Vector2, velocity: Vector2) -> RigidBody2D:
+	var extra := duplicate() as RigidBody2D
+	var trail := extra.get_node_or_null(^"RampTrail")
+	if trail:
+		extra.remove_child(trail)  # the copy builds its own in _ready
+		trail.free()
+	# Start on the playfield even if this ball is up a ramp right now
+	extra.collision_layer = _restore_layers
+	extra.collision_mask = _restore_mask
+	extra.z_index = _restore_z
+	extra.transform = Transform2D(0.0, get_parent().to_local(from))
+	extra.linear_velocity = velocity
+	get_parent().add_child(extra)
+	extra.spawn_xform = spawn_xform
+	return extra
+
 func _on_start_region_body_entered(body: Node) -> void:
 	if body == self:
 		can_launch = true
@@ -126,6 +146,11 @@ func _on_start_region_body_exited(body: Node) -> void:
 
 func _on_death_zone_body_entered(body: Node) -> void:
 	if body == self and not _pending_respawn:
+		if get_tree().get_nodes_in_group("ball").size() > 1:
+			# Multiball: a ball that drains while others are still up just leaves play
+			remove_from_group("ball")
+			queue_free()
+			return
 		PinballEvents.ball_drained.emit()
 		_pending_respawn = true
 		_cooldown_frames = 3
@@ -164,6 +189,7 @@ func _build_ramp_trail() -> void:
 	var drop := Image.create(3, 3, false, Image.FORMAT_RGBA8)
 	drop.fill(Color.WHITE)
 	_ramp_trail = CPUParticles2D.new()
+	_ramp_trail.name = "RampTrail"
 	_ramp_trail.texture = ImageTexture.create_from_image(drop)
 	_ramp_trail.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 	_ramp_trail.emitting = false

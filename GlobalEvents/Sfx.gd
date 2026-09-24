@@ -6,6 +6,13 @@ class_name Sfx
 static var LIB: Dictionary = {
 	"launch": preload("res://Audio/sfx/ball_launch.wav"),
 	"bumper": preload("res://Audio/sfx/bumper.wav"),
+	"ramp": preload("res://Audio/sfx/ramp.wav"),
+	"kickback": preload("res://Audio/sfx/kickback.wav"),
+	"charge": preload("res://Audio/sfx/charge.wav"),
+	"spirit": preload("res://Audio/sfx/spirit.wav"),
+	"spirit_hit": preload("res://Audio/sfx/spirit_hit.wav"),
+	"catch": preload("res://Audio/sfx/catch.wav"),
+	"multiball": preload("res://Audio/sfx/multiball.wav"),
 }
 
 const DEFAULT_BUS := "Master"

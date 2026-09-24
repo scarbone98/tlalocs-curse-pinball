@@ -15,3 +15,4 @@ signal game_over(final_score: int, is_new_best: bool)
 signal scored_at(points: int, world_pos: Vector2) # base points awarded at a spot, for popups
 signal multiplier_changed(multiplier: int)
 signal curse_changed(active: bool)
+signal ramp_made(side: String, combo: int) # ball went over a side ramp and back down

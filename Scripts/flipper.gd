@@ -15,7 +15,6 @@ extends AnimatableBody2D
 @export var contact_margin: float = 6.0
 
 var _target: float
-var _ball: RigidBody2D
 var _ball_radius := 19.0
 var _tip_local := Vector2.ZERO    # flipper tip relative to the pivot, in local space
 var _half_thickness := 12.0
@@ -24,9 +23,9 @@ func _ready() -> void:
 	rotation = deg_to_rad(rest_angle_deg)
 	_target = rotation
 	_measure_shape()
-	_ball = get_tree().get_first_node_in_group("ball") as RigidBody2D
-	if _ball:
-		var shape := _ball.get_node_or_null("CollisionShape2D") as CollisionShape2D
+	var ball := get_tree().get_first_node_in_group("ball") as RigidBody2D
+	if ball:
+		var shape := ball.get_node_or_null("CollisionShape2D") as CollisionShape2D
 		if shape and shape.shape is CircleShape2D:
 			_ball_radius = (shape.shape as CircleShape2D).radius
 
@@ -64,16 +63,17 @@ func _physics_process(delta: float) -> void:
 	rotation += turned
 
 	if pressed and turned != 0.0:
-		_kick_ball(turned / delta)
+		for ball in get_tree().get_nodes_in_group("ball"):  # multiball: every ball in play
+			_kick_ball(ball as RigidBody2D, turned / delta)
 
-func _kick_ball(omega: float) -> void:
-	if _ball == null or _ball.collision_mask == 0 or _tip_local == Vector2.ZERO:
+func _kick_ball(ball: RigidBody2D, omega: float) -> void:
+	if ball == null or ball.collision_mask == 0 or _tip_local == Vector2.ZERO:
 		return
 	var pivot := global_position
 	var seg := global_transform * _tip_local - pivot
-	var t: float = clamp((_ball.global_position - pivot).dot(seg) / seg.length_squared(), 0.0, 1.0)
+	var t: float = clamp((ball.global_position - pivot).dot(seg) / seg.length_squared(), 0.0, 1.0)
 	var closest := pivot + seg * t
-	var to_ball := _ball.global_position - closest
+	var to_ball := ball.global_position - closest
 	if to_ball.length() > _ball_radius + _half_thickness + contact_margin:
 		return
 
@@ -85,9 +85,9 @@ func _kick_ball(omega: float) -> void:
 		return  # ball is on the side the flipper is swinging away from
 
 	var target := kick_base + push * kick_gain
-	var v := _ball.linear_velocity
+	var v := ball.linear_velocity
 	var along := v.dot(n)
 	if along >= target:
 		return
 	v += n * (target - along)
-	_ball.linear_velocity = v  # the ball caps its own speed
+	ball.linear_velocity = v  # the ball caps its own speed
