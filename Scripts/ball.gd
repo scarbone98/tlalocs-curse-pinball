@@ -7,7 +7,11 @@ extends RigidBody2D
 @export var min_launch_power: float = 0.85
 @export var tap_seconds: float = 0.15
 @export var sweep_seconds: float = 0.9
-@export var anim_min_speed_scale: float = 0
+## The sprite is drawn about 1.7x the collision circle, like Pokemon Pinball's ball
+## (a 16px sprite colliding as a 4px-radius circle): it looks big but fits the same gaps.
+## Its spin copies that game too: every contact sets the spin from how fast the ball is
+## sliding along the surface, and the ball keeps that spin in the air.
+const SPIN_FRAMES := 16  # Sprites/ball_spin.png, one full turn
 ## Tuned to Pokemon Pinball's engine (pret/pokepinball). Its field is about 160x310px,
 ## so 1px there is about 4.3 units here, and it runs one physics step per 60Hz frame:
 ##  - no friction or drag, only gravity: 11/256 px/frame^2 (660 here, project settings)
@@ -57,6 +61,8 @@ var _stuck_time := 0.0
 var _off_ramp_time := 0.0
 var _banked_v := Vector2.ZERO  # the velocity the ball holds, up to max_velocity
 var _moved_v := Vector2.ZERO   # what it actually moved at last step, up to max_travel
+var _spin := 0.0   # radians per second, clockwise
+var _turn := 0.0   # how far the sprite has turned
 const BANK_TOLERANCE := 30.0  # a step of gravity against the ball (660/120) still keeps it
 static var _ramp_art: Image
 
@@ -92,21 +98,16 @@ func _ready() -> void:
 	PinballEvents.launch_pressed.connect(_begin_charge)
 	PinballEvents.launch_released.connect(_release_charge)
 
+	max_contacts_reported = 4  # to read the surface the ball is rolling on
 	if anim:
-		anim.play()
-		anim.speed_scale = 1.0
+		anim.stop()
 
 func _physics_process(delta: float) -> void:
 	if anim:
-		anim.rotation = 0.0  # sprite stays upright
-
-		# the ball slides without friction, so it barely spins; animate from how fast it
-		# travels instead, turning the glyph the way it's heading
-		var roll := linear_velocity.x / 19.0 + angular_velocity
-		if absf(roll) > 0.5:
-			anim.speed_scale = max(absf(roll) * 0.1, anim_min_speed_scale) * signf(roll)
-		else:
-			anim.speed_scale = 0
+		# The body itself never rotates (no friction); the frames show the spin instead
+		anim.rotation = -rotation
+		_turn = fposmod(_turn + _spin * delta, TAU)
+		anim.frame = int(_turn / TAU * SPIN_FRAMES) % SPIN_FRAMES
 
 	_watch_for_stuck(delta)
 	_watch_ramp_exit(delta)
@@ -248,6 +249,7 @@ func _integrate_forces(state: PhysicsDirectBodyState2D) -> void:
 
 	var v := state.linear_velocity
 	v = _add_back_banked(v)
+	_update_spin(state, v)
 	var on_ramp := (collision_mask & RAMP_LAYER_BIT) != 0
 	if on_ramp and v.length() > 1.0:
 		var floor_speed := ramp_entry_speed if not _was_on_ramp else ramp_min_speed
@@ -259,6 +261,17 @@ func _integrate_forces(state: PhysicsDirectBodyState2D) -> void:
 	_banked_v = _clamp_axes(v, max_velocity)
 	_moved_v = _clamp_axes(_banked_v, max_travel)
 	state.linear_velocity = _moved_v
+
+# Rolling along a surface turns the ball at speed / radius. The spin radius is the
+# drawn ball's, so the pattern rolls at the pace the big sprite would.
+func _update_spin(state: PhysicsDirectBodyState2D, v: Vector2) -> void:
+	if state.get_contact_count() == 0:
+		return
+	var normal := state.get_contact_local_normal(0)
+	_spin = normal.cross(v) / _drawn_radius()
+
+func _drawn_radius() -> float:
+	return anim.sprite_frames.get_frame_texture("default", 0).get_width() * anim.scale.x * 0.5 if anim else 19.0
 
 # The engine only knows the speed the ball moved at. Put the banked excess back on
 # any axis where the ball is still going the same way at least as fast (free flight,
@@ -290,7 +303,7 @@ func _build_ramp_trail() -> void:
 	_ramp_trail.lifetime = 0.35
 	_ramp_trail.local_coords = false
 	_ramp_trail.emission_shape = CPUParticles2D.EMISSION_SHAPE_SPHERE
-	_ramp_trail.emission_sphere_radius = 12.0
+	_ramp_trail.emission_sphere_radius = 24.0  # around the drawn ball, not the collision circle
 	_ramp_trail.gravity = Vector2.ZERO
 	_ramp_trail.initial_velocity_min = 10.0
 	_ramp_trail.initial_velocity_max = 40.0
