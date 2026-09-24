@@ -1,8 +1,8 @@
 extends Node2D
 ## The spinner across the left loop lane, like the one on Pokemon Pinball's Red Field
 ## that charges Pikachu. A ball going through sets the plate spinning as fast as the
-## ball was going; it slows to a stop, scoring every turn, and every few turns count as
-## a frog hit toward lighting the kickback.
+## ball was going; it slows to a stop, scoring every turn, and every turn charges the
+## kickback, as Pokemon Pinball's spinner charges its Pikachu saver.
 
 const SPINNER := preload("res://Sprites/table/spinner.png")
 
@@ -14,7 +14,6 @@ const TURNS_PER_SPEED := 1.0 / 150.0  # turns per second for each unit of ball s
 const MAX_TURNS_PER_SECOND := 14.0
 const FRICTION := 3.0  # turns per second lost each second
 const TURN_POINTS := 100
-const TURNS_PER_CHARGE := 4
 
 var features: Node2D  # TableFeatures, which owns the shared sprite and scoring helpers
 
@@ -52,8 +51,7 @@ func _physics_process(delta: float) -> void:
 		_scored_turns += 1
 		PinballEvents.add_score.emit(TURN_POINTS)
 		AudioSfx.play("spinner")
-		if _scored_turns % TURNS_PER_CHARGE == 0:
-			features.kickback.add_charge_hit()
+		features.kickback.add_spinner_turn()
 	if _rate == 0.0:
 		# settle face up, so it never stops edge-on
 		_turned = float(_scored_turns)

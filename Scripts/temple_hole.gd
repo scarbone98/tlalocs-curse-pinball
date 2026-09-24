@@ -22,7 +22,7 @@ const PRIZES := [
 	[3, "points_small"], [2, "points_big"], [2, "kickback"], [2, "spirit"], [2, "travel"],
 ]
 const PRIZE_CAPTIONS := {
-	"points_small": "Temple offering!", "points_big": "Temple treasure!", "kickback": "Kickback lit!",
+	"points_small": "Temple offering!", "points_big": "Temple treasure!", "kickback": "Kickback both sides!",
 	"spirit": "A spirit rises!", "travel": "The road opens!",
 }
 
@@ -113,7 +113,7 @@ func _pick_prize() -> String:
 		if roll < 0:
 			pick = prize[1]
 			break
-	if pick == "kickback" and features.kickback.charged:
+	if pick == "kickback" and features.kickback.both_sides:
 		return "points_small"
 	if pick == "spirit" and features.spirit._active:
 		return "points_small"

@@ -25,11 +25,9 @@ const SPIN_SIZE := 20
 @export var bounce: float = 0.25
 @export var max_velocity: float = 2050.0
 @export var max_travel: float = 1280.0
-## The side ramps are water channels (collision layer 2, switched on by the gates). The
-## current eases the climb: on a ramp gravity pulls the ball back at only this fraction
-## of its strength, so a good shot glides all the way round and a weak one slows and
-## rolls back down naturally, with no sudden push either way.
-@export var ramp_gravity_scale: float = 0.4
+## The side ramps are water channels (collision layer 2, switched on by the gates). Like
+## Pokemon Pinball's ramps they're plain physics with the table's own gravity: a good
+## shot makes it round, a weak one rolls back out of the mouth.
 ## Ball search, like a real machine's: a ball that stays inside a small circle this long
 ## (say, pinned between a bumper and a wall) gets knocked back toward the middle of the
 ## table. The flipper area is left alone so a cradled ball stays put.
@@ -294,9 +292,6 @@ func _integrate_forces(state: PhysicsDirectBodyState2D) -> void:
 	v = _add_back_banked(v)
 	_update_spin(state, v)
 	var on_ramp := (collision_mask & RAMP_LAYER_BIT) != 0
-	if on_ramp:
-		# the engine has applied full gravity this step; give most of it back
-		v -= state.total_gravity * state.step * (1.0 - ramp_gravity_scale)
 	if on_ramp != _was_on_ramp:
 		_was_on_ramp = on_ramp
 		_ramp_trail.emitting = on_ramp
