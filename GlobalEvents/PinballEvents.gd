@@ -20,3 +20,4 @@ signal ball_left_ramp(ball: RigidBody2D) # a ball bounced out of a ramp mouth; g
 signal spirit_caught()                  # a water spirit was caught
 signal top_lanes_completed()           # all three top lanes lit
 signal objective_changed(text: String) # the journey's current goal, shown under the score
+signal ball_tier_changed(tier: int)   # ball upgraded or worn down: 0 stone, 1 jade, 2 turquoise, 3 gold

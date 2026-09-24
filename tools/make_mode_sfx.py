@@ -64,6 +64,9 @@ def main():
     write("spirit.wav", sweep(300, 1200, 0.45, triangle, 0.35, vibrato=0.04))
     write("spirit_hit.wav", sweep(1400, 500, 0.09, square, 0.22))
     write("catch.wav", notes([(C5, 0.08), (E5, 0.08), (G5, 0.08), (C6, 0.08), (0, 0.04), (G5, 0.08), (C6, 0.3)]))
+    write("spinner.wav", notes([(G6, 0.02)], square, 0.16))
+    write("upgrade.wav", notes([(C5, 0.05), (G5, 0.05), (C6, 0.05), (E6, 0.05), (G6, 0.22)], triangle, 0.4))
+    write("downgrade.wav", sweep(700, 260, 0.3, triangle, 0.3))
     write("multiball.wav", notes([(G5, 0.07), (0, 0.02), (G5, 0.07), (0, 0.02), (C6, 0.07), (E6, 0.07), (G6, 0.25)]))
     print("wrote mode sound effects")
 

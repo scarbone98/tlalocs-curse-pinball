@@ -56,7 +56,13 @@ func _add_kick_zone(at: Vector2, index: int) -> void:
 	add_child(area)
 
 func _on_frog_hit(body: Node) -> void:
-	if charged or not features._is_ball_on_playfield(body):
+	if not features._is_ball_on_playfield(body):
+		return
+	add_charge_hit()
+
+## One step toward lighting the kickback (a frog hit, or turns of the spinner)
+func add_charge_hit() -> void:
+	if charged:
 		return
 	_hits += 1
 	if _hits < HITS_TO_CHARGE:

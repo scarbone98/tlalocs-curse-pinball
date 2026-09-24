@@ -22,6 +22,7 @@ const RampShots := preload("res://Scripts/ramp_shots.gd")
 const Kickback := preload("res://Scripts/kickback.gd")
 const SpiritCapture := preload("res://Scripts/spirit_capture.gd")
 const Journey := preload("res://Scripts/journey.gd")
+const Spinner := preload("res://Scripts/spinner.gd")
 const TempleHole := preload("res://Scripts/temple_hole.gd")
 const ElDorado := preload("res://Scripts/el_dorado.gd")
 
@@ -54,7 +55,13 @@ const FACE_HITS_STEP := 2
 const FACE_HIT_COOLDOWN := 1.5  # a ball rattling around on the face only counts once
 const CURSE_SECONDS := 20.0
 const CURSE_REST_SECONDS := 30.0  # once the rain passes Tlaloc sleeps, and face hits don't build
-const MAX_MULTIPLIER := 5
+# Ball upgrades, like Pokemon Pinball's Poke, Great, Ultra and Master Balls: each is a
+# multiplier on everything scored. Completing the top lanes moves up one; a minute
+# later it wears down one, and so on back to stone. Draining goes straight to stone.
+const BALL_TIERS := [["Stone", 1], ["Jade", 2], ["Turquoise", 3], ["Gold", 5]]
+const UPGRADE_SECONDS := 60.0
+const UPGRADE_WARN_SECONDS := 10.0  # the multiplier bars blink as it's about to wear down
+const TOP_TIER_POINTS := 25000  # completing the lanes with the gold ball already out
 const MULTIBALL_DELAY := 1.4  # Tlaloc spits out the extra ball after the curse toast
 const MULTIBALL_SPEED := 1300.0
 const MAX_BALLS := 2  # only from a single ball, so multiball can't feed more curses
@@ -80,6 +87,8 @@ var el_dorado: Node2D
 var _face_hits := 0
 var _face_cooldown := 0.0
 var _curses := 0
+var _tier := 0
+var _tier_left := 0.0
 var _rest_left := 0.0
 
 enum { MASK_ASLEEP, MASK_STIRRING, MASK_CURSED }
@@ -106,7 +115,7 @@ func _ready() -> void:
 	spirit = SpiritCapture.new()
 	journey = Journey.new()
 	temple = TempleHole.new()
-	for mode in [RampShots.new(), kickback, spirit, journey, temple]:
+	for mode in [RampShots.new(), kickback, spirit, journey, temple, Spinner.new()]:
 		mode.features = self
 		add_child(mode)
 	# The bonus stage is its own chamber below the table, so it lives beside it
@@ -264,6 +273,17 @@ func _physics_process(delta: float) -> void:
 			_render_shrine()
 	if GameManager.curse_active:
 		_render_shrine()  # the lamps drain as the storm runs out
+	if _tier > 0:
+		_tier_left -= delta
+		if _tier_left <= 0.0:
+			_tier -= 1
+			_tier_left = UPGRADE_SECONDS
+			_apply_tier()
+			PinballEvents.toast.emit("%s Ball x%d" % BALL_TIERS[_tier])
+			AudioSfx.play("downgrade")
+		var blink := _tier_left < UPGRADE_WARN_SECONDS and int(_tier_left * 4.0) % 2 == 0
+		for i in _bars.size():
+			_bars[i].frame = 1 if i < GameManager.multiplier and not blink else 0
 	for area in _lane_cooldowns:
 		_lane_cooldowns[area] = maxf(_lane_cooldowns[area] - delta, 0.0)
 
@@ -287,10 +307,23 @@ func _on_top_lane(index: int) -> void:
 		_top_lit = [false, false, false]
 		_award(TOP_LANES_COMPLETE_POINTS, _top_lamps[1].global_position)
 		PinballEvents.top_lanes_completed.emit()
-		if GameManager.multiplier < MAX_MULTIPLIER:
-			GameManager.set_multiplier(GameManager.multiplier + 1)
-			PinballEvents.toast.emit("Bonus x%d" % GameManager.multiplier)
+		_upgrade_ball()
 		_celebrate(_top_lamps, _render_top_lanes)
+
+func _upgrade_ball() -> void:
+	_tier_left = UPGRADE_SECONDS
+	if _tier == BALL_TIERS.size() - 1:
+		_award(TOP_TIER_POINTS, _top_lamps[1].global_position + Vector2(0, -40))
+		PinballEvents.toast.emit("Gold Ball renewed!")
+		return
+	_tier += 1
+	_apply_tier()
+	PinballEvents.toast.emit("%s Ball x%d!" % BALL_TIERS[_tier])
+	AudioSfx.play("upgrade")
+
+func _apply_tier() -> void:
+	GameManager.set_multiplier(BALL_TIERS[_tier][1])
+	PinballEvents.ball_tier_changed.emit(_tier)
 
 func _on_bottom_lane(index: int) -> void:
 	_award(BOTTOM_LANE_POINTS, _bottom_lamps[index].global_position)
@@ -350,6 +383,13 @@ func _release_extra_ball() -> void:
 	var balls := get_tree().get_nodes_in_group("ball")
 	if balls.is_empty() or balls.size() >= MAX_BALLS or _face == null:
 		return
+	# Not while the ball is held (temple, kickback) or off in El Dorado; the curse's
+	# multiball waits for it to be back in play
+	var ball := balls[0] as RigidBody2D
+	if ball.freeze or ball.stage_origin != Vector2.ZERO:
+		if GameManager.curse_active:
+			get_tree().create_timer(0.5).timeout.connect(_release_extra_ball)
+		return
 	var from := _face.global_position + Vector2(0, -90)
 	var velocity := Vector2(randf_range(-250.0, 250.0), -MULTIBALL_SPEED)
 	balls[0].spawn_extra_ball(from, velocity)
@@ -405,6 +445,9 @@ func _render_shrine() -> void:
 		_shrine_lamps[i].frame = 1 if i < lit else 0
 
 func _on_multiplier_changed(multiplier: int) -> void:
+	if multiplier == 1 and _tier > 0:
+		_tier = 0  # the ball drained, and the upgrade with it
+		PinballEvents.ball_tier_changed.emit(0)
 	for i in _bars.size():
 		_bars[i].frame = 1 if i < multiplier else 0
 

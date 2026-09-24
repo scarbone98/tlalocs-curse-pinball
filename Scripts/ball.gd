@@ -12,7 +12,9 @@ extends RigidBody2D
 ## too far over the walls and posts the ball passes; this still fits the same gaps.
 ## Its spin copies that game too: every contact sets the spin from how fast the ball is
 ## sliding along the surface, and the ball keeps that spin in the air.
-const SPIN_FRAMES := 16  # Sprites/ball_spin.png, one full turn
+const SPIN_FRAMES := 16  # Sprites/ball_spin.png, one full turn per row
+const SPIN_SHEET := preload("res://Sprites/ball_spin.png")
+const SPIN_SIZE := 20
 ## Tuned to Pokemon Pinball's engine (pret/pokepinball). Its field is about 160x310px,
 ## so 1px there is about 4.3 units here, and it runs one physics step per 60Hz frame:
 ##  - no friction or drag, only gravity: 11/256 px/frame^2 (660 here, project settings)
@@ -68,6 +70,7 @@ var _spin := 0.0   # radians per second, clockwise
 var _turn := 0.0   # how far the sprite has turned
 const BANK_TOLERANCE := 30.0  # a step of gravity against the ball (660/120) still keeps it
 static var _ramp_art: Image
+static var _tier_frames := {}  # tier -> SpriteFrames for that row of the spin sheet
 
 @onready var anim: AnimatedSprite2D = $AnimatedSprite2D
 
@@ -101,6 +104,7 @@ func _ready() -> void:
 	PinballEvents.launch_pressed.connect(_begin_charge)
 	PinballEvents.launch_released.connect(_release_charge)
 
+	PinballEvents.ball_tier_changed.connect(set_tier)
 	max_contacts_reported = 4  # to read the surface the ball is rolling on
 	if anim:
 		anim.stop()
@@ -119,6 +123,22 @@ func _physics_process(delta: float) -> void:
 		_moved_v = Vector2.ZERO
 	_watch_for_stuck(delta)
 	_watch_ramp_exit(delta)
+
+## Shows the ball as stone, jade, turquoise or gold (one row each of the spin sheet)
+func set_tier(tier: int) -> void:
+	if anim == null:
+		return
+	if not _tier_frames.has(tier):
+		var frames := SpriteFrames.new()
+		for i in SPIN_FRAMES:
+			var atlas := AtlasTexture.new()
+			atlas.atlas = SPIN_SHEET
+			atlas.region = Rect2(i * SPIN_SIZE, tier * SPIN_SIZE, SPIN_SIZE, SPIN_SIZE)
+			frames.add_frame("default", atlas)
+		_tier_frames[tier] = frames
+	var shown := anim.frame
+	anim.sprite_frames = _tier_frames[tier]
+	anim.frame = shown
 
 func _watch_ramp_exit(delta: float) -> void:
 	if (collision_mask & RAMP_LAYER_BIT) == 0 or _over_ramp_art():
@@ -209,8 +229,14 @@ func spawn_extra_ball(from: Vector2, velocity: Vector2) -> RigidBody2D:
 	extra.collision_layer = _restore_layers
 	extra.collision_mask = _restore_mask
 	extra.z_index = _restore_z
+	# ...and loose on the main table, even if this one is held or shrunk into the temple
+	extra.freeze = false
+	extra.stage_origin = Vector2.ZERO
 	extra.transform = Transform2D(0.0, get_parent().to_local(from))
 	extra.linear_velocity = velocity
+	var extra_anim := extra.get_node_or_null(^"AnimatedSprite2D") as AnimatedSprite2D
+	if extra_anim:
+		extra_anim.scale = Vector2.ONE * draw_scale
 	get_parent().add_child(extra)
 	extra.spawn_xform = spawn_xform
 	return extra

@@ -13,6 +13,9 @@ static var LIB: Dictionary = {
 	"spirit_hit": preload("res://Audio/sfx/spirit_hit.wav"),
 	"catch": preload("res://Audio/sfx/catch.wav"),
 	"multiball": preload("res://Audio/sfx/multiball.wav"),
+	"spinner": preload("res://Audio/sfx/spinner.wav"),
+	"upgrade": preload("res://Audio/sfx/upgrade.wav"),
+	"downgrade": preload("res://Audio/sfx/downgrade.wav"),
 }
 
 const DEFAULT_BUS := "Master"
