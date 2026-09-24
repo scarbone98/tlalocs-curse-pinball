@@ -24,6 +24,16 @@ const CARRY_PATHS := [
 	[Vector2(581, 977), Vector2(512, 977), Vector2(-650, -950)],
 ]
 
+# The corridor under each outlane's roof was wide open, so a ball just rolling along
+# the side drifted in, and outlanes took most drains (Pokemon Pinball's take a minority).
+# A lip hanging under each roof lowers the corridor's ceiling: a ball still gets in if
+# it comes in low and level, but not by drifting. The kickback's carry path runs under it.
+const OUTLANE_LIP_BOTTOM := 956.0
+const OUTLANE_LIPS := [
+	[Vector2(70, 952), Vector2(82, 948), Vector2(131, 941), Vector2(138, 947), Vector2(138, 956), Vector2(70, 956)],
+	[Vector2(538, 956), Vector2(538, 946), Vector2(546, 940), Vector2(612, 946), Vector2(612, 956)],
+]
+
 enum { STONE, AWAKE, LEAP }
 
 var features: Node2D  # TableFeatures, which owns the shared sprite and scoring helpers
@@ -37,6 +47,12 @@ func _ready() -> void:
 		_frogs.append(features._sprite(FROG, 3, at))
 	for i in KICK_ZONES.size():
 		_add_kick_zone(KICK_ZONES[i], i)
+	var lips := StaticBody2D.new()
+	for lip in OUTLANE_LIPS:
+		var shape := CollisionPolygon2D.new()
+		shape.polygon = PackedVector2Array(lip)
+		lips.add_child(shape)
+	add_child(lips)
 	var pool := features.get_node_or_null(^"../mushrooms")
 	if pool:
 		for frog in pool.get_children():
