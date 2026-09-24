@@ -85,6 +85,9 @@ def main():
     write("shrine_out.wav", sweep(120, 520, 0.2, triangle, 0.4))
     # stone on stone, and water poured into the Chac Mool's bowl
     write("chac_mool.wav", mixdown(notes([(98.0, 0.05)], square, 0.3), notes([(0, 0.03), (G5, 0.04), (C6, 0.08)], triangle, 0.25)))
+    # the jaguar's roar, and the jingle for an extra ball
+    write("roar.wav", mixdown(sweep(260, 90, 0.35, square, 0.22, vibrato=0.12), sweep(520, 180, 0.25, triangle, 0.2)))
+    write("extra_ball.wav", notes([(G5, 0.07), (C6, 0.07), (E6, 0.07), (G6, 0.07), (0, 0.03), (E6, 0.07), (G6, 0.3)], triangle, 0.4))
     write("multiball.wav", notes([(G5, 0.07), (0, 0.02), (G5, 0.07), (0, 0.02), (C6, 0.07), (E6, 0.07), (G6, 0.25)]))
     print("wrote mode sound effects")
 

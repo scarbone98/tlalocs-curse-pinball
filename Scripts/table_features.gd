@@ -25,6 +25,7 @@ const Spinner := preload("res://Scripts/spinner.gd")
 const Torches := preload("res://Scripts/torches.gd")
 const ShrineDoor := preload("res://Scripts/shrine_door.gd")
 const ChacMool := preload("res://Scripts/chac_mool.gd")
+const JaguarDen := preload("res://Scripts/jaguar_den.gd")
 const Effects := preload("res://Scripts/effects.gd")
 const TableLife := preload("res://Scripts/table_life.gd")
 const Music := preload("res://Scripts/music.gd")
@@ -120,7 +121,7 @@ func _ready() -> void:
 	spirit = SpiritCapture.new()
 	journey = Journey.new()
 	temple = TempleHole.new()
-	for mode in [RampShots.new(), kickback, spirit, journey, temple, Spinner.new(), Torches.new(), ShrineDoor.new(), ChacMool.new()]:
+	for mode in [RampShots.new(), kickback, spirit, journey, temple, Spinner.new(), Torches.new(), ShrineDoor.new(), ChacMool.new(), JaguarDen.new()]:
 		mode.features = self
 		add_child(mode)
 	add_child(Effects.new())

@@ -42,6 +42,11 @@ func set_curse_active(active: bool) -> void:
 func grant_ball_save(seconds: float) -> void:
 	_ball_save_left = maxf(_ball_save_left, seconds)
 
+## One more ball (the jaguar awards these)
+func award_extra_ball() -> void:
+	lives += 1
+	PinballEvents.lives_changed.emit(lives)
+
 func ball_save_left() -> float:
 	return _ball_save_left
 
