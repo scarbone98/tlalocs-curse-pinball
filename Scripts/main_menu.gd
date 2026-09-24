@@ -117,6 +117,10 @@ func _build() -> void:
 	_button("Spirit Codex  %d/%d" % [SpiritCodex.count(), SpiritCodex.SPECIES.size()], func():
 		_codex.open())
 	_button("How to Play", _show_how_to)
+	var speed := _button("Speed: " + GameManager.speed_name(), func(): pass)
+	speed.pressed.connect(func():
+		GameManager.cycle_speed()
+		speed.text = "Speed: " + GameManager.speed_name())
 	if _paused_game:
 		_button("Restart", func():
 			get_tree().paused = false

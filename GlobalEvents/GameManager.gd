@@ -9,10 +9,20 @@ var multiplier := 1
 var curse_active := false
 var show_title := true  # the title menu opens on load; Play Again goes straight back in
 
+## Game speed. The physics match Pokemon Pinball 1:1 at its own 60Hz; Relaxed slows the
+## whole game evenly (time itself, so every proportion stays the same) for a floatier feel.
+const SPEEDS := [["1:1", 1.0], ["Relaxed", 0.8]]
+const SETTINGS_PATH := "user://settings.cfg"
+var speed_index := 0
+
 var _ball_save_left := 0.0
 var _ball_save_used := false
 
 func _ready():
+	var config := ConfigFile.new()
+	if config.load(SETTINGS_PATH) == OK:
+		speed_index = clampi(int(config.get_value("options", "speed", 0)), 0, SPEEDS.size() - 1)
+	_apply_speed()
 	lives = starting_lives
 	score = 0
 	# Hook up to the global event bus
@@ -88,6 +98,20 @@ func _game_over():
 	PinballEvents.game_over.emit(final_score, is_new_best)
 
 # Called by the game over screen; the scene reloads so the table starts fresh.
+func cycle_speed() -> void:
+	speed_index = (speed_index + 1) % SPEEDS.size()
+	_apply_speed()
+	var config := ConfigFile.new()
+	config.load(SETTINGS_PATH)
+	config.set_value("options", "speed", speed_index)
+	config.save(SETTINGS_PATH)
+
+func speed_name() -> String:
+	return SPEEDS[speed_index][0]
+
+func _apply_speed() -> void:
+	Engine.time_scale = SPEEDS[speed_index][1]
+
 ## Back to the title menu, with a fresh table behind it
 func to_title() -> void:
 	show_title = true
