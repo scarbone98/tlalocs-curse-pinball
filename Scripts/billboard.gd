@@ -17,6 +17,7 @@ const PRIZES := ["points_small", "points_big", "kickback", "spirit", "travel"]
 const RELIC := 10          # four relics, in journey order
 const BALL := 14           # four ball upgrades
 const SPIRIT := 18         # sixteen spirits, in SpiritCodex.SPECIES order
+const DIVINE := 34         # the same sixteen, awakened
 
 const SHOW_SECONDS := 2.6
 const FADE_SECONDS := 0.25

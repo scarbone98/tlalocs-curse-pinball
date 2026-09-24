@@ -8,8 +8,9 @@ const TRACKS := {
 	"el_dorado": preload("res://Audio/music/el_dorado.ogg"),
 	"curse": preload("res://Audio/music/curse.ogg"),
 	"spirit": preload("res://Audio/music/spirit.ogg"),
+	"awaken": preload("res://Audio/music/spirit.ogg"),  # the Awakening shares the spirits' tune
 }
-const PRIORITY := ["el_dorado", "curse", "spirit"]
+const PRIORITY := ["el_dorado", "curse", "awaken", "spirit"]
 const MODE_VOLUME_DB := 0.0  # the loops are already matched to the table track's loudness
 const SILENT_DB := -40.0
 const FADE_IN_SECONDS := 1.2
@@ -18,7 +19,7 @@ const FADE_BACK_SECONDS := 1.5  # back to the table track, a touch slower still
 var _table: AudioStreamPlayer
 var _mode: AudioStreamPlayer
 var _table_volume_db := 0.0
-var _active := {"el_dorado": false, "curse": false, "spirit": false}
+var _active := {"el_dorado": false, "curse": false, "awaken": false, "spirit": false}
 var _playing := ""
 
 func _ready() -> void:
@@ -31,6 +32,7 @@ func _ready() -> void:
 	PinballEvents.curse_changed.connect(_mode_changed.bind("curse"))
 	PinballEvents.spirit_changed.connect(_mode_changed.bind("spirit"))
 	PinballEvents.el_dorado_changed.connect(_mode_changed.bind("el_dorado"))
+	PinballEvents.awakening_changed.connect(_mode_changed.bind("awaken"))
 
 func _mode_changed(active: bool, mode: String) -> void:
 	_active[mode] = active

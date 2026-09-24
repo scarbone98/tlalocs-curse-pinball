@@ -10,6 +10,7 @@ Ours pops up under the score with, one 64x40 frame each:
    10-13 the four relics
    14-17 the four ball upgrades
    18-33 the sixteen spirits of the Spirit Codex, on a teal sunburst
+   34-49 the same spirits awakened into their divine forms, on a gold sunburst
 
 The monuments are drawn on the left and mirrored, lit evenly from the front so the
 mirror holds. The prizes, relics and balls are the table's own sprites, enlarged on a
@@ -267,6 +268,10 @@ def main():
     for row in range(sheet.height // 14):
         spirit = sheet.crop((0, row * 14, 18, row * 14 + 14))
         pictures.append(framed(spirit, 2, backdrop=(C('#123a4a'), C('#1a5a6a'))))
+    divine = Image.open("Sprites/table/spirits_awakened.png").convert("RGBA")
+    for row in range(divine.height // 18):
+        form = divine.crop((0, row * 18, 22, row * 18 + 18))
+        pictures.append(framed(form, 2, backdrop=(C('#6a3a10'), C('#a8681c'))))
     strip(pictures).save(OUT)
     print("wrote", OUT, len(pictures), "pictures")
 

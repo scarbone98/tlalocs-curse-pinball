@@ -2,8 +2,8 @@ extends Node2D
 ## The temple hole in the middle of the table, like Pokemon Pinball's Ditto and
 ## Bellsprout holes. A shot up into it (not a ball falling back over it) is caught,
 ## held for a moment, and spun on the temple's roulette before being sent back down
-## to the flippers. With the road open (a serpent's pips full) it travels to the next
-## city instead. Once all four relics are lit it's El Dorado's gate, and the ball goes
+## to the flippers. With the Awakening lit it starts that instead; with the road open
+## (a serpent's pips full) it travels to the next city. Once all four relics are lit it's El Dorado's gate, and the ball goes
 ## through to the bonus stage.
 
 const HOLE := preload("res://Sprites/table/temple_hole.png")
@@ -19,11 +19,11 @@ enum { HOLE_IDLE, HOLE_FLASH, GATE_A, GATE_B }
 
 # Weight, then what it does. Kickback and spirit fall back to points when they can't apply.
 const PRIZES := [
-	[3, "points_small"], [2, "points_big"], [2, "kickback"], [2, "spirit"], [2, "travel"],
+	[3, "points_small"], [2, "points_big"], [2, "kickback"], [2, "spirit"], [2, "travel"], [1, "awaken"],
 ]
 const PRIZE_CAPTIONS := {
 	"points_small": "Temple offering!", "points_big": "Temple treasure!", "kickback": "Kickback both sides!",
-	"spirit": "A spirit rises!", "travel": "The road opens!",
+	"spirit": "A spirit rises!", "travel": "The road opens!", "awaken": "The spirits stir!",
 }
 
 var features: Node2D  # TableFeatures, which owns the shared sprite and scoring helpers
@@ -47,8 +47,8 @@ func _physics_process(delta: float) -> void:
 		_sprite.frame = HOLE_FLASH if int(_clock * 8.0) % 2 == 0 else HOLE_IDLE
 	elif gate_open:
 		_sprite.frame = GATE_A if int(_clock * 4.0) % 2 == 0 else GATE_B
-	elif features.journey.road_open:
-		_sprite.frame = HOLE_FLASH if int(_clock * 3.0) % 2 == 0 else HOLE_IDLE  # the road leads here
+	elif features.journey.road_open or features.awakening.lit:
+		_sprite.frame = HOLE_FLASH if int(_clock * 3.0) % 2 == 0 else HOLE_IDLE  # something waits here
 	else:
 		_sprite.frame = HOLE_IDLE
 	if _held or _rearm > 0.0:
@@ -76,6 +76,11 @@ func _catch(ball: RigidBody2D) -> void:
 	if gate_open:
 		PinballEvents.toast.emit("To El Dorado!")
 		get_tree().create_timer(HOLD_SECONDS).timeout.connect(func(): features.el_dorado.enter(ball))
+		return
+	if features.awakening.lit and not features.awakening.active:
+		get_tree().create_timer(HOLD_SECONDS).timeout.connect(func():
+			features.awakening.start()
+			eject(ball))
 		return
 	if features.journey.road_open:
 		PinballEvents.toast.emit("The road leads on...")
@@ -117,6 +122,8 @@ func _pick_prize() -> String:
 		return "points_small"
 	if pick == "spirit" and features.spirit._active:
 		return "points_small"
+	if pick == "awaken" and (features.awakening.active or SpiritCodex.awakenable().is_empty()):
+		return "points_small"
 	return pick
 
 func _award_prize(prize: String) -> void:
@@ -127,6 +134,8 @@ func _award_prize(prize: String) -> void:
 			features.spirit.summon()
 		"travel":
 			features.journey.travel()
+		"awaken":
+			features.awakening.start()
 		"points_big":
 			features._award(15000, AT + Vector2(0, -40))
 		_:

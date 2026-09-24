@@ -27,3 +27,5 @@ signal billboard(picture: int, caption: String) # pop a picture up on the billbo
 signal billboard_spin(result: int, seconds: float, caption: String) # spin the roulette reel, landing on result
 signal spirit_changed(active: bool)    # a water spirit rose or went back under
 signal el_dorado_changed(active: bool) # the ball went into El Dorado or came back out
+signal bottom_lanes_completed()        # all four bottom lanes lit
+signal awakening_changed(active: bool) # an Awakening started or ended

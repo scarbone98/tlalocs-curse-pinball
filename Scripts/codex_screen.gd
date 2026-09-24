@@ -5,7 +5,9 @@ class_name CodexScreen
 ## pauses the game; closing it picks up where it left off.
 
 const SPIRITS := preload("res://Sprites/table/spirits.png")
+const DIVINE := preload("res://Sprites/table/spirits_awakened.png")
 const SPIRIT_SIZE := Vector2(18, 14)
+const DIVINE_SIZE := Vector2(22, 18)
 const ICON_SCALE := 4.0
 const CITIES := ["Tenochtitlan", "Teotihuacan", "Chichen Itza", "Palenque"]
 
@@ -38,6 +40,8 @@ func open() -> void:
 	panel.add_child(box)
 
 	box.add_child(_label("Spirit Codex  %d/%d" % [SpiritCodex.count(), SpiritCodex.SPECIES.size()], "TitleLabel", 44))
+	if SpiritCodex.awakened_count() > 0:
+		box.add_child(_label("Awakened  %d/%d" % [SpiritCodex.awakened_count(), SpiritCodex.SPECIES.size()], "ScoreLabel", 30))
 	for city in CITIES.size():
 		box.add_child(_label(CITIES[city] + ("  - complete!" if SpiritCodex.city_complete(city) else ""), "HintLabel", 30))
 		var row := HBoxContainer.new()
@@ -69,9 +73,12 @@ func _cell(index: int) -> Control:
 	var found := SpiritCodex.has_caught(index)
 	var cell := VBoxContainer.new()
 	cell.custom_minimum_size = Vector2(150, 0)
+	# an awakened spirit shows its divine form, gold and glowing
+	var divine := SpiritCodex.is_awakened(index)
 	var atlas := AtlasTexture.new()
-	atlas.atlas = SPIRITS
-	atlas.region = Rect2(Vector2(0, index) * SPIRIT_SIZE, SPIRIT_SIZE)
+	atlas.atlas = DIVINE if divine else SPIRITS
+	var size := DIVINE_SIZE if divine else SPIRIT_SIZE
+	atlas.region = Rect2(Vector2(0, index) * size, size)
 	var icon := TextureRect.new()
 	icon.texture = atlas
 	icon.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
@@ -81,7 +88,7 @@ func _cell(index: int) -> Control:
 	if not found:
 		icon.modulate = Color(0, 0, 0, 0.85)  # a silhouette until it's caught
 	cell.add_child(icon)
-	var name: String = spirit.name if found else "???"
+	var name: String = (spirit.divine if divine else spirit.name) if found else "???"
 	if spirit.rare and found:
 		name += " *"
 	cell.add_child(_label(name, "HintLabel", 24))

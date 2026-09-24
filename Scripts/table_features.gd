@@ -26,6 +26,7 @@ const Torches := preload("res://Scripts/torches.gd")
 const ShrineDoor := preload("res://Scripts/shrine_door.gd")
 const ChacMool := preload("res://Scripts/chac_mool.gd")
 const JaguarDen := preload("res://Scripts/jaguar_den.gd")
+const Awakening := preload("res://Scripts/awakening.gd")
 const Effects := preload("res://Scripts/effects.gd")
 const TableLife := preload("res://Scripts/table_life.gd")
 const Music := preload("res://Scripts/music.gd")
@@ -87,6 +88,7 @@ var kickback: Node2D
 var spirit: Node2D
 var journey: Node2D
 var temple: Node2D
+var awakening: Node2D
 var el_dorado: Node2D
 
 var _face_hits := 0
@@ -121,7 +123,8 @@ func _ready() -> void:
 	spirit = SpiritCapture.new()
 	journey = Journey.new()
 	temple = TempleHole.new()
-	for mode in [RampShots.new(), kickback, spirit, journey, temple, Spinner.new(), Torches.new(), ShrineDoor.new(), ChacMool.new(), JaguarDen.new()]:
+	awakening = Awakening.new()
+	for mode in [RampShots.new(), kickback, spirit, journey, temple, Spinner.new(), Torches.new(), ShrineDoor.new(), ChacMool.new(), JaguarDen.new(), awakening]:
 		mode.features = self
 		add_child(mode)
 	add_child(Effects.new())
@@ -365,6 +368,7 @@ func _on_bottom_lane(index: int) -> void:
 		_bottom_lit = [false, false, false, false]
 		_award(BOTTOM_LANES_COMPLETE_POINTS, Vector2(338, 1000))
 		PinballEvents.toast.emit("Lanes complete!")
+		PinballEvents.bottom_lanes_completed.emit()
 		_celebrate(_bottom_lamps, _render_bottom_lanes)
 
 func _on_face_body_entered(body: Node) -> void:

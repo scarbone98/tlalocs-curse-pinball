@@ -8,17 +8,25 @@ frames each: resting, blinking, and struck (washed out in gold, as the ajolote i
 The ajolote is the table's original water spirit (tools/make_mode_sprites.py), padded
 to the same size.
 
+Also writes Sprites/table/offering.png, the sacred offering (a jade bead in a gold
+ring, two frames as it glints) that appears on the table during an Awakening, and
+Sprites/table/spirits_awakened.png: each spirit's divine form after the
+Awakening, like Pokemon Pinball's evolutions. It's the spirit brightened, outlined in
+gold and wrapped in an aura, 22x18, two frames as the aura pulses.
+
 Run from the repo root:  python3 tools/make_spirit_sprites.py
 """
 from pathlib import Path
 
 from PIL import Image
 
-from pixel_art import asymmetry
+from pixel_art import Canvas, asymmetry
 import make_mode_sprites as mode_sprites
 
 OUT = Path("Sprites/table/spirits.png")
+AWAKENED_OUT = Path("Sprites/table/spirits_awakened.png")
 W, H = 18, 14
+AW, AH = W + 4, H + 4
 T = (0, 0, 0, 0)
 
 
@@ -137,6 +145,42 @@ def struck(img):
     return out
 
 
+def awakened(img, pulse):
+    """The divine form: brightened, a gold outline, and an aura that pulses."""
+    base = Image.new("RGBA", (AW, AH), T)
+    base.alpha_composite(img, (2, 2))
+    ink, gold = PALETTE["o"], PALETTE["Y"]
+    out = Image.new("RGBA", (AW, AH), T)
+    filled = lambda x, y: 0 <= x < AW and 0 <= y < AH and base.getpixel((x, y))[3] > 0
+    near = lambda x, y, r: any(filled(x + dx, y + dy) for dx in range(-r, r + 1) for dy in range(-r, r + 1)
+                               if abs(dx) + abs(dy) <= r)
+    for y in range(AH):
+        for x in range(AW):
+            c = base.getpixel((x, y))
+            if c[3] > 0:
+                if c == ink:
+                    out.putpixel((x, y), gold)
+                else:  # a warm lift toward gold
+                    out.putpixel((x, y), tuple(int(v + (w - v) * 0.3) for v, w in zip(c[:3], (0xFF, 0xE8, 0x80))) + (255,))
+            elif near(x, y, 1):
+                out.putpixel((x, y), (0xFF, 0xF4, 0xC0, 170) if pulse else (0xF8, 0xD0, 0x00, 130))
+            elif near(x, y, 2):
+                out.putpixel((x, y), (0xF8, 0xD0, 0x00, 70 if pulse else 35))
+    return out
+
+
+def offering(glint):
+    c = Canvas(12, 12)
+    c.ellipse(6, 6, 5.4, 5.4, PALETTE["Y"])           # gold ring
+    c.ellipse(6, 6, 4.0, 4.0, PALETTE["J"])           # jade bead
+    c.ellipse(6, 5, 2.6, 2.4, PALETTE["E"])
+    if glint:
+        c.rect(4, 3, 5, 4, PALETTE["w"])
+    c.mirror()
+    c.outline(PALETTE["o"])
+    return c.image()
+
+
 def ajolote_frames():
     """The original water spirit, padded from 18x12 to 18x14."""
     rows = mode_sprites.SPIRIT
@@ -150,6 +194,7 @@ def ajolote_frames():
 
 def main():
     sheet = Image.new("RGBA", (W * 3, H * len(ORDER)), T)
+    divine = Image.new("RGBA", (AW * 2, AH * len(ORDER)), T)
     for row, (name, _city, _rare) in enumerate(ORDER):
         if name == "ajolote":
             frames = ajolote_frames()
@@ -162,7 +207,19 @@ def main():
                 assert asymmetry(f) == 0, name
         for i, frame in enumerate(frames):
             sheet.paste(frame, (i * W, row * H))
+        for i in range(2):
+            form = awakened(frames[0], i == 1)
+            # the ajolote keeps its original art's highlight on one side
+            assert name == "ajolote" or asymmetry(form) == 0, name
+            divine.paste(form, (i * AW, row * AH))
     sheet.save(OUT)
+    divine.save(AWAKENED_OUT)
+    bead = [offering(False), offering(True)]
+    strip = Image.new("RGBA", (24, 12), T)
+    for i, f in enumerate(bead):
+        assert asymmetry(f) == 0, "offering"
+        strip.paste(f, (i * 12, 0))
+    strip.save(Path("Sprites/table/offering.png"))
     print("wrote", OUT, "with", len(ORDER), "spirits")
 
 
