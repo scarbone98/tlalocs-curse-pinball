@@ -4,14 +4,17 @@ extends AnimatableBody2D
 @export var action_name: StringName = &"left_flipper"
 @export var rest_angle_deg: float = 0   # angle when released
 @export var up_angle_deg: float = 65.0      # angle when pressed
-@export var up_speed_deg: float = 1800.0    # how fast it flips up
-@export var down_speed_deg: float = 800.0   # how fast it returns
+## Pokemon Pinball's flippers take about 5 frames (79ms) each way
+@export var up_speed_deg: float = 820.0     # how fast it flips up
+@export var down_speed_deg: float = 820.0   # how fast it returns
 
 ## A moving AnimatableBody only nudges a RigidBody, so while swinging up we set the
 ## ball's speed off the flipper ourselves: kick_base plus the surface speed at the contact
 ## point times kick_gain. Hitting near the tip sends it further, like a real flipper.
-@export var kick_base: float = 450.0
-@export var kick_gain: float = 0.8
+## Pokemon Pinball's kick grows straight from nothing at the pivot to 12.6 px/frame
+## at the tip, which is past the ball's speed limit, so tip shots leave at full speed.
+@export var kick_base: float = 0.0
+@export var kick_gain: float = 3.3
 @export var contact_margin: float = 6.0
 
 var _target: float

@@ -485,11 +485,11 @@ position = Vector2(-6.9999995, 34.999996)
 scale = Vector2(1.75, 1.75)
 
 [node name="mushy2" parent="mushrooms" instance=ExtResource("16_ta5nu")]
-position = Vector2(-42.999996, -44.999996)
+position = Vector2(-30, -45)
 scale = Vector2(1.75, 1.75)
 
 [node name="mushy3" parent="mushrooms" instance=ExtResource("16_ta5nu")]
-position = Vector2(45.999996, -26.999998)
+position = Vector2(36, -27)
 scale = Vector2(1.75, 1.75)
 
 [node name="AudioStreamPlayer2D" type="AudioStreamPlayer2D" parent="."]

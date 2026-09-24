@@ -1,20 +1,45 @@
 extends RigidBody2D
 
-@export var launch_speed: float = -2500.0
-## Holding launch sweeps power between this and full; a quick tap is always full power
-@export var min_launch_power: float = 0.5
+## Pokemon Pinball's plunger fires at 5.5 px/frame (1420 at this table's scale)
+@export var launch_speed: float = -1420.0
+## Holding launch sweeps power between this and full; a quick tap is always full power.
+## Even the weakest launch clears the plunger lane.
+@export var min_launch_power: float = 0.85
 @export var tap_seconds: float = 0.15
 @export var sweep_seconds: float = 0.9
 @export var anim_min_speed_scale: float = 0
-## Pokemon Pinball's ball never loses speed to friction or drag, only to what it hits, and
-## its speed is capped. That is what lets a good flip carry all the way up a ramp.
-@export var bounce: float = 0.3
-@export var max_speed: float = 2600.0
+## Tuned to Pokemon Pinball's engine (pret/pokepinball). Its field is about 160x310px,
+## so 1px there is about 4.3 units here, and it runs one physics step per 60Hz frame:
+##  - no friction or drag, only gravity: 11/256 px/frame^2 (660 here, project settings)
+##  - walls hand back a quarter of the speed going into them (bounce 0.25)
+##  - two speed limits per axis. The ball can hold up to 8 px/frame (max_velocity)
+##    but never moves more than 5 px/frame (max_travel). A hard shot therefore flies
+##    at a flat top speed until gravity has eaten the banked speed, then arcs over.
+@export var bounce: float = 0.25
+@export var max_velocity: float = 2050.0
+@export var max_travel: float = 1280.0
 ## The side ramps are water channels (collision layer 2, switched on by the gates). Once
 ## the ball is in one, the current carries it: speed never drops below ramp_min_speed, so
 ## a ball that made it through the gate always finishes the loop.
 @export var ramp_entry_speed: float = 1300.0
 @export var ramp_min_speed: float = 950.0
+## Ball search, like a real machine's: a ball that stays inside a small circle this long
+## (say, pinned between a bumper and a wall) gets knocked back toward the middle of the
+## table. The flipper area is left alone so a cradled ball stays put.
+@export var stuck_seconds: float = 1.5
+@export var stuck_radius: float = 40.0
+@export var unstick_speed: float = 700.0
+const UNSTICK_TOWARD := Vector2(340, 760)
+const CRADLE_Y := 1080.0  # below this the ball is on or around the flippers
+## The gates put a ball on the ramp colliders as it passes a ramp mouth. One that clips
+## the lip and bounces back out would then ignore every playfield wall and fall off the
+## table, so a ramp ball that stays off the ramp art (map_f2) this long goes back to
+## the playfield.
+@export var off_ramp_grace: float = 0.15
+const RAMP_ART := preload("res://Sprites/map_f2.png")
+const ART_PER_SCENE := Vector2(256.0 / 720.0, 424.0 / 1280.0)
+# The right ramp's top branch runs on into the shrine doorway, painted on the base art
+const SHRINE_CHUTE := Rect2(585, 160, 85, 150)
 
 var can_launch: bool = false
 var spawn_xform: Transform2D
@@ -27,6 +52,13 @@ var _charging := false
 var _charge_seconds := 0.0
 var _was_on_ramp := false
 var _ramp_trail: CPUParticles2D
+var _stuck_anchor := Vector2.ZERO
+var _stuck_time := 0.0
+var _off_ramp_time := 0.0
+var _banked_v := Vector2.ZERO  # the velocity the ball holds, up to max_velocity
+var _moved_v := Vector2.ZERO   # what it actually moved at last step, up to max_travel
+const BANK_TOLERANCE := 30.0  # a step of gravity against the ball (660/120) still keeps it
+static var _ramp_art: Image
 
 @onready var anim: AnimatedSprite2D = $AnimatedSprite2D
 
@@ -44,6 +76,8 @@ func _ready() -> void:
 	angular_damp_mode = DAMP_MODE_REPLACE
 	angular_damp = 0.0
 	_build_ramp_trail()
+	if _ramp_art == null:
+		_ramp_art = RAMP_ART.get_image()
 
 	var start_region: Area2D = get_tree().get_first_node_in_group("launch_region") as Area2D
 	if start_region:
@@ -62,7 +96,7 @@ func _ready() -> void:
 		anim.play()
 		anim.speed_scale = 1.0
 
-func _physics_process(_delta: float) -> void:
+func _physics_process(delta: float) -> void:
 	if anim:
 		anim.rotation = 0.0  # sprite stays upright
 
@@ -73,6 +107,45 @@ func _physics_process(_delta: float) -> void:
 			anim.speed_scale = max(absf(roll) * 0.1, anim_min_speed_scale) * signf(roll)
 		else:
 			anim.speed_scale = 0
+
+	_watch_for_stuck(delta)
+	_watch_ramp_exit(delta)
+
+func _watch_ramp_exit(delta: float) -> void:
+	if (collision_mask & RAMP_LAYER_BIT) == 0 or _over_ramp_art():
+		_off_ramp_time = 0.0
+		return
+	_off_ramp_time += delta
+	if _off_ramp_time >= off_ramp_grace:
+		_off_ramp_time = 0.0
+		collision_layer = _restore_layers
+		collision_mask = _restore_mask
+		z_index = _restore_z
+		PinballEvents.ball_left_ramp.emit(self)
+
+func _over_ramp_art() -> bool:
+	if _ramp_art == null:
+		return true  # no art to check against; leave it to the gates
+	if SHRINE_CHUTE.has_point(global_position):
+		return true
+	var px := Vector2i((global_position * ART_PER_SCENE).floor())
+	if px.x < 0 or px.y < 0 or px.x >= _ramp_art.get_width() or px.y >= _ramp_art.get_height():
+		return false
+	return _ramp_art.get_pixelv(px).a > 0.0
+
+func _watch_for_stuck(delta: float) -> void:
+	var pos := global_position
+	var exempt := can_launch or freeze or _pending_respawn or pos.y > CRADLE_Y \
+		or (collision_mask & RAMP_LAYER_BIT) != 0
+	if exempt or pos.distance_to(_stuck_anchor) > stuck_radius:
+		_stuck_anchor = pos
+		_stuck_time = 0.0
+		return
+	_stuck_time += delta
+	if _stuck_time >= stuck_seconds:
+		_stuck_time = 0.0
+		_stuck_anchor = pos
+		linear_velocity = (UNSTICK_TOWARD - pos).normalized() * unstick_speed
 
 func _process(delta: float) -> void:
 	if _charging:
@@ -163,6 +236,8 @@ func _integrate_forces(state: PhysicsDirectBodyState2D) -> void:
 		state.angular_velocity = 0.0
 		state.transform = spawn_xform
 		state.sleeping = false
+		_banked_v = Vector2.ZERO
+		_moved_v = Vector2.ZERO
 
 		_cooldown_frames -= 1
 		if _cooldown_frames <= 0:
@@ -172,6 +247,7 @@ func _integrate_forces(state: PhysicsDirectBodyState2D) -> void:
 		return
 
 	var v := state.linear_velocity
+	v = _add_back_banked(v)
 	var on_ramp := (collision_mask & RAMP_LAYER_BIT) != 0
 	if on_ramp and v.length() > 1.0:
 		var floor_speed := ramp_entry_speed if not _was_on_ramp else ramp_min_speed
@@ -180,7 +256,24 @@ func _integrate_forces(state: PhysicsDirectBodyState2D) -> void:
 	if on_ramp != _was_on_ramp:
 		_was_on_ramp = on_ramp
 		_ramp_trail.emitting = on_ramp
-	state.linear_velocity = v.limit_length(max_speed)
+	_banked_v = _clamp_axes(v, max_velocity)
+	_moved_v = _clamp_axes(_banked_v, max_travel)
+	state.linear_velocity = _moved_v
+
+# The engine only knows the speed the ball moved at. Put the banked excess back on
+# any axis where the ball is still going the same way at least as fast (free flight,
+# or a flipper still pushing it); a hit that stopped or turned it spends the excess.
+func _add_back_banked(v: Vector2) -> Vector2:
+	var excess := _banked_v - _moved_v
+	for axis in 2:
+		if excess[axis] != 0.0 and signf(v[axis]) == signf(excess[axis]) \
+				and absf(v[axis]) >= absf(_moved_v[axis]) - BANK_TOLERANCE:
+			v[axis] += excess[axis]
+	return v
+
+# Pokemon Pinball limits x and y separately, so a diagonal ball can go a bit faster
+func _clamp_axes(v: Vector2, limit: float) -> Vector2:
+	return Vector2(clampf(v.x, -limit, limit), clampf(v.y, -limit, limit))
 
 const RAMP_LAYER_BIT := 2
 

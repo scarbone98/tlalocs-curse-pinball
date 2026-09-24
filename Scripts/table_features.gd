@@ -4,7 +4,8 @@ extends Node2D
 ## The table art has empty lamp inserts painted in (lane circles, bonus bars,
 ## arrow inserts, wall lamps). This builds sprites on top of each one and runs
 ## the rules behind them: lane rollovers, bonus multiplier, the Tlaloc face
-## target and the curse storm mode.
+## target and the curse storm mode. Tlaloc's shrine, top right, shows the curse:
+## his mask wakes as the face is hit and its raindrop lamps fill toward the storm.
 
 # The 256x424 table art is stretched to 720x1280, so feature sprites use the same scale
 const MAP_SCALE := Vector2(720.0 / 256.0, 1280.0 / 424.0)
@@ -14,6 +15,9 @@ const BONUS_BAR := preload("res://Sprites/table/bonus_bar.png")
 const ARROW_INSERT := preload("res://Sprites/table/arrow_insert.png")
 const TORCH := preload("res://Sprites/table/torch.png")
 const RAINDROP := preload("res://Sprites/table/raindrop.png")
+const TLALOC_MASK := preload("res://Sprites/table/tlaloc_mask.png")
+const RAIN_LAMP := preload("res://Sprites/table/rain_lamp.png")
+const BRAZIER := preload("res://Sprites/table/brazier.png")
 const RampShots := preload("res://Scripts/ramp_shots.gd")
 const Kickback := preload("res://Scripts/kickback.gd")
 const SpiritCapture := preload("res://Scripts/spirit_capture.gd")
@@ -28,6 +32,11 @@ const ARROWS := [
 	[Vector2(86, 725), -22.0], [Vector2(592, 725), 22.0],
 ]
 const TORCHES := [Vector2(319, 549), Vector2(442, 642), Vector2(208, 815)]
+# The shrine's empty panels, in table-art pixels (see tools/make_shrine_sprites.py)
+const SHRINE_MASK_ART := Vector2(223.5, 42.5)
+# Raindrop lamps either side of the mask, in fill order: bottom pair, then top pair
+const SHRINE_LAMPS_ART := [Vector2(202.5, 46.5), Vector2(245.5, 46.5), Vector2(202.5, 38.5), Vector2(245.5, 38.5)]
+const SHRINE_BRAZIERS_ART := [Vector2(202, 75.5), Vector2(246, 75.5)]
 
 const TOP_LANE_POINTS := 250
 const TOP_LANES_COMPLETE_POINTS := 2000
@@ -37,8 +46,11 @@ const FACE_POINTS := 500
 const SKILL_SHOT_POINTS := 5000
 const SKILL_SHOT_WINDOW := 3.0  # seconds; a top lane this soon after launch came straight off the plunger
 const LANE_COOLDOWN := 0.8  # one bounce inside a rollover slot shouldn't score twice
-const FACE_HITS_FOR_CURSE := 3
+const FACE_HITS_FOR_CURSE := 5  # for the first curse; each one after needs FACE_HITS_STEP more
+const FACE_HITS_STEP := 2
+const FACE_HIT_COOLDOWN := 1.5  # a ball rattling around on the face only counts once
 const CURSE_SECONDS := 20.0
+const CURSE_REST_SECONDS := 30.0  # once the rain passes Tlaloc sleeps, and face hits don't build
 const MAX_MULTIPLIER := 5
 const MULTIBALL_DELAY := 1.4  # Tlaloc spits out the extra ball after the curse toast
 const MULTIBALL_SPEED := 1300.0
@@ -58,6 +70,12 @@ var _face: Area2D
 var _face_sprite: AnimatedSprite2D
 var _face_hits := 0
 var _face_cooldown := 0.0
+var _curses := 0
+var _rest_left := 0.0
+
+enum { MASK_ASLEEP, MASK_STIRRING, MASK_CURSED }
+var _shrine_mask: AnimatedSprite2D
+var _shrine_lamps: Array[AnimatedSprite2D] = []
 
 var _rain: CPUParticles2D
 var _storm_tint: CanvasModulate
@@ -72,6 +90,7 @@ func _ready() -> void:
 	_build_bonus_bars()
 	_build_arrows()
 	_build_torches()
+	_build_shrine()
 	_build_storm()
 	_hook_face()
 	for mode in [RampShots.new(), Kickback.new(), SpiritCapture.new()]:
@@ -153,6 +172,17 @@ func _build_torches() -> void:
 		torch.play()
 		_torches.append(torch)
 
+func _build_shrine() -> void:
+	_shrine_mask = _sprite(TLALOC_MASK, 3, SHRINE_MASK_ART * MAP_SCALE)
+	for at in SHRINE_LAMPS_ART:
+		_shrine_lamps.append(_sprite(RAIN_LAMP, 2, at * MAP_SCALE))
+	for at in SHRINE_BRAZIERS_ART:
+		var brazier := _sprite(BRAZIER, 4, at * MAP_SCALE, 8.0)
+		brazier.frame = randi() % 4
+		brazier.play()
+		_torches.append(brazier)  # flares up with the torches during the curse
+	_render_shrine()
+
 func _build_storm() -> void:
 	_storm_tint = CanvasModulate.new()
 	_storm_tint.color = Color.WHITE
@@ -211,6 +241,12 @@ func _physics_process(delta: float) -> void:
 	# Timers run on game time so they stay correct on slow frames
 	_skill_shot_left = maxf(_skill_shot_left - delta, 0.0)
 	_face_cooldown = maxf(_face_cooldown - delta, 0.0)
+	if _rest_left > 0.0:
+		_rest_left = maxf(_rest_left - delta, 0.0)
+		if _rest_left == 0.0:
+			_render_shrine()
+	if GameManager.curse_active:
+		_render_shrine()  # the lamps drain as the storm runs out
 	for area in _lane_cooldowns:
 		_lane_cooldowns[area] = maxf(_lane_cooldowns[area] - delta, 0.0)
 
@@ -253,17 +289,24 @@ func _on_face_body_entered(body: Node) -> void:
 		return
 	if _face_cooldown > 0.0:
 		return
-	_face_cooldown = 0.6
+	_face_cooldown = FACE_HIT_COOLDOWN
 
 	_award(FACE_POINTS, _face.global_position)
 	_flash_face_eyes()
-	if GameManager.curse_active:
+	if GameManager.curse_active or _rest_left > 0.0:
+		return
+	# Only a shot up through the face stirs Tlaloc; a ball falling back over it doesn't
+	if (body as RigidBody2D).linear_velocity.y > 0.0:
 		return
 	_face_hits += 1
-	if _face_hits >= FACE_HITS_FOR_CURSE:
+	if _face_hits >= _face_hits_needed():
 		_start_curse()
 	else:
-		PinballEvents.toast.emit("Tlaloc stirs %d/%d" % [_face_hits, FACE_HITS_FOR_CURSE])
+		PinballEvents.toast.emit("Tlaloc stirs %d/%d" % [_face_hits, _face_hits_needed()])
+		_render_shrine()
+
+func _face_hits_needed() -> int:
+	return FACE_HITS_FOR_CURSE + FACE_HITS_STEP * _curses
 
 func _award(points: int, at: Vector2) -> void:
 	PinballEvents.add_score.emit(points)
@@ -271,6 +314,7 @@ func _award(points: int, at: Vector2) -> void:
 
 func _start_curse() -> void:
 	_face_hits = 0
+	_curses += 1
 	GameManager.set_curse_active(true)
 	PinballEvents.toast.emit("Tlaloc's Curse!")
 	_rain.emitting = true
@@ -296,6 +340,8 @@ func _release_extra_ball() -> void:
 
 func _end_curse() -> void:
 	GameManager.set_curse_active(false)
+	_rest_left = CURSE_REST_SECONDS
+	_render_shrine()
 	PinballEvents.toast.emit("The rain passes")
 	_rain.emitting = false
 	create_tween().tween_property(_storm_tint, "color", Color.WHITE, 1.2)
@@ -323,6 +369,22 @@ func _render_top_lanes() -> void:
 func _render_bottom_lanes() -> void:
 	for i in _bottom_lamps.size():
 		_bottom_lamps[i].frame = 1 if _bottom_lit[i] else 0
+
+# Mask: asleep, stirring once the face has been hit, blazing under the curse. The rain
+# lamps fill toward the next curse, then drain as the storm runs out.
+func _render_shrine() -> void:
+	var lit := 0
+	if GameManager.curse_active:
+		_shrine_mask.frame = MASK_CURSED
+		lit = ceili(_shrine_lamps.size() * _curse_timer.time_left / CURSE_SECONDS)
+	elif _face_hits > 0 and _rest_left == 0.0:
+		_shrine_mask.frame = MASK_STIRRING
+		# spread over the hits before the one that brings the storm, so every hit shows
+		lit = mini(ceili(float(_shrine_lamps.size() * _face_hits) / (_face_hits_needed() - 1)), _shrine_lamps.size())
+	else:
+		_shrine_mask.frame = MASK_ASLEEP
+	for i in _shrine_lamps.size():
+		_shrine_lamps[i].frame = 1 if i < lit else 0
 
 func _on_multiplier_changed(multiplier: int) -> void:
 	for i in _bars.size():

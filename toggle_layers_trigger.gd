@@ -43,6 +43,9 @@ func _ready() -> void:
 	else:
 		back_ray.enabled = true
 
+	# The ball put itself back on the playfield, so its next pass is a fresh entry
+	PinballEvents.ball_left_ramp.connect(func(rb: RigidBody2D): _last_side.erase(rb.get_instance_id()))
+
 func _physics_process(_delta: float) -> void:
 	_frame += 1
 	if front_ray == null or back_ray == null:

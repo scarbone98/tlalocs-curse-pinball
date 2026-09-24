@@ -16,3 +16,4 @@ signal scored_at(points: int, world_pos: Vector2) # base points awarded at a spo
 signal multiplier_changed(multiplier: int)
 signal curse_changed(active: bool)
 signal ramp_made(side: String, combo: int) # ball went over a side ramp and back down
+signal ball_left_ramp(ball: RigidBody2D) # a ball bounced out of a ramp mouth; gates forget it

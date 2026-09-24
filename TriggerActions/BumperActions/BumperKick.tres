@@ -4,5 +4,7 @@
 
 [resource]
 script = ExtResource("1_y0jiy")
-base_impulse = 600.0
+base_impulse = 514.0
+gain = 1.25
+max_impulse = 2200.0
 metadata/_custom_type_script = "uid://b1vxe1lhs6tew"
