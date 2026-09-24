@@ -23,3 +23,5 @@ signal objective_changed(text: String) # the journey's current goal, shown under
 signal ball_tier_changed(tier: int)   # ball upgraded or worn down: 0 stone, 1 jade, 2 turquoise, 3 gold
 signal effect(kind: String, at: Vector2) # a burst of particles: "splash", "sparks", "dust" or "gold"
 signal rumble(strength: float)         # shakes the screen (and buzzes phones), like the cartridge's rumble pak
+signal billboard(picture: int, caption: String) # pop a picture up on the billboard (see Scripts/billboard.gd)
+signal billboard_spin(result: int, seconds: float, caption: String) # spin the roulette reel, landing on result

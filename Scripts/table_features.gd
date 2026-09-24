@@ -327,7 +327,7 @@ func _upgrade_ball() -> void:
 		return
 	_tier += 1
 	_apply_tier()
-	PinballEvents.toast.emit("%s Ball x%d!" % BALL_TIERS[_tier])
+	PinballEvents.billboard.emit(Billboard.BALL + _tier, "%s Ball x%d!" % BALL_TIERS[_tier])
 	AudioSfx.play("upgrade")
 
 func _apply_tier() -> void:

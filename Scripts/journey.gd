@@ -65,6 +65,9 @@ func _ready() -> void:
 	PinballEvents.top_lanes_completed.connect(func(): _feat_done("lanes"))
 	_render()
 	_announce_goal.call_deferred()
+	# The first launch shows where the journey starts
+	PinballEvents.ball_launched.connect(func():
+		PinballEvents.billboard.emit(Billboard.CITY + city, "The journey begins: %s" % CITIES[city].name), CONNECT_ONE_SHOT)
 
 func _build_serpent(side: int, wedge: Array, facing: Vector2) -> void:
 	var body := StaticBody2D.new()
@@ -152,7 +155,7 @@ func travel() -> void:
 	while relics[city]:
 		city = (city + 1) % CITIES.size()
 	features._award(TRAVEL_POINTS, _serpents[0].global_position.lerp(_serpents[1].global_position, 0.5))
-	PinballEvents.toast.emit("Travel to %s!" % CITIES[city].name)
+	PinballEvents.billboard.emit(Billboard.CITY + city, "Travel to %s!" % CITIES[city].name)
 	AudioSfx.play("ramp")
 	_announce_goal()
 
@@ -167,12 +170,12 @@ func _feat_done(feat: String) -> void:
 	features._award(RELIC_POINTS, _relic_lamps[city].global_position)
 	PinballEvents.effect.emit("gold", _relic_lamps[city].global_position)
 	PinballEvents.rumble.emit(4.0)
-	PinballEvents.toast.emit("Relic of %s!" % CITIES[city].name)
+	PinballEvents.billboard.emit(Billboard.RELIC + city, "Relic of %s!" % CITIES[city].name)
 	AudioSfx.play("catch")
 	if not relics.has(false):
 		el_dorado_open = true
 		features.temple.set_gate_open(true)
-		get_tree().create_timer(1.6).timeout.connect(func(): PinballEvents.toast.emit("El Dorado awakens!"))
+		get_tree().create_timer(2.8).timeout.connect(func(): PinballEvents.billboard.emit(Billboard.EL_DORADO, "El Dorado awakens!"))
 		_announce_goal()
 		return
 	get_tree().create_timer(1.6).timeout.connect(travel)

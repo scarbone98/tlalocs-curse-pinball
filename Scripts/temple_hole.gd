@@ -21,6 +21,10 @@ enum { HOLE_IDLE, HOLE_FLASH, GATE_A, GATE_B }
 const PRIZES := [
 	[3, "points_small"], [2, "points_big"], [2, "kickback"], [2, "spirit"], [2, "travel"],
 ]
+const PRIZE_CAPTIONS := {
+	"points_small": "Temple offering!", "points_big": "Temple treasure!", "kickback": "Kickback lit!",
+	"spirit": "A spirit rises!", "travel": "The road opens!",
+}
 
 var features: Node2D  # TableFeatures, which owns the shared sprite and scoring helpers
 var gate_open := false
@@ -73,13 +77,17 @@ func _catch(ball: RigidBody2D) -> void:
 		PinballEvents.toast.emit("To El Dorado!")
 		get_tree().create_timer(HOLD_SECONDS).timeout.connect(func(): features.el_dorado.enter(ball))
 		return
-	var travelling: bool = features.journey.road_open
-	PinballEvents.toast.emit("The road leads on..." if travelling else "Temple offering...")
-	get_tree().create_timer(HOLD_SECONDS).timeout.connect(func():
-		if travelling:
+	if features.journey.road_open:
+		PinballEvents.toast.emit("The road leads on...")
+		get_tree().create_timer(HOLD_SECONDS).timeout.connect(func():
 			features.journey.travel()
-		else:
-			_spin_roulette()
+			eject(ball))
+		return
+	# The prize is picked now so the billboard's reel can spin while the ball is held
+	var prize := _pick_prize()
+	PinballEvents.billboard_spin.emit(Billboard.PRIZE + Billboard.PRIZES.find(prize), HOLD_SECONDS, PRIZE_CAPTIONS[prize])
+	get_tree().create_timer(HOLD_SECONDS).timeout.connect(func():
+		_award_prize(prize)
 		eject(ball))
 
 ## Sends a held ball back down toward the flippers (the bonus stage returns it here too)
@@ -92,30 +100,34 @@ func eject(ball: RigidBody2D) -> void:
 	ball.linear_velocity = Vector2(randf_range(-EJECT_SPREAD, EJECT_SPREAD), EJECT_SPEED)
 	AudioSfx.play("launch")
 
-func _spin_roulette() -> void:
+# What the roulette lands on. A prize that can't apply right now (the kickback's already
+# lit, a spirit's already up) turns into an offering instead.
+func _pick_prize() -> String:
 	var total := 0
 	for prize in PRIZES:
 		total += prize[0]
 	var roll := randi() % total
-	var pick: String
+	var pick := "points_small"
 	for prize in PRIZES:
 		roll -= prize[0]
 		if roll < 0:
 			pick = prize[1]
 			break
-	match pick:
+	if pick == "kickback" and features.kickback.charged:
+		return "points_small"
+	if pick == "spirit" and features.spirit._active:
+		return "points_small"
+	return pick
+
+func _award_prize(prize: String) -> void:
+	match prize:
 		"kickback":
-			if features.kickback.charge():
-				return
+			features.kickback.charge()
 		"spirit":
-			if features.spirit.summon():
-				return
+			features.spirit.summon()
 		"travel":
 			features.journey.travel()
-			return
 		"points_big":
 			features._award(15000, AT + Vector2(0, -40))
-			PinballEvents.toast.emit("Temple treasure!")
-			return
-	features._award(5000, AT + Vector2(0, -40))
-	PinballEvents.toast.emit("Temple offering!")
+		_:
+			features._award(5000, AT + Vector2(0, -40))

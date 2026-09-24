@@ -17,6 +17,7 @@ var _power_meter: Control
 var _power_fill: ColorRect
 var _hint_label: Label
 var _objective_label: Label
+var _billboard: Billboard
 
 func _ready() -> void:
 	theme = ScareathonTheme.build(UI_SCALE)
@@ -27,6 +28,7 @@ func _ready() -> void:
 	_build_launch_button()
 	_build_hint()
 	_build_objective()
+	_build_billboard()
 
 	# Connect to global events
 	PinballEvents.set_score.connect(_on_set_score)
@@ -162,6 +164,14 @@ func _build_objective() -> void:
 	_objective_label.add_theme_stylebox_override("normal", ScareathonTheme.pill_box(UI_SCALE))
 	_objective_label.visible = false
 	add_child(_objective_label)
+
+# Pops up under the objective line for the big moments (see Scripts/billboard.gd)
+func _build_billboard() -> void:
+	_billboard = Billboard.new()
+	_billboard.set_anchors_preset(Control.PRESET_CENTER_TOP)
+	_billboard.grow_horizontal = Control.GROW_DIRECTION_BOTH
+	_billboard.offset_top = 88 * UI_SCALE
+	add_child(_billboard)
 
 func _on_objective_changed(text: String) -> void:
 	_objective_label.text = text
