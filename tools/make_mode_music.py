@@ -9,10 +9,13 @@ and noise channels), written as note lists below:
   el_dorado   The Gilded King: A minor, 140 bpm, a fanfare for the bonus stage
 
 Each track is one section played twice, the second time with a harmony line under
-the lead, and loops seamlessly. Needs ffmpeg for the OGG encode.
+the lead, and loops seamlessly. So switching to a mode never jars, every track is
+low-passed down to the table track's warmth (raw square waves and noise hats are much
+brighter) and normalised to 1 dB under its loudness (-18 LUFS). Needs ffmpeg.
 
 Run from the repo root:  python3 tools/make_mode_music.py
 """
+import json
 import math
 import random
 import struct
@@ -23,6 +26,8 @@ from pathlib import Path
 
 RATE = 22050
 OUT_DIR = Path("Audio/music")
+TARGET_LUFS = -19.0  # the table's own track measures -18
+LOWPASS_HZ = 2600    # rounds off the square waves' and hats' buzz, like the table track
 NOTE_NAMES = {"C": 0, "C#": 1, "Db": 1, "D": 2, "D#": 3, "Eb": 3, "E": 4, "F": 5, "F#": 6, "Gb": 6,
               "G": 7, "G#": 8, "Ab": 8, "A": 9, "A#": 10, "Bb": 10, "B": 11}
 
@@ -90,7 +95,7 @@ def render_drums(pattern, step_seconds, total_steps, volume, seed=1):
         elif hit == "h":    # a tick of noise, like rain
             n = int(0.025 * RATE)
             for i in range(n):
-                out[start + i] += rng.uniform(-1, 1) * (1 - i / n) ** 2 * volume * 0.35
+                out[start + i] += rng.uniform(-1, 1) * (1 - i / n) ** 2 * volume * 0.18
     return out
 
 
@@ -135,10 +140,12 @@ def mix(tracks, gains):
         for i, s in enumerate(track):
             out[i] += s * gain
     peak = max(abs(s) for s in out) or 1.0
-    return [math.tanh(1.2 * s / peak) * 0.85 for s in out]   # gentle limiter
+    return [s / peak * 0.8 for s in out]   # just headroom; loudness is set when encoding
 
 
 def write_ogg(name, samples):
+    """Low-passes, then normalises to TARGET_LUFS with a fixed gain (two-pass loudnorm in
+    linear mode, so the dynamics are left alone), and encodes."""
     OUT_DIR.mkdir(parents=True, exist_ok=True)
     with tempfile.NamedTemporaryFile(suffix=".wav") as tmp:
         with wave.open(tmp.name, "wb") as w:
@@ -146,8 +153,16 @@ def write_ogg(name, samples):
             w.setsampwidth(2)
             w.setframerate(RATE)
             w.writeframes(b"".join(struct.pack("<h", int(max(-1.0, min(1.0, s)) * 32767)) for s in samples))
-        subprocess.run(["ffmpeg", "-y", "-loglevel", "error", "-i", tmp.name, "-c:a", "libvorbis", "-q:a", "4",
-                        str(OUT_DIR / name)], check=True)
+        tone = "lowpass=f=%d,lowpass=f=%d" % (LOWPASS_HZ, LOWPASS_HZ)
+        probe = subprocess.run(["ffmpeg", "-hide_banner", "-nostats", "-i", tmp.name, "-af",
+                                tone + ",loudnorm=I=%g:TP=-2:LRA=11:print_format=json" % TARGET_LUFS,
+                                "-f", "null", "-"], capture_output=True, text=True, check=True).stderr
+        m = json.loads(probe[probe.rindex("{"):probe.rindex("}") + 1])
+        norm = ("loudnorm=I=%g:TP=-2:LRA=11:measured_I=%s:measured_TP=%s:measured_LRA=%s:"
+                "measured_thresh=%s:offset=%s:linear=true" % (TARGET_LUFS, m["input_i"], m["input_tp"],
+                                                              m["input_lra"], m["input_thresh"], m["target_offset"]))
+        subprocess.run(["ffmpeg", "-y", "-loglevel", "error", "-i", tmp.name, "-af", tone + "," + norm,
+                        "-ar", str(RATE), "-c:a", "libvorbis", "-q:a", "4", str(OUT_DIR / name)], check=True)
 
 
 def song(bpm, chords, lead, bass_pattern, roots, arp_notes, drums, harmony_down, gains):

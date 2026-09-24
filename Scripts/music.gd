@@ -10,9 +10,10 @@ const TRACKS := {
 	"spirit": preload("res://Audio/music/spirit.ogg"),
 }
 const PRIORITY := ["el_dorado", "curse", "spirit"]
-const MODE_VOLUME_DB := -8.0  # the mode loops are mixed hotter than the table track
+const MODE_VOLUME_DB := 0.0  # the loops are already matched to the table track's loudness
 const SILENT_DB := -40.0
-const FADE_SECONDS := 0.6
+const FADE_IN_SECONDS := 1.2
+const FADE_BACK_SECONDS := 1.5  # back to the table track, a touch slower still
 
 var _table: AudioStreamPlayer
 var _mode: AudioStreamPlayer
@@ -45,16 +46,16 @@ func _switch_to(mode: String) -> void:
 	_playing = mode
 	var fade := create_tween().set_parallel()
 	if mode == "":
-		fade.tween_property(_mode, "volume_db", SILENT_DB, FADE_SECONDS)
+		fade.tween_property(_mode, "volume_db", SILENT_DB, FADE_BACK_SECONDS)
 		if _table:
 			_table.stream_paused = false
-			fade.tween_property(_table, "volume_db", _table_volume_db, FADE_SECONDS)
+			fade.tween_property(_table, "volume_db", _table_volume_db, FADE_BACK_SECONDS)
 		fade.chain().tween_callback(_mode.stop)
 		return
 	_mode.stream = TRACKS[mode]
 	_mode.volume_db = SILENT_DB
 	_mode.play()
-	fade.tween_property(_mode, "volume_db", MODE_VOLUME_DB, FADE_SECONDS)
+	fade.tween_property(_mode, "volume_db", MODE_VOLUME_DB, FADE_IN_SECONDS)
 	if _table and not _table.stream_paused:
-		fade.tween_property(_table, "volume_db", SILENT_DB, FADE_SECONDS)
+		fade.tween_property(_table, "volume_db", SILENT_DB, FADE_IN_SECONDS)
 		fade.chain().tween_callback(func(): if _playing != "": _table.stream_paused = true)
