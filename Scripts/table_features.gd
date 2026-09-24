@@ -114,6 +114,7 @@ func _ready() -> void:
 	_build_arrows()
 	_build_shrine()
 	_build_storm()
+	_build_lane_gate()
 	_hook_face()
 	kickback = Kickback.new()
 	spirit = SpiritCapture.new()
@@ -197,6 +198,28 @@ func _build_arrows() -> void:
 		var arrow := _sprite(ARROW_INSERT, 2, entry[0])
 		arrow.rotation_degrees = entry[1]
 		_arrows.append(arrow)
+
+# The launch lane runs up the right side and round the top-right orbit into the top of
+# the table. Without a gate a ball in play could run the orbit backwards and drop all
+# the way back into the launch lane, so, like Pokemon Pinball's, a one-way gate where
+# the orbit meets the table lets launched balls out but turns balls in play away.
+const LANE_GATE_X := 480.0
+const LANE_GATE_SPAN := Vector2(215, 305)  # across the orbit, ends buried in its walls
+
+func _build_lane_gate() -> void:
+	var gate := StaticBody2D.new()
+	var shape := CollisionShape2D.new()
+	var segment := SegmentShape2D.new()
+	segment.a = Vector2(-(LANE_GATE_SPAN.y - LANE_GATE_SPAN.x) / 2.0, 0)
+	segment.b = Vector2((LANE_GATE_SPAN.y - LANE_GATE_SPAN.x) / 2.0, 0)
+	shape.shape = segment
+	shape.one_way_collision = true
+	# One-way shapes stop bodies moving along their local +y; turned a quarter, that's
+	# a ball heading right, into the orbit. Launched balls come out heading left.
+	shape.rotation_degrees = -90.0
+	shape.position = Vector2(LANE_GATE_X, (LANE_GATE_SPAN.x + LANE_GATE_SPAN.y) / 2.0)
+	gate.add_child(shape)
+	add_child(gate)
 
 func _build_shrine() -> void:
 	_shrine_mask = _sprite(TLALOC_MASK, 4, SHRINE_MASK_ART * MAP_SCALE)
