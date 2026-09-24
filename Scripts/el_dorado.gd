@@ -187,6 +187,7 @@ func enter(ball: RigidBody2D) -> void:
 	ball.freeze = false
 	ball.linear_velocity = Vector2(0, 150)
 	_show_camera_on(Rect2(ORIGIN, Vector2(720, 1280)))
+	PinballEvents.el_dorado_changed.emit(true)
 	PinballEvents.billboard.emit(Billboard.EL_DORADO, "Strike the Gilded King!")
 	_show_progress()
 	AudioSfx.play("multiball")
@@ -224,6 +225,7 @@ func _finish(won: bool, message: String) -> void:
 		return
 	_active = false
 	PinballEvents.toast.emit(message)
+	PinballEvents.el_dorado_changed.emit(false)
 	var ball := _ball
 	ball.freeze_mode = RigidBody2D.FREEZE_MODE_KINEMATIC
 	ball.set_deferred("freeze", true)

@@ -82,6 +82,7 @@ func _summon() -> void:
 	_spirit.show()
 	_area.set_deferred("monitoring", true)
 	PinballEvents.toast.emit("A water spirit rises!")
+	PinballEvents.spirit_changed.emit(true)
 	AudioSfx.play("spirit")
 
 func _physics_process(delta: float) -> void:
@@ -128,6 +129,7 @@ func _on_body_entered(body: Node) -> void:
 
 func _dismiss() -> void:
 	_active = false
+	PinballEvents.spirit_changed.emit(false)
 	_area.set_deferred("monitoring", false)
 	_spirit.hide()
 	_splash()

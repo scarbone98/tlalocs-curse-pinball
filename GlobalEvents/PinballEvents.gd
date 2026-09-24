@@ -25,3 +25,5 @@ signal effect(kind: String, at: Vector2) # a burst of particles: "splash", "spar
 signal rumble(strength: float)         # shakes the screen (and buzzes phones), like the cartridge's rumble pak
 signal billboard(picture: int, caption: String) # pop a picture up on the billboard (see Scripts/billboard.gd)
 signal billboard_spin(result: int, seconds: float, caption: String) # spin the roulette reel, landing on result
+signal spirit_changed(active: bool)    # a water spirit rose or went back under
+signal el_dorado_changed(active: bool) # the ball went into El Dorado or came back out

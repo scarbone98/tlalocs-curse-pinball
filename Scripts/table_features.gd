@@ -25,6 +25,7 @@ const Journey := preload("res://Scripts/journey.gd")
 const Spinner := preload("res://Scripts/spinner.gd")
 const Effects := preload("res://Scripts/effects.gd")
 const TableLife := preload("res://Scripts/table_life.gd")
+const Music := preload("res://Scripts/music.gd")
 const TempleHole := preload("res://Scripts/temple_hole.gd")
 const ElDorado := preload("res://Scripts/el_dorado.gd")
 
@@ -121,6 +122,7 @@ func _ready() -> void:
 		mode.features = self
 		add_child(mode)
 	add_child(Effects.new())
+	add_child(Music.new())
 	var life := TableLife.new()
 	life.features = self
 	add_child(life)
