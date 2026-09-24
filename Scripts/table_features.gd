@@ -23,6 +23,8 @@ const Kickback := preload("res://Scripts/kickback.gd")
 const SpiritCapture := preload("res://Scripts/spirit_capture.gd")
 const Journey := preload("res://Scripts/journey.gd")
 const Spinner := preload("res://Scripts/spinner.gd")
+const Effects := preload("res://Scripts/effects.gd")
+const TableLife := preload("res://Scripts/table_life.gd")
 const TempleHole := preload("res://Scripts/temple_hole.gd")
 const ElDorado := preload("res://Scripts/el_dorado.gd")
 
@@ -91,7 +93,7 @@ var _tier := 0
 var _tier_left := 0.0
 var _rest_left := 0.0
 
-enum { MASK_ASLEEP, MASK_STIRRING, MASK_CURSED }
+enum { MASK_ASLEEP, MASK_STIRRING, MASK_CURSED, MASK_GLOWING }
 var _shrine_mask: AnimatedSprite2D
 var _shrine_lamps: Array[AnimatedSprite2D] = []
 
@@ -118,6 +120,10 @@ func _ready() -> void:
 	for mode in [RampShots.new(), kickback, spirit, journey, temple, Spinner.new()]:
 		mode.features = self
 		add_child(mode)
+	add_child(Effects.new())
+	var life := TableLife.new()
+	life.features = self
+	add_child(life)
 	# The bonus stage is its own chamber below the table, so it lives beside it
 	el_dorado = ElDorado.new()
 	el_dorado.features = self
@@ -199,7 +205,7 @@ func _build_torches() -> void:
 		_torches.append(torch)
 
 func _build_shrine() -> void:
-	_shrine_mask = _sprite(TLALOC_MASK, 3, SHRINE_MASK_ART * MAP_SCALE)
+	_shrine_mask = _sprite(TLALOC_MASK, 4, SHRINE_MASK_ART * MAP_SCALE)
 	for at in SHRINE_LAMPS_ART:
 		_shrine_lamps.append(_sprite(RAIN_LAMP, 2, at * MAP_SCALE))
 	for at in SHRINE_BRAZIERS_ART:
@@ -273,6 +279,9 @@ func _physics_process(delta: float) -> void:
 			_render_shrine()
 	if GameManager.curse_active:
 		_render_shrine()  # the lamps drain as the storm runs out
+	elif _shrine_mask.frame == MASK_STIRRING or _shrine_mask.frame == MASK_GLOWING:
+		# his eyes smoulder while he stirs
+		_shrine_mask.frame = MASK_GLOWING if Time.get_ticks_msec() % 900 < 450 else MASK_STIRRING
 	if _tier > 0:
 		_tier_left -= delta
 		if _tier_left <= 0.0:
@@ -411,6 +420,7 @@ func _end_curse() -> void:
 func _strike_lightning() -> void:
 	if not GameManager.curse_active:
 		return
+	PinballEvents.rumble.emit(5.0)
 	var tween := create_tween()
 	tween.tween_property(_lightning, "color:a", 0.55, 0.04)
 	tween.tween_property(_lightning, "color:a", 0.0, 0.08)

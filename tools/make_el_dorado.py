@@ -228,9 +228,11 @@ def king_frame(state):
     # brow ridge and almond eyes of shell and obsidian
     c.rect(9, 17, 13, 17, ORANGE)
     white, pupil = (WHITE, INK) if state == "idle" else (PALE, WHITE) if state == "hit" else (GOLD_D, GOLD_D)
+    if state == "blink":
+        white, pupil = ORANGE, ORANGE
     c.rect(10, 18, 13, 18, INK); c.set(9, 19, INK); c.set(14, 19, INK)
     c.rect(10, 19, 13, 19, white); c.rect(11, 19, 12, 19, pupil)
-    c.rect(10, 20, 13, 20, INK if state != "beaten" else GOLD_D)
+    c.rect(10, 20, 13, 20, INK if state not in ("beaten", "blink") else GOLD_D)
     if state == "beaten":
         c.rect(9, 19, 14, 19, BRONZE); c.rect(10, 18, 13, 18, GOLD_D)
     # nose: lit bridge between shaded wings, nostrils
@@ -256,7 +258,7 @@ def king_frame(state):
 
 
 def king_frames():
-    return [king_frame(state) for state in ("idle", "hit", "beaten")]
+    return [king_frame(state) for state in ("idle", "hit", "beaten", "blink")]
 
 
 def coin_frame(lit):

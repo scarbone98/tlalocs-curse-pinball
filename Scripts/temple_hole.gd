@@ -67,6 +67,8 @@ func _catch(ball: RigidBody2D) -> void:
 	sink.tween_property(ball, "global_position", AT, 0.1)
 	sink.parallel().tween_property(ball.anim, "scale", ball.anim.scale * 0.6, 0.1)
 	AudioSfx.play("kickback")
+	PinballEvents.rumble.emit(4.0)
+	PinballEvents.effect.emit("gold" if gate_open else "dust", AT)
 	if gate_open:
 		PinballEvents.toast.emit("To El Dorado!")
 		get_tree().create_timer(HOLD_SECONDS).timeout.connect(func(): features.el_dorado.enter(ball))

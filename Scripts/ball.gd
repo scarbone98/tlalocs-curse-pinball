@@ -44,6 +44,12 @@ const CRADLE_Y := 1080.0  # below this the ball is on or around the flippers
 ## the playfield.
 @export var off_ramp_grace: float = 0.15
 const RAMP_ART := preload("res://Sprites/map_f2.png")
+## Pokemon Pinball rumbles on any collision faster than 3 px/frame into the surface
+## (770 here); harder hits shake more.
+const IMPACT_SPEED := 770.0
+const IMPACT_RUMBLE_PER_SPEED := 1.0 / 400.0
+const IMPACT_MAX_RUMBLE := 3.0  # a wall never shakes as hard as the table's big moments
+const IMPACT_COOLDOWN := 0.12
 const ART_PER_SCENE := Vector2(256.0 / 720.0, 424.0 / 1280.0)
 # The right ramp's top branch runs on into the shrine doorway, painted on the base art
 const SHRINE_CHUTE := Rect2(585, 160, 85, 150)
@@ -67,6 +73,7 @@ var _moved_v := Vector2.ZERO   # what it actually moved at last step, up to max_
 var draw_scale := 1.0  # the sprite's scale as set in the scene (the temple hole shrinks it)
 var stage_origin := Vector2.ZERO  # top left of the table the ball is on (El Dorado is below)
 var _spin := 0.0   # radians per second, clockwise
+var _impact_cooldown := 0.0
 var _turn := 0.0   # how far the sprite has turned
 const BANK_TOLERANCE := 30.0  # a step of gravity against the ball (660/120) still keeps it
 static var _ramp_art: Image
@@ -121,6 +128,7 @@ func _physics_process(delta: float) -> void:
 		# held by the temple or the kickback; whatever it banked before doesn't carry over
 		_banked_v = Vector2.ZERO
 		_moved_v = Vector2.ZERO
+	_impact_cooldown = maxf(_impact_cooldown - delta, 0.0)
 	_watch_for_stuck(delta)
 	_watch_ramp_exit(delta)
 
@@ -303,6 +311,15 @@ func _update_spin(state: PhysicsDirectBodyState2D, v: Vector2) -> void:
 		return
 	var normal := state.get_contact_local_normal(0)
 	_spin = normal.cross(v) / _drawn_radius()
+	# how fast it was going into the surface it just met
+	var into := -_moved_v.dot(normal)
+	if into > IMPACT_SPEED and _impact_cooldown <= 0.0:
+		_impact_cooldown = IMPACT_COOLDOWN
+		_on_impact.call_deferred(global_position - normal * 19.0, (into - IMPACT_SPEED) * IMPACT_RUMBLE_PER_SPEED + 1.0)
+
+func _on_impact(at: Vector2, strength: float) -> void:
+	PinballEvents.effect.emit("dust", at)
+	PinballEvents.rumble.emit(minf(strength, IMPACT_MAX_RUMBLE))
 
 func _drawn_radius() -> float:
 	return anim.sprite_frames.get_frame_texture("default", 0).get_width() * anim.scale.x * 0.5 if anim else 19.0

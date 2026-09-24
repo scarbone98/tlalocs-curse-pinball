@@ -3,7 +3,8 @@
 Writes over the files the scenes already reference, so no scene edits are needed:
 
   Sprites/pinball_sprite.png     16 frames of a silver ball with a spinning jade glyph
-  bumper_mushroom.png            frog-on-lily-pad bumper (idle, hit)
+  bumper_mushroom.png            frog-on-lily-pad bumper (idle, hit, then blink and
+                                 throat-puff frames it plays while waiting)
   bumper_mushroom_dust.png       5-frame water splash played on each bumper hit
   paddle_left.png / right.png    gold flippers (recolored from tools/source_art)
 
@@ -88,9 +89,12 @@ FROG = [
     "Fo.oGGo.oF",
     "FF..oo..FF",
 ]
+# While it waits, the frog blinks and puffs out its throat
+FROG_BLINK = [".ooo..ooo.", ".oGo..oGo."] + FROG[2:]
+FROG_PUFF = FROG[:5] + [".oGllllGo.", "Fo.ollo.oF"] + FROG[7:]
 
 
-def frog_frame(hit):
+def frog_frame(hit, rows=FROG):
     pad = Image.new("RGBA", (14, 14), T)
     lily, lily_dark, glow = rgba("#1F5E45"), rgba("#123D2C"), rgba("#F5D77A")
     for y in range(14):
@@ -105,7 +109,7 @@ def frog_frame(hit):
         "o": rgba("#14301A"), "G": rgba("#A6E85A" if hit else "#7FCF45"), "l": rgba("#E4FFB0" if hit else "#C2F07A"),
         "Y": rgba("#FFE27A"), "k": rgba("#101010"), "m": rgba("#3F8A2A"), "F": rgba("#5DB23A"),
     }
-    frog = from_rows(FROG, key)
+    frog = from_rows(rows, key)
     pad.alpha_composite(frog, (2, 3 if not hit else 2))
     return upscale(pad, 3)
 
@@ -152,7 +156,8 @@ def recolor_flipper(name):
 
 def main():
     strip([ball_frame(i * 2 * math.pi / 16) for i in range(16)]).save("Sprites/pinball_sprite.png")
-    strip([frog_frame(False), frog_frame(True)]).save("bumper_mushroom.png")
+    strip([frog_frame(False), frog_frame(True), frog_frame(False, FROG_BLINK), frog_frame(False, FROG_PUFF)]).save(
+        "bumper_mushroom.png")
     strip([splash_frame(i) for i in range(5)]).save("bumper_mushroom_dust.png")
     recolor_flipper("paddle_left.png")
     recolor_flipper("paddle_right.png")

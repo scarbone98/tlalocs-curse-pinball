@@ -91,6 +91,8 @@ func _on_kick_zone_entered(body: Node, index: int) -> void:
 	_carry_out(ball, CARRY_PATHS[index])
 	features._award(KICK_POINTS, _frogs[index].global_position)
 	PinballEvents.toast.emit("Kickback!")
+	PinballEvents.effect.emit("splash", _frogs[index].global_position)
+	PinballEvents.rumble.emit(6.0)
 	AudioSfx.play("kickback")
 
 	_frogs[index].frame = LEAP

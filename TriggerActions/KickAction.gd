@@ -10,6 +10,8 @@ class_name BumperKickAction
 @export var max_impulse: float = 3200.0     # clamp to keep it sane
 @export var nudge_out_px: float = 1.0       # small push out to avoid sticking
 @export var scatter_deg: float = 0.0        # random spread on the kick, so a ball can't settle into a repeating loop
+@export var effect: String = ""             # particle burst where the ball was struck (see Scripts/effects.gd)
+@export var rumble: float = 0.0             # screen shake for the hit, like the cartridge's rumble pak
 
 func execute(ball: RigidBody2D, trigger: Node) -> void:
 	if ball == null:
@@ -30,6 +32,10 @@ func execute(ball: RigidBody2D, trigger: Node) -> void:
 	var impulse: Vector2 = n * impulse_mag   # explicitly Vector2
 
 	ball.apply_impulse(impulse)
+	if effect != "":
+		PinballEvents.effect.emit(effect, trigger_pos.lerp(ball.global_position, 0.6))
+	if rumble > 0.0:
+		PinballEvents.rumble.emit(rumble)
 
 	# optional small nudge outward so ball doesn’t stay overlapping
 	if nudge_out_px > 0.0:

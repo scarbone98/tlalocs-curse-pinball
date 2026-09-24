@@ -72,12 +72,14 @@ def mask_frame(state):
     c.ellipse(8.5, 6.8, 7.0, 5.9, TEAL_L, where=lambda x, y: y <= 1)       # lit top of the ring
     c.rect(15, 4, 17, 7, TEAL); c.rect(15, 4, 17, 4, TEAL_L)
     c.ellipse(8.5, 6.8, 4.6, 3.9, NAVY)
-    inner = {"asleep": BLUE_D, "stirring": ORANGE, "cursed": RAIN}[state]
+    inner = {"asleep": BLUE_D, "stirring": ORANGE, "glowing": GOLD, "cursed": RAIN}[state]
     c.ellipse(8.5, 6.8, 3.7, 3.0, inner)
     if state == "asleep":
         c.rect(5, 6, 11, 6, STRIPE_B)          # shut lid
     elif state == "stirring":
         c.rect(7, 5, 9, 7, GOLD); c.set(8, 6, PALE)
+    elif state == "glowing":
+        c.rect(7, 5, 9, 7, PALE); c.set(8, 6, (255, 255, 255, 255))
     else:
         c.rect(7, 5, 9, 7, WHITE); c.set(8, 6, (255, 255, 255, 255))
     # moustache band, curling up into a spiral at each end
@@ -93,7 +95,7 @@ def mask_frame(state):
 
 
 def mask_frames():
-    return [mask_frame(state) for state in ("asleep", "stirring", "cursed")]
+    return [mask_frame(state) for state in ("asleep", "stirring", "cursed", "glowing")]
 
 
 # One lamp of the curse meter: a raindrop that fills as Tlaloc stirs.

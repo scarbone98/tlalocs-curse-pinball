@@ -31,6 +31,8 @@ const JACKPOT_STEP := 50000  # each trip's jackpot is worth more
 enum { KING_IDLE, KING_HIT, KING_BEATEN }
 
 var features: Node2D  # TableFeatures, for scoring and the table's own flippers
+# The frogs' kick, with gold sparks instead of a water splash, for the coins and the King
+var _gold_kick := _make_gold_kick()
 
 var _ball: RigidBody2D
 var _active := false
@@ -91,6 +93,11 @@ func _ready() -> void:
 	drain.body_entered.connect(func(body): if body == _ball: _finish(false, "The gold slips away"))
 	add_child(drain)
 
+static func _make_gold_kick() -> BumperKickAction:
+	var kick := BUMPER_KICK.duplicate() as BumperKickAction
+	kick.effect = "sparks"
+	return kick
+
 func _add_copy(original: Node, at: Vector2) -> Node2D:
 	var copy := original.duplicate() as Node2D
 	add_child(copy)
@@ -103,7 +110,7 @@ func _mirror(at: Vector2) -> Vector2:
 func _add_coin(at: Vector2) -> void:
 	var coin := Area2D.new()
 	coin.set_script(preload("res://TriggerActions/trigger_area.gd"))
-	var actions: Array[TriggerAction] = [BUMPER_KICK, BUMPER_SOUND]
+	var actions: Array[TriggerAction] = [_gold_kick, BUMPER_SOUND]
 	coin.actions = actions
 	coin.position = at
 	coin.monitorable = false
@@ -143,7 +150,7 @@ func _add_king() -> void:
 	sensor.body_entered.connect(_on_king_hit)
 	_king.add_child(sensor)
 
-	_king_sprite = features._sprite(KING, 3, Vector2.ZERO)
+	_king_sprite = features._sprite(KING, 4, Vector2.ZERO)
 	_king_sprite.reparent(_king, false)
 
 func _physics_process(delta: float) -> void:
@@ -188,7 +195,8 @@ func _on_king_hit(body: Node) -> void:
 	if not _active or body != _ball or _king_cooldown > 0.0:
 		return
 	_king_cooldown = KING_HIT_COOLDOWN
-	BUMPER_KICK.execute(_ball, _king)
+	_gold_kick.execute(_ball, _king)
+	PinballEvents.rumble.emit(6.0)
 	_hits += 1
 	features._award(KING_POINTS, _king.global_position)
 	AudioSfx.play("spirit_hit", 0.0, Vector2.ONE * (1.0 + 0.1 * _hits))
@@ -200,6 +208,8 @@ func _on_king_hit(body: Node) -> void:
 		_king_sprite.frame = KING_BEATEN
 		var jackpot: int = JACKPOT + JACKPOT_STEP * features.journey.trips
 		features._award(jackpot, _king.global_position + Vector2(0, -60))
+		PinballEvents.effect.emit("gold", _king.global_position)
+		PinballEvents.rumble.emit(10.0)
 		AudioSfx.play("catch")
 		_finish(true, "EL DORADO!")
 	else:

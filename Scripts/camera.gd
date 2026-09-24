@@ -7,8 +7,16 @@ extends Camera2D
 const SWITCH_MARGIN := 80.0
 const GLIDE_SECONDS := 0.35
 
+## Rumble, like the Pokemon Pinball cartridge's rumble pak: hard hits jolt the view a
+## few pixels, and the shake dies away in a fraction of a second.
+const SHAKE_DECAY := 14.0
+
 var _followed: Node2D
 var _glide := 0.0
+var _shake := 0.0
+
+func _ready() -> void:
+	PinballEvents.rumble.connect(func(strength: float): _shake = maxf(_shake, strength))
 
 func _process(dt):
 	var target := _pick_target()
@@ -25,6 +33,9 @@ func _process(dt):
 		_glide = maxf(_glide - dt, 0.0)
 	else:
 		global_position = target.global_position
+
+	_shake *= exp(-SHAKE_DECAY * dt)
+	offset = Vector2(randf_range(-1.0, 1.0), randf_range(-1.0, 1.0)) * _shake if _shake > 0.3 else Vector2.ZERO
 
 func _pick_target() -> Node2D:
 	var followed_ok := is_instance_valid(_followed) and _followed.is_in_group("ball")

@@ -88,7 +88,7 @@ func _build_serpent(side: int, wedge: Array, facing: Vector2) -> void:
 	add_child(sensor)
 
 	var art: Vector2 = SERPENT_ART[side]
-	var head: AnimatedSprite2D = features._sprite(SERPENT, 2, art * features.MAP_SCALE)
+	var head: AnimatedSprite2D = features._sprite(SERPENT, 3, art * features.MAP_SCALE)
 	head.flip_h = side == 1
 	_serpents.append(head)
 	for i in HITS_TO_TRAVEL:
@@ -125,6 +125,8 @@ func _on_serpent_hit(body: Node, side: int, facing: Vector2) -> void:
 	ball.linear_velocity += facing * HIT_PUSH
 	features._award(HIT_POINTS, _serpents[side].global_position)
 	AudioSfx.play("bumper")
+	PinballEvents.effect.emit("sparks", ball.global_position - facing * 20.0)
+	PinballEvents.rumble.emit(5.0)
 	_serpents[side].frame = SERPENT_HIT
 	get_tree().create_timer(0.25).timeout.connect(func(): _serpents[side].frame = SERPENT_IDLE)
 	if road_open or el_dorado_open:
@@ -163,6 +165,8 @@ func _feat_done(feat: String) -> void:
 		return
 	relics[city] = true
 	features._award(RELIC_POINTS, _relic_lamps[city].global_position)
+	PinballEvents.effect.emit("gold", _relic_lamps[city].global_position)
+	PinballEvents.rumble.emit(4.0)
 	PinballEvents.toast.emit("Relic of %s!" % CITIES[city].name)
 	AudioSfx.play("catch")
 	if not relics.has(false):

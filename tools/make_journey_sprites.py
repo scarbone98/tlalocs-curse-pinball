@@ -89,11 +89,18 @@ SERPENT_IDLE = {".": T, "o": INK, "S": STONE, "s": STONE_D, "L": STONE_L, "J": J
 SERPENT_STRUCK = dict(SERPENT_IDLE, S=STONE_L, s=STONE, L=WHITE, E=WHITE, K=EMBER, J=GREEN, g=PALE, R=ORANGE)
 
 
-def serpent(struck):
+# While it waits, the serpent flicks its forked tongue out past its jaws
+SERPENT_TONGUE = list(SERPENT)
+SERPENT_TONGUE[15] = "oSSSSSSMMMMMMMMMMMoR"
+SERPENT_TONGUE[16] = "oSsSSSSMMRRRRRRRRRRR"
+SERPENT_TONGUE[17] = "oSSSSSSMMMMMMMMMMMoR"
+
+
+def serpent(struck, rows=SERPENT):
     """A feathered serpent's head coming out of the left wall, facing right. 20x24."""
     key = SERPENT_STRUCK if struck else SERPENT_IDLE
-    img = Image.new("RGBA", (20, len(SERPENT)), T)
-    for y, row in enumerate(SERPENT):
+    img = Image.new("RGBA", (20, len(rows)), T)
+    for y, row in enumerate(rows):
         for x, ch in enumerate(row.ljust(20, ".")):
             img.putpixel((x, y), key[ch])
     return img
@@ -184,7 +191,7 @@ def hole(state):
 
 def main():
     OUT_DIR.mkdir(parents=True, exist_ok=True)
-    strip([serpent(False), serpent(True)]).save(OUT_DIR / "serpent.png")
+    strip([serpent(False), serpent(True), serpent(False, SERPENT_TONGUE)]).save(OUT_DIR / "serpent.png")
     strip([from_rows(PIP_OFF, PIP_KEY), from_rows(PIP_ON, PIP_KEY)]).save(OUT_DIR / "serpent_pip.png")
     relics = [from_rows(r, RELIC_DARK) for r in RELICS] + [from_rows(r, RELIC_LIT) for r in RELICS]
     strip(relics).save(OUT_DIR / "relics.png")
