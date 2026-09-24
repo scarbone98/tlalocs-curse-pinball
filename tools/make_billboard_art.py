@@ -9,6 +9,7 @@ Ours pops up under the score with, one 64x40 frame each:
    5-9   the temple roulette's prizes: offering, treasure, kickback, water spirit, travel
    10-13 the four relics
    14-17 the four ball upgrades
+   18-33 the sixteen spirits of the Spirit Codex, on a teal sunburst
 
 The monuments are drawn on the left and mirrored, lit evenly from the front so the
 mirror holds. The prizes, relics and balls are the table's own sprites, enlarged on a
@@ -262,6 +263,10 @@ def main():
     pictures = cities + [el_dorado()] + prizes
     pictures += [framed(r, 3) for r in relics]
     pictures += [framed(b, 2) for b in balls]
+    sheet = Image.open("Sprites/table/spirits.png").convert("RGBA")
+    for row in range(sheet.height // 14):
+        spirit = sheet.crop((0, row * 14, 18, row * 14 + 14))
+        pictures.append(framed(spirit, 2, backdrop=(C('#123a4a'), C('#1a5a6a'))))
     strip(pictures).save(OUT)
     print("wrote", OUT, len(pictures), "pictures")
 

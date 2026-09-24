@@ -18,6 +18,7 @@ var _power_fill: ColorRect
 var _hint_label: Label
 var _objective_label: Label
 var _billboard: Billboard
+var _codex: CodexScreen
 
 func _ready() -> void:
 	theme = ScareathonTheme.build(UI_SCALE)
@@ -29,6 +30,7 @@ func _ready() -> void:
 	_build_hint()
 	_build_objective()
 	_build_billboard()
+	_build_codex()
 
 	# Connect to global events
 	PinballEvents.set_score.connect(_on_set_score)
@@ -173,6 +175,21 @@ func _build_billboard() -> void:
 	_billboard.offset_top = 88 * UI_SCALE
 	add_child(_billboard)
 
+# The Spirit Codex: a button between the score and balls opens it over the table
+func _build_codex() -> void:
+	var button := Button.new()
+	button.text = "Codex"
+	button.focus_mode = Control.FOCUS_NONE
+	button.add_to_group("touch_block")
+	button.add_theme_font_size_override("font_size", int(15 * UI_SCALE))
+	button.set_anchors_preset(Control.PRESET_CENTER_TOP)
+	button.grow_horizontal = Control.GROW_DIRECTION_BOTH
+	button.offset_top = 16 * UI_SCALE
+	button.pressed.connect(func(): _codex.open())
+	add_child(button)
+	_codex = CodexScreen.new()
+	add_child(_codex)
+
 func _on_objective_changed(text: String) -> void:
 	_objective_label.text = text
 	_objective_label.visible = not _hint_label.visible
@@ -228,11 +245,18 @@ func _on_game_over(final_score: int, is_new_best: bool) -> void:
 	box.add_child(_centered_label("Score  %d" % final_score, "ScoreLabel"))
 	box.add_child(_centered_label("New best!" if is_new_best else "Best  %d" % HighScore.load_best(), "HintLabel"))
 
+	box.add_child(_centered_label("Spirit Codex  %d/%d" % [SpiritCodex.count(), SpiritCodex.SPECIES.size()], "HintLabel"))
+	var codex := Button.new()
+	codex.text = "Codex"
+	codex.pressed.connect(func(): _codex.open())
+	box.add_child(codex)
+
 	var again := Button.new()
 	again.text = "Play Again"
 	again.pressed.connect(GameManager.restart)
 	box.add_child(again)
 	again.grab_focus()
+	move_child(_codex, -1)  # the Codex opens over the game over panel
 
 func _centered_label(text: String, variation: StringName) -> Label:
 	var label := Label.new()

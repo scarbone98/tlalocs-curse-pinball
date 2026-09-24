@@ -22,6 +22,7 @@ boot_splash/image="res://ui/splash.png"
 PinballEvents="*res://GlobalEvents/PinballEvents.gd"
 GameManager="*res://GlobalEvents/GameManager.gd"
 AudioSfx="*res://GlobalEvents/Sfx.gd"
+SpiritCodex="*res://GlobalEvents/SpiritCodex.gd"
 
 [display]
 

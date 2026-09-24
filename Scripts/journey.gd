@@ -31,7 +31,7 @@ const RELIC_POINTS := 10000
 
 const CITIES := [
 	{"name": "Tenochtitlan", "goal": "Make %d ramps", "feat": "ramps", "need": 3},
-	{"name": "Teotihuacan", "goal": "Catch %d water spirit", "feat": "spirit", "need": 1},
+	{"name": "Teotihuacan", "goal": "Catch a spirit", "feat": "spirit", "need": 1},
 	{"name": "Chichen Itza", "goal": "Wake Tlaloc's curse", "feat": "curse", "need": 1},
 	{"name": "Palenque", "goal": "Light all top lanes", "feat": "lanes", "need": 1},
 ]
