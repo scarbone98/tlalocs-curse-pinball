@@ -16,6 +16,7 @@ var _launch_box: VBoxContainer
 var _power_meter: Control
 var _power_fill: ColorRect
 var _hint_label: Label
+var _objective_label: Label
 
 func _ready() -> void:
 	theme = ScareathonTheme.build(UI_SCALE)
@@ -25,6 +26,7 @@ func _ready() -> void:
 	_build_toast()
 	_build_launch_button()
 	_build_hint()
+	_build_objective()
 
 	# Connect to global events
 	PinballEvents.set_score.connect(_on_set_score)
@@ -33,6 +35,7 @@ func _ready() -> void:
 	PinballEvents.launch_available.connect(_on_launch_available)
 	PinballEvents.launch_power_changed.connect(_on_launch_power_changed)
 	PinballEvents.game_over.connect(_on_game_over)
+	PinballEvents.objective_changed.connect(_on_objective_changed)
 
 	_render_score()
 	_render_lives()
@@ -146,6 +149,24 @@ func _build_hint() -> void:
 	_hint_label.text = "Flippers: tap sides or Left / Right\nHold Launch, let go in the gold: skill shot"
 	add_child(_hint_label)
 
+# The journey's current goal, in the hint's spot once the controls hint has gone
+func _build_objective() -> void:
+	_objective_label = Label.new()
+	_objective_label.theme_type_variation = "HintLabel"
+	_objective_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_objective_label.add_theme_font_size_override("font_size", int(13 * UI_SCALE))
+	_objective_label.set_anchors_preset(Control.PRESET_CENTER_TOP)
+	_objective_label.grow_horizontal = Control.GROW_DIRECTION_BOTH
+	_objective_label.offset_top = 62 * UI_SCALE
+	_objective_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_objective_label.add_theme_stylebox_override("normal", ScareathonTheme.pill_box(UI_SCALE))
+	_objective_label.visible = false
+	add_child(_objective_label)
+
+func _on_objective_changed(text: String) -> void:
+	_objective_label.text = text
+	_objective_label.visible = not _hint_label.visible
+
 func _on_set_score(_value: int) -> void:
 	_render_score()
 
@@ -157,7 +178,9 @@ func _on_launch_available(available: bool) -> void:
 	_power_meter.modulate.a = 0.0
 	# The controls hint only matters until the first ball is in play
 	if not available and _hint_label.visible:
-		create_tween().tween_property(_hint_label, "modulate:a", 0.0, 0.4).finished.connect(_hint_label.hide)
+		create_tween().tween_property(_hint_label, "modulate:a", 0.0, 0.4).finished.connect(func():
+			_hint_label.hide()
+			_objective_label.visible = _objective_label.text != "")
 
 func _on_toast(message: String) -> void:
 	if _tween and _tween.is_running():

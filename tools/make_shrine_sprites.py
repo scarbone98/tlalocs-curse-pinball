@@ -15,6 +15,8 @@ from pathlib import Path
 
 from PIL import Image
 
+from pixel_art import Canvas, asymmetry
+
 OUT_DIR = Path("Sprites/table")
 
 # Sampled from Sprites/map_f1.png
@@ -57,55 +59,41 @@ def strip(frames):
     return sheet
 
 
-# Tlaloc's mask: goggle rings for eyes, a curled moustache lip and fangs. The eye
-# centres (E) change per frame: shut while he sleeps, gold as he stirs, lightning
-# white under the curse.
-MASK = [
-    ".....ooooooo...........ooooooo.....",
-    "...ooRRRRRRRoo.......ooRRRRRRRoo...",
-    "..oRRrrrrrrrRRo.....oRRrrrrrrrRRo..",
-    ".oRRroooooooRRRooooooRRroooooooRRo.",
-    ".oRroEEEEEEEorRRRRRRRRroEEEEEEEorRo",
-    "oRRoEEEEEEEEEoRRrrrrrRoEEEEEEEEEoRRo"[:35],
-    "oRroEEEEEEEEEorRooooRroEEEEEEEEEorRo"[:35],
-    "oRroEEEEEEEEEorRoRRoRroEEEEEEEEEorRo"[:35],
-    "oRRoEEEEEEEEEoRRoRRoRRoEEEEEEEEEoRRo"[:35],
-    ".oRroEEEEEEEorRRoRRoRRroEEEEEEEorRo."[:35],
-    ".oRRroooooooRRRRRRRRRRRroooooooRRo."[:35],
-    "..oRRRRRRRRRRRRRRRRRRRRRRRRRRRRRo.."[:35],
-    ".ooMMMMMMMMMMMMMMMMMMMMMMMMMMMMMoo."[:35],
-    "oMMmmmmmmmmmmmmmmmmmmmmmmmmmmmmmMMo"[:35],
-    "oMmoooooFFoooooFFoooooFFoooooFFomMo"[:35],
-    ".oo.....FF.....FF.....FF.....FF.oo."[:35],
-    "........o.......o.....o.......o...."[:35],
-]
+# Tlaloc's mask: goggle rings for eyes, a curled moustache lip and fangs, drawn on the
+# left and mirrored so it's exactly symmetrical. The eyes change per frame: shut while
+# he sleeps, gold as he stirs, lightning white under the curse.
+BLUE_D = (0x18, 0x42, 0x88, 255)
 
 
-def mask_key(eye):
-    return {
-        ".": T, "o": INK, "R": TEAL, "r": NAVY, "M": STRIPE_B, "m": STRIPE_W,
-        "F": WHITE, "E": eye,
-    }
+def mask_frame(state):
+    c = Canvas(35, 17)
+    # goggle rings joined by a bridge over the nose
+    c.ellipse(8.5, 6.8, 7.0, 5.9, TEAL)
+    c.ellipse(8.5, 6.8, 7.0, 5.9, TEAL_L, where=lambda x, y: y <= 1)       # lit top of the ring
+    c.rect(15, 4, 17, 7, TEAL); c.rect(15, 4, 17, 4, TEAL_L)
+    c.ellipse(8.5, 6.8, 4.6, 3.9, NAVY)
+    inner = {"asleep": BLUE_D, "stirring": ORANGE, "cursed": RAIN}[state]
+    c.ellipse(8.5, 6.8, 3.7, 3.0, inner)
+    if state == "asleep":
+        c.rect(5, 6, 11, 6, STRIPE_B)          # shut lid
+    elif state == "stirring":
+        c.rect(7, 5, 9, 7, GOLD); c.set(8, 6, PALE)
+    else:
+        c.rect(7, 5, 9, 7, WHITE); c.set(8, 6, (255, 255, 255, 255))
+    # moustache band, curling up into a spiral at each end
+    c.rect(4, 11, 17, 12, STRIPE_B); c.rect(5, 11, 17, 11, STRIPE_W)
+    c.ellipse(3.0, 10.4, 2.3, 2.3, STRIPE_B); c.set(3, 10, STRIPE_W); c.set(2, 10, NAVY)
+    # fangs hanging from the lip, tapering to a point
+    for fx, ln in ((9, 2), (12, 3), (15, 3)):
+        c.rect(fx - 1, 13, fx, 13, WHITE)
+        c.rect(fx, 14, fx, 12 + ln, WHITE)
+    c.mirror()
+    c.outline(INK)
+    return c.image()
 
 
 def mask_frames():
-    rows = [r.ljust(35, ".")[:35] for r in MASK]
-    asleep = from_rows(rows, mask_key(NAVY))
-    # Shut eyes: a lid line across the middle of each goggle
-    for x in range(5, 12):
-        asleep.putpixel((x, 7), STRIPE_B)
-    for x in range(24, 31):
-        asleep.putpixel((x, 7), STRIPE_B)
-    stirring = from_rows(rows, mask_key(ORANGE))
-    cursed = from_rows(rows, mask_key(RAIN))
-    # Pupils: gold with a hot centre while stirring, white sparks under the curse
-    for img, ring, core in ((stirring, GOLD, PALE), (cursed, WHITE, (0xFF, 0xFF, 0xFF, 255))):
-        for cx in (8, 27):
-            for dx, dy in ((0, 0), (1, 0), (0, 1), (1, 1), (-1, 0), (2, 0), (0, -1), (1, -1), (0, 2), (1, 2)):
-                img.putpixel((cx + dx, 6 + dy), ring)
-            for dx, dy in ((0, 0), (1, 0), (0, 1), (1, 1)):
-                img.putpixel((cx + dx, 6 + dy), core)
-    return [asleep, stirring, cursed]
+    return [mask_frame(state) for state in ("asleep", "stirring", "cursed")]
 
 
 # One lamp of the curse meter: a raindrop that fills as Tlaloc stirs.
@@ -113,9 +101,9 @@ DROP = [
     "..o..",
     ".oDo.",
     ".oDo.",
-    "oDddo",
-    "oDddo",
-    "oddso",
+    "odDdo",
+    "odDdo",
+    "osdso",
     ".ooo.",
 ]
 DROP_OFF = {".": T, "o": INK, "D": STRIPE_B, "d": NAVY, "s": NAVY}
@@ -126,51 +114,42 @@ BOWL = [
     "oooooooooo",
     "oSSSSSSSSo",
     ".oSssssSo.",
-    "..oSsssSo."[:10],
+    "..oSssSo..",
     "...oSSo...",
     "...oSSo...",
     "..oSSSSo..",
     "..oooooo..",
 ]
 BOWL_KEY = {".": T, "o": INK, "S": STONE, "s": STONE_D}
-FLAMES = [
-    [
-        "....p.....",
-        "....Gp....",
-        "...GGG....",
-        "...GOG.p..",
-        "..GOOOGG..",
-        "..GOPPOG..",
-        ".EOPPPPOE.",
-    ],
-    [
-        ".....p....",
-        "....pG....",
-        "....GGG...",
-        "..p.GOG...",
-        "..GGOOOG..",
-        "..GOPPOG..",
-        ".EOPPPPOE.",
-    ],
-    [
-        "..........",
-        "....p.....",
-        "...GGp....",
-        "...GOGG...",
-        "..GOOOOG..",
-        "..GOPPOG..",
-        ".EOPPPPOE.",
-    ],
-    [
-        "......p...",
-        "...p.G....",
-        "...GGG....",
-        "...GOOG...",
-        "..GOPOOG..",
-        "..GOPPOG..",
-        ".EOPPPPOE.",
-    ],
+# The flame stands straight, leans one way, leans the other, then gutters low
+FLAME_UP = [
+    "....pp....",
+    "....GG....",
+    "...GGGG...",
+    "...GOOG...",
+    "..GOOOOG..",
+    "..GOPPOG..",
+    ".EOPPPPOE.",
 ]
+FLAME_LEAN = [
+    "...p......",
+    "...GG.....",
+    "...GGGG...",
+    "..GGOOG...",
+    "..GOOOOG..",
+    "..GOPPOG..",
+    ".EOPPPPOE.",
+]
+FLAME_LOW = [
+    "..........",
+    "....pp....",
+    "...GGGG...",
+    "...GOOG...",
+    "..GOOOOG..",
+    "..GOPPOG..",
+    ".EOPPPPOE.",
+]
+FLAMES = [FLAME_UP, FLAME_LEAN, [r[::-1] for r in FLAME_LEAN], FLAME_LOW]
 FLAME_KEY = {".": T, "p": PALE, "G": GOLD, "O": ORANGE, "P": PALE, "E": EMBER}
 
 
@@ -186,7 +165,11 @@ def brazier_frames():
 
 def main():
     OUT_DIR.mkdir(parents=True, exist_ok=True)
-    strip(mask_frames()).save(OUT_DIR / "tlaloc_mask.png")
+    masks = mask_frames()
+    bowl = from_rows(BOWL, BOWL_KEY)
+    for img in masks + [from_rows(DROP, DROP_OFF), from_rows(DROP, DROP_ON), bowl]:
+        assert asymmetry(img) == 0, "shrine sprites must mirror exactly"
+    strip(masks).save(OUT_DIR / "tlaloc_mask.png")
     strip([from_rows(DROP, DROP_OFF), from_rows(DROP, DROP_ON)]).save(OUT_DIR / "rain_lamp.png")
     strip(brazier_frames()).save(OUT_DIR / "brazier.png")
     print("wrote tlaloc mask, rain lamp and brazier sprites")

@@ -21,6 +21,9 @@ const BRAZIER := preload("res://Sprites/table/brazier.png")
 const RampShots := preload("res://Scripts/ramp_shots.gd")
 const Kickback := preload("res://Scripts/kickback.gd")
 const SpiritCapture := preload("res://Scripts/spirit_capture.gd")
+const Journey := preload("res://Scripts/journey.gd")
+const TempleHole := preload("res://Scripts/temple_hole.gd")
+const ElDorado := preload("res://Scripts/el_dorado.gd")
 
 # Scene positions of the painted inserts (measured from Sprites/map_f1.png)
 const TOP_LANES := [Vector2(329, 305), Vector2(388, 305), Vector2(447, 305)]
@@ -68,6 +71,12 @@ var _bottom_lit := [false, false, false, false]
 
 var _face: Area2D
 var _face_sprite: AnimatedSprite2D
+var kickback: Node2D
+var spirit: Node2D
+var journey: Node2D
+var temple: Node2D
+var el_dorado: Node2D
+
 var _face_hits := 0
 var _face_cooldown := 0.0
 var _curses := 0
@@ -93,9 +102,17 @@ func _ready() -> void:
 	_build_shrine()
 	_build_storm()
 	_hook_face()
-	for mode in [RampShots.new(), Kickback.new(), SpiritCapture.new()]:
+	kickback = Kickback.new()
+	spirit = SpiritCapture.new()
+	journey = Journey.new()
+	temple = TempleHole.new()
+	for mode in [RampShots.new(), kickback, spirit, journey, temple]:
 		mode.features = self
 		add_child(mode)
+	# The bonus stage is its own chamber below the table, so it lives beside it
+	el_dorado = ElDorado.new()
+	el_dorado.features = self
+	get_parent().add_child.call_deferred(el_dorado)
 
 	var chase := Timer.new()
 	chase.wait_time = 0.18
@@ -269,6 +286,7 @@ func _on_top_lane(index: int) -> void:
 	if not _top_lit.has(false):
 		_top_lit = [false, false, false]
 		_award(TOP_LANES_COMPLETE_POINTS, _top_lamps[1].global_position)
+		PinballEvents.top_lanes_completed.emit()
 		if GameManager.multiplier < MAX_MULTIPLIER:
 			GameManager.set_multiplier(GameManager.multiplier + 1)
 			PinballEvents.toast.emit("Bonus x%d" % GameManager.multiplier)

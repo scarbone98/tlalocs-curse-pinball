@@ -6,7 +6,7 @@ extends Node2D
 const SPIRIT := preload("res://Sprites/table/spirit.png")
 const RIPPLE := preload("res://Sprites/table/ripple.png")
 
-const SPAWN_AT := Vector2(345, 700)
+const SPAWN_AT := Vector2(337, 760)  # below the temple hole, above the face
 const RIPPLE_OFFSET := Vector2(0, 26)
 const HIT_RADIUS := 26.0
 const RAMPS_TO_SUMMON := 3
@@ -64,6 +64,14 @@ func _on_ramp_made(_side: String, _combo: int) -> void:
 		_ramps = 0
 		_summon()
 
+## Raises a spirit now (the temple's roulette can award one). False if one is already up.
+func summon() -> bool:
+	if _active:
+		return false
+	_ramps = 0
+	_summon()
+	return true
+
 func _summon() -> void:
 	_active = true
 	_hits = 0
@@ -115,6 +123,7 @@ func _on_body_entered(body: Node) -> void:
 	features._award(CATCH_POINTS * caught, SPAWN_AT + Vector2(0, -40))
 	PinballEvents.toast.emit("Ajolote caught! x%d" % caught)
 	AudioSfx.play("catch")
+	PinballEvents.spirit_caught.emit()
 	_dismiss()
 
 func _dismiss() -> void:

@@ -61,6 +61,8 @@ var _stuck_time := 0.0
 var _off_ramp_time := 0.0
 var _banked_v := Vector2.ZERO  # the velocity the ball holds, up to max_velocity
 var _moved_v := Vector2.ZERO   # what it actually moved at last step, up to max_travel
+var draw_scale := 1.0  # the sprite's scale as set in the scene (the temple hole shrinks it)
+var stage_origin := Vector2.ZERO  # top left of the table the ball is on (El Dorado is below)
 var _spin := 0.0   # radians per second, clockwise
 var _turn := 0.0   # how far the sprite has turned
 const BANK_TOLERANCE := 30.0  # a step of gravity against the ball (660/120) still keeps it
@@ -101,6 +103,7 @@ func _ready() -> void:
 	max_contacts_reported = 4  # to read the surface the ball is rolling on
 	if anim:
 		anim.stop()
+		draw_scale = anim.scale.x
 
 func _physics_process(delta: float) -> void:
 	if anim:
@@ -109,6 +112,10 @@ func _physics_process(delta: float) -> void:
 		_turn = fposmod(_turn + _spin * delta, TAU)
 		anim.frame = int(_turn / TAU * SPIN_FRAMES) % SPIN_FRAMES
 
+	if freeze:
+		# held by the temple or the kickback; whatever it banked before doesn't carry over
+		_banked_v = Vector2.ZERO
+		_moved_v = Vector2.ZERO
 	_watch_for_stuck(delta)
 	_watch_ramp_exit(delta)
 
@@ -136,7 +143,7 @@ func _over_ramp_art() -> bool:
 
 func _watch_for_stuck(delta: float) -> void:
 	var pos := global_position
-	var exempt := can_launch or freeze or _pending_respawn or pos.y > CRADLE_Y \
+	var exempt := can_launch or freeze or _pending_respawn or pos.y - stage_origin.y > CRADLE_Y \
 		or (collision_mask & RAMP_LAYER_BIT) != 0
 	if exempt or pos.distance_to(_stuck_anchor) > stuck_radius:
 		_stuck_anchor = pos
@@ -146,7 +153,7 @@ func _watch_for_stuck(delta: float) -> void:
 	if _stuck_time >= stuck_seconds:
 		_stuck_time = 0.0
 		_stuck_anchor = pos
-		linear_velocity = (UNSTICK_TOWARD - pos).normalized() * unstick_speed
+		linear_velocity = (stage_origin + UNSTICK_TOWARD - pos).normalized() * unstick_speed
 
 func _process(delta: float) -> void:
 	if _charging:

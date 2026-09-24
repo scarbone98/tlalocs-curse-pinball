@@ -17,3 +17,6 @@ signal multiplier_changed(multiplier: int)
 signal curse_changed(active: bool)
 signal ramp_made(side: String, combo: int) # ball went over a side ramp and back down
 signal ball_left_ramp(ball: RigidBody2D) # a ball bounced out of a ramp mouth; gates forget it
+signal spirit_caught()                  # a water spirit was caught
+signal top_lanes_completed()           # all three top lanes lit
+signal objective_changed(text: String) # the journey's current goal, shown under the score

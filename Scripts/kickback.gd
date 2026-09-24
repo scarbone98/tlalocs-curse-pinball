@@ -62,11 +62,18 @@ func _on_frog_hit(body: Node) -> void:
 	if _hits < HITS_TO_CHARGE:
 		_blink_frogs()
 		return
+	charge()
+
+## Lights the kickback now (the temple's roulette can award it). False if already lit.
+func charge() -> bool:
+	if charged:
+		return false
 	_hits = 0
 	charged = true
 	_show(AWAKE)
 	PinballEvents.toast.emit("Kickback ready!")
 	AudioSfx.play("charge")
+	return true
 
 func _on_kick_zone_entered(body: Node, index: int) -> void:
 	if not charged or not features._is_ball_on_playfield(body):
