@@ -7,6 +7,7 @@ var lives : int
 var score : int = 0
 var multiplier := 1
 var curse_active := false
+var show_title := true  # the title menu opens on load; Play Again goes straight back in
 
 var _ball_save_left := 0.0
 var _ball_save_used := false
@@ -87,6 +88,11 @@ func _game_over():
 	PinballEvents.game_over.emit(final_score, is_new_best)
 
 # Called by the game over screen; the scene reloads so the table starts fresh.
+## Back to the title menu, with a fresh table behind it
+func to_title() -> void:
+	show_title = true
+	restart()
+
 func restart() -> void:
 	score = 0
 	lives = starting_lives

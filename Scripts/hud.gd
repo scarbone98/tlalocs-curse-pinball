@@ -15,7 +15,7 @@ var _launch_button: Button
 var _launch_box: VBoxContainer
 var _power_meter: Control
 var _power_fill: ColorRect
-var _hint_label: Label
+var _menu: MainMenu
 var _objective_label: Label
 var _billboard: Billboard
 var _codex: CodexScreen
@@ -27,10 +27,9 @@ func _ready() -> void:
 	_style_top_bar()
 	_build_toast()
 	_build_launch_button()
-	_build_hint()
 	_build_objective()
 	_build_billboard()
-	_build_codex()
+	_build_menu()
 
 	# Connect to global events
 	PinballEvents.set_score.connect(_on_set_score)
@@ -139,20 +138,6 @@ func _on_launch_power_changed(power: float, charging: bool) -> void:
 	var in_sweet_spot := power >= SKILL_SHOT_POWER.x and power <= SKILL_SHOT_POWER.y
 	_power_fill.color = ScareathonTheme.AMBER if in_sweet_spot else ScareathonTheme.BLOOD
 
-func _build_hint() -> void:
-	_hint_label = Label.new()
-	_hint_label.theme_type_variation = "HintLabel"
-	_hint_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	_hint_label.add_theme_font_size_override("font_size", int(15 * UI_SCALE))
-	_hint_label.set_anchors_preset(Control.PRESET_CENTER_TOP)
-	_hint_label.grow_horizontal = Control.GROW_DIRECTION_BOTH
-	_hint_label.offset_top = 62 * UI_SCALE
-	_hint_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	_hint_label.add_theme_stylebox_override("normal", ScareathonTheme.pill_box(UI_SCALE))
-	# Touch laptops report a touchscreen too, so show both control schemes
-	_hint_label.text = "Flippers: tap sides or Left / Right\nHold Launch, let go in the gold: skill shot"
-	add_child(_hint_label)
-
 # The journey's current goal, in the hint's spot once the controls hint has gone
 func _build_objective() -> void:
 	_objective_label = Label.new()
@@ -175,24 +160,36 @@ func _build_billboard() -> void:
 	_billboard.offset_top = 88 * UI_SCALE
 	add_child(_billboard)
 
-# The Spirit Codex: a button between the score and balls opens it over the table
-func _build_codex() -> void:
-	var button := Button.new()
-	button.text = "Codex"
-	button.focus_mode = Control.FOCUS_NONE
-	button.add_to_group("touch_block")
-	button.add_theme_font_size_override("font_size", int(15 * UI_SCALE))
-	button.set_anchors_preset(Control.PRESET_CENTER_TOP)
-	button.grow_horizontal = Control.GROW_DIRECTION_BOTH
-	button.offset_top = 16 * UI_SCALE
-	button.pressed.connect(func(): _codex.open())
-	add_child(button)
+# The pause button between the score and balls opens the menu (Resume, the Spirit Codex,
+# How to Play, Restart). The same menu is the title screen when the game loads.
+func _build_menu() -> void:
+	var pause := Button.new()
+	pause.text = "II"
+	pause.focus_mode = Control.FOCUS_NONE
+	pause.add_to_group("touch_block")
+	pause.add_theme_font_size_override("font_size", int(16 * UI_SCALE))
+	pause.set_anchors_preset(Control.PRESET_CENTER_TOP)
+	pause.grow_horizontal = Control.GROW_DIRECTION_BOTH
+	pause.offset_top = 16 * UI_SCALE
+	pause.pressed.connect(func(): _menu.open(true, _codex))
+	add_child(pause)
+	_menu = MainMenu.new()
+	_menu.play_pressed.connect(func(): GameManager.show_title = false)
+	add_child(_menu)
 	_codex = CodexScreen.new()
-	add_child(_codex)
+	add_child(_codex)  # over the menu, which opens it
+	if GameManager.show_title:
+		_menu.open.call_deferred(false, _codex)
+
+# Escape pauses, like the pause button
+func _unhandled_input(event: InputEvent) -> void:
+	if event.is_action_pressed("ui_cancel") and not get_tree().paused:
+		get_viewport().set_input_as_handled()
+		_menu.open(true, _codex)
 
 func _on_objective_changed(text: String) -> void:
 	_objective_label.text = text
-	_objective_label.visible = not _hint_label.visible
+	_objective_label.visible = text != ""
 
 func _on_set_score(_value: int) -> void:
 	_render_score()
@@ -203,11 +200,6 @@ func _on_lives_changed(_lives: int) -> void:
 func _on_launch_available(available: bool) -> void:
 	_launch_box.visible = available
 	_power_meter.modulate.a = 0.0
-	# The controls hint only matters until the first ball is in play
-	if not available and _hint_label.visible:
-		create_tween().tween_property(_hint_label, "modulate:a", 0.0, 0.4).finished.connect(func():
-			_hint_label.hide()
-			_objective_label.visible = _objective_label.text != "")
 
 func _on_toast(message: String) -> void:
 	if _tween and _tween.is_running():
@@ -246,15 +238,18 @@ func _on_game_over(final_score: int, is_new_best: bool) -> void:
 	box.add_child(_centered_label("New best!" if is_new_best else "Best  %d" % HighScore.load_best(), "HintLabel"))
 
 	box.add_child(_centered_label("Spirit Codex  %d/%d" % [SpiritCodex.count(), SpiritCodex.SPECIES.size()], "HintLabel"))
-	var codex := Button.new()
-	codex.text = "Codex"
-	codex.pressed.connect(func(): _codex.open())
-	box.add_child(codex)
-
 	var again := Button.new()
 	again.text = "Play Again"
 	again.pressed.connect(GameManager.restart)
 	box.add_child(again)
+	var codex := Button.new()
+	codex.text = "Spirit Codex"
+	codex.pressed.connect(func(): _codex.open())
+	box.add_child(codex)
+	var menu := Button.new()
+	menu.text = "Menu"
+	menu.pressed.connect(GameManager.to_title)
+	box.add_child(menu)
 	again.grab_focus()
 	move_child(_codex, -1)  # the Codex opens over the game over panel
 
