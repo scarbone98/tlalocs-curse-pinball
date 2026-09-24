@@ -7,6 +7,7 @@ extends Node2D
 ##   sparks  gold off the slingshots, serpents, coins and the Gilded King
 ##   dust    stone off a wall the ball slams into
 ##   gold    a shower of gold for a relic or the El Dorado jackpot
+##   fire    sparks flying up off a torch as it catches
 
 const VIBRATE_FROM := 6.0  # only the big moments (kickback, the King, the jackpot) buzz the phone
 const VIBRATE_MS_PER_STRENGTH := 6
@@ -17,6 +18,7 @@ const KINDS := {
 	"sparks": [10, 0.3, Vector2(200, 380), 200.0, [Color("#fffbd6"), Color("#f8d000"), Color(0.97, 0.63, 0.03, 0.0)]],
 	"dust": [6, 0.3, Vector2(60, 140), 0.0, [Color("#b4c4cc"), Color("#748c9a"), Color(0.34, 0.43, 0.47, 0.0)]],
 	"gold": [32, 0.7, Vector2(160, 420), 380.0, [Color("#fffbd6"), Color("#f8d000"), Color(0.75, 0.54, 0.06, 0.0)]],
+	"fire": [14, 0.5, Vector2(60, 180), -260.0, [Color("#fffbd6"), Color("#f8a008"), Color(0.75, 0.34, 0.18, 0.0)]],
 }
 
 var _pixel: ImageTexture

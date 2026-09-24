@@ -38,6 +38,13 @@ func set_curse_active(active: bool) -> void:
 	curse_active = active
 	PinballEvents.curse_changed.emit(active)
 
+## A ball saver for the next few seconds (the torches award one): a drain gives the ball back
+func grant_ball_save(seconds: float) -> void:
+	_ball_save_left = maxf(_ball_save_left, seconds)
+
+func ball_save_left() -> float:
+	return _ball_save_left
+
 func _on_ball_launched():
 	if not _ball_save_used:
 		_ball_save_left = ball_save_seconds

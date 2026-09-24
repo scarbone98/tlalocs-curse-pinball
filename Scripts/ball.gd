@@ -40,10 +40,11 @@ const UNSTICK_TOWARD := Vector2(340, 760)
 const CRADLE_Y := 1080.0  # below this the ball is on or around the flippers
 ## The gates put a ball on the ramp colliders as it passes a ramp mouth. One that clips
 ## the lip and bounces back out would then ignore every playfield wall and fall off the
-## table, so a ramp ball that stays off the ramp art (map_f2) this long goes back to
-## the playfield.
+## table, so a ramp ball that stays out of the ramp zone this long goes back to the
+## playfield. The zone is the ramp art with the gaps between its rails filled in
+## (tools/make_ramp_zone.py), so a ball rolling up the middle of a ramp stays on it.
 @export var off_ramp_grace: float = 0.15
-const RAMP_ART := preload("res://Sprites/map_f2.png")
+const RAMP_ZONE := preload("res://Sprites/ramp_zone.png")
 ## Pokemon Pinball rumbles on any collision faster than 3 px/frame into the surface
 ## (770 here); harder hits shake more.
 const IMPACT_SPEED := 770.0
@@ -96,7 +97,7 @@ func _ready() -> void:
 	angular_damp = 0.0
 	_build_ramp_trail()
 	if _ramp_art == null:
-		_ramp_art = RAMP_ART.get_image()
+		_ramp_art = RAMP_ZONE.get_image()
 
 	var start_region: Area2D = get_tree().get_first_node_in_group("launch_region") as Area2D
 	if start_region:

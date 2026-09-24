@@ -46,6 +46,15 @@ def sweep(f0, f1, dur, wave_fn=triangle, volume=0.32, vibrato=0.0):
     return out
 
 
+def mixdown(*parts):
+    """Plays several sounds over each other."""
+    out = [0.0] * max(len(p) for p in parts)
+    for part in parts:
+        for i, s in enumerate(part):
+            out[i] += s
+    return out
+
+
 def write(name, samples):
     with wave.open(str(OUT_DIR / name), "wb") as w:
         w.setnchannels(1)
@@ -67,6 +76,15 @@ def main():
     write("spinner.wav", notes([(G6, 0.02)], square, 0.16))
     write("upgrade.wav", notes([(C5, 0.05), (G5, 0.05), (C6, 0.05), (E6, 0.05), (G6, 0.22)], triangle, 0.4))
     write("downgrade.wav", sweep(700, 260, 0.3, triangle, 0.3))
+    # a frog's croak with a plop of water under it, for the frog bumpers
+    write("frog.wav", mixdown(sweep(420, 180, 0.09, square, 0.2, vibrato=0.08), notes([(0, 0.02), (C6, 0.03)], triangle, 0.2)))
+    # a torch catching: a rising rush of flame
+    write("torch.wav", sweep(200, 700, 0.18, square, 0.14, vibrato=0.3))
+    # the shrine swallowing the ball: a low gong that sinks, then rises when it spits it out
+    write("shrine.wav", sweep(220, 90, 0.5, triangle, 0.45, vibrato=0.02))
+    write("shrine_out.wav", sweep(120, 520, 0.2, triangle, 0.4))
+    # stone on stone, and water poured into the Chac Mool's bowl
+    write("chac_mool.wav", mixdown(notes([(98.0, 0.05)], square, 0.3), notes([(0, 0.03), (G5, 0.04), (C6, 0.08)], triangle, 0.25)))
     write("multiball.wav", notes([(G5, 0.07), (0, 0.02), (G5, 0.07), (0, 0.02), (C6, 0.07), (E6, 0.07), (G6, 0.25)]))
     print("wrote mode sound effects")
 

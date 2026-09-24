@@ -1,7 +1,9 @@
-[gd_resource type="Resource" script_class="PlaySoundAction" load_steps=2 format=3 uid="uid://coy54yfvtlhmh"]
+[gd_resource type="Resource" script_class="PlaySoundAction" load_steps=3 format=3 uid="uid://coy54yfvtlhmh"]
 
 [ext_resource type="Script" uid="uid://b0xlis15d6inm" path="res://TriggerActions/PlaySoundAction.gd" id="1_m2sqt"]
+[ext_resource type="AudioStream" uid="uid://dfbl6gxblaes7" path="res://Audio/sfx/frog.wav" id="2_frog"]
 
 [resource]
 script = ExtResource("1_m2sqt")
+sound = ExtResource("2_frog")
 metadata/_custom_type_script = "uid://b0xlis15d6inm"

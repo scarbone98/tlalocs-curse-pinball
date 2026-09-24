@@ -13,7 +13,6 @@ const MAP_SCALE := Vector2(720.0 / 256.0, 1280.0 / 424.0)
 const LANE_LAMP := preload("res://Sprites/table/lane_lamp.png")
 const BONUS_BAR := preload("res://Sprites/table/bonus_bar.png")
 const ARROW_INSERT := preload("res://Sprites/table/arrow_insert.png")
-const TORCH := preload("res://Sprites/table/torch.png")
 const RAINDROP := preload("res://Sprites/table/raindrop.png")
 const TLALOC_MASK := preload("res://Sprites/table/tlaloc_mask.png")
 const RAIN_LAMP := preload("res://Sprites/table/rain_lamp.png")
@@ -23,6 +22,9 @@ const Kickback := preload("res://Scripts/kickback.gd")
 const SpiritCapture := preload("res://Scripts/spirit_capture.gd")
 const Journey := preload("res://Scripts/journey.gd")
 const Spinner := preload("res://Scripts/spinner.gd")
+const Torches := preload("res://Scripts/torches.gd")
+const ShrineDoor := preload("res://Scripts/shrine_door.gd")
+const ChacMool := preload("res://Scripts/chac_mool.gd")
 const Effects := preload("res://Scripts/effects.gd")
 const TableLife := preload("res://Scripts/table_life.gd")
 const Music := preload("res://Scripts/music.gd")
@@ -38,7 +40,6 @@ const ARROWS := [
 	[Vector2(190, 366), 22.0], [Vector2(103, 374), 22.0], [Vector2(179, 555), 0.0],
 	[Vector2(86, 725), -22.0], [Vector2(592, 725), 22.0],
 ]
-const TORCHES := [Vector2(319, 549), Vector2(442, 642), Vector2(208, 815)]
 # The shrine's empty panels, in table-art pixels (see tools/make_shrine_sprites.py)
 const SHRINE_MASK_ART := Vector2(223.5, 42.5)
 # Raindrop lamps either side of the mask, in fill order: bottom pair, then top pair
@@ -97,6 +98,7 @@ var _rest_left := 0.0
 enum { MASK_ASLEEP, MASK_STIRRING, MASK_CURSED, MASK_GLOWING }
 var _shrine_mask: AnimatedSprite2D
 var _shrine_lamps: Array[AnimatedSprite2D] = []
+var _shrine_flash_left := 0.0
 
 var _rain: CPUParticles2D
 var _storm_tint: CanvasModulate
@@ -110,7 +112,6 @@ func _ready() -> void:
 	_build_lanes()
 	_build_bonus_bars()
 	_build_arrows()
-	_build_torches()
 	_build_shrine()
 	_build_storm()
 	_hook_face()
@@ -118,7 +119,7 @@ func _ready() -> void:
 	spirit = SpiritCapture.new()
 	journey = Journey.new()
 	temple = TempleHole.new()
-	for mode in [RampShots.new(), kickback, spirit, journey, temple, Spinner.new()]:
+	for mode in [RampShots.new(), kickback, spirit, journey, temple, Spinner.new(), Torches.new(), ShrineDoor.new(), ChacMool.new()]:
 		mode.features = self
 		add_child(mode)
 	add_child(Effects.new())
@@ -197,15 +198,6 @@ func _build_arrows() -> void:
 		arrow.rotation_degrees = entry[1]
 		_arrows.append(arrow)
 
-func _build_torches() -> void:
-	for at in TORCHES:
-		# Flame base sits on the painted lamp, flame rises above it
-		var torch := _sprite(TORCH, 4, at, 8.0)
-		torch.offset = Vector2(0, -4)
-		torch.frame = randi() % 4
-		torch.play()
-		_torches.append(torch)
-
 func _build_shrine() -> void:
 	_shrine_mask = _sprite(TLALOC_MASK, 4, SHRINE_MASK_ART * MAP_SCALE)
 	for at in SHRINE_LAMPS_ART:
@@ -279,7 +271,12 @@ func _physics_process(delta: float) -> void:
 		_rest_left = maxf(_rest_left - delta, 0.0)
 		if _rest_left == 0.0:
 			_render_shrine()
-	if GameManager.curse_active:
+	if _shrine_flash_left > 0.0:
+		_shrine_flash_left -= delta
+		_shrine_mask.frame = MASK_CURSED  # eyes blazing while he takes an offering
+		if _shrine_flash_left <= 0.0:
+			_render_shrine()
+	elif GameManager.curse_active:
 		_render_shrine()  # the lamps drain as the storm runs out
 	elif _shrine_mask.frame == MASK_STIRRING or _shrine_mask.frame == MASK_GLOWING:
 		# his eyes smoulder while he stirs
@@ -360,6 +357,12 @@ func _on_face_body_entered(body: Node) -> void:
 	# Only a shot up through the face stirs Tlaloc; a ball falling back over it doesn't
 	if (body as RigidBody2D).linear_velocity.y > 0.0:
 		return
+	stir_tlaloc()
+
+## One step toward Tlaloc's curse (a shot up through his face, or an offering at his shrine)
+func stir_tlaloc() -> void:
+	if GameManager.curse_active or _rest_left > 0.0:
+		return
 	_face_hits += 1
 	if _face_hits >= _face_hits_needed():
 		_start_curse()
@@ -439,6 +442,10 @@ func _render_top_lanes() -> void:
 func _render_bottom_lanes() -> void:
 	for i in _bottom_lamps.size():
 		_bottom_lamps[i].frame = 1 if _bottom_lit[i] else 0
+
+## Tlaloc's eyes blaze for a moment (while the shrine holds an offering)
+func _flash_shrine(seconds: float) -> void:
+	_shrine_flash_left = seconds
 
 # Mask: asleep, stirring once the face has been hit, blazing under the curse. The rain
 # lamps fill toward the next curse, then drain as the storm runs out.

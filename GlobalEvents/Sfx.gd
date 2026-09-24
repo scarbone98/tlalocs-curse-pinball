@@ -16,6 +16,11 @@ static var LIB: Dictionary = {
 	"spinner": preload("res://Audio/sfx/spinner.wav"),
 	"upgrade": preload("res://Audio/sfx/upgrade.wav"),
 	"downgrade": preload("res://Audio/sfx/downgrade.wav"),
+	"frog": preload("res://Audio/sfx/frog.wav"),
+	"torch": preload("res://Audio/sfx/torch.wav"),
+	"shrine": preload("res://Audio/sfx/shrine.wav"),
+	"shrine_out": preload("res://Audio/sfx/shrine_out.wav"),
+	"chac_mool": preload("res://Audio/sfx/chac_mool.wav"),
 }
 
 const DEFAULT_BUS := "Master"

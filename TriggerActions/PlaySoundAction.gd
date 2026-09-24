@@ -7,4 +7,5 @@ func execute(ball, trigger) -> void:
 		var p := AudioStreamPlayer.new()
 		trigger.add_child(p)
 		p.stream = sound
+		p.finished.connect(p.queue_free)  # one player per hit, so don't let them pile up
 		p.play()
