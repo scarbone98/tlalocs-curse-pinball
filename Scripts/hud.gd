@@ -2,6 +2,11 @@ extends Control
 
 # The table viewport is 720 wide, twice the 360 the shared theme was tuned for.
 const UI_SCALE := 2.0
+# The score and balls pills, sized to leave the pause button room between them. A long
+# score shrinks toward SCORE_FONT_MIN rather than running under the pause button.
+const TOP_FONT := 18
+const SCORE_FONT_MIN := 11
+const TOP_GAP := 6.0
 # Launch power that drops the ball into a top lane (see ball.gd); marked on the meter
 const SKILL_SHOT_POWER := Vector2(0.70, 0.78)
 const MIN_LAUNCH_POWER := 0.5
@@ -19,6 +24,7 @@ var _menu: MainMenu
 var _objective_label: Label
 var _billboard: Billboard
 var _codex: CodexScreen
+var _pause: Button
 
 func _ready() -> void:
 	theme = ScareathonTheme.build(UI_SCALE)
@@ -39,21 +45,22 @@ func _ready() -> void:
 	PinballEvents.launch_power_changed.connect(_on_launch_power_changed)
 	PinballEvents.game_over.connect(_on_game_over)
 	PinballEvents.objective_changed.connect(_on_objective_changed)
+	resized.connect(_fit_score)
 
 	_render_score()
 	_render_lives()
 
 func _style_top_bar() -> void:
 	var bar: HBoxContainer = $HBoxContainer
-	bar.offset_left = 16 * UI_SCALE
-	bar.offset_right = -16 * UI_SCALE
-	bar.offset_top = 12 * UI_SCALE
-	bar.offset_bottom = 60 * UI_SCALE
+	bar.offset_left = 12 * UI_SCALE
+	bar.offset_right = -12 * UI_SCALE
+	bar.offset_top = 10 * UI_SCALE
+	bar.offset_bottom = 46 * UI_SCALE
 	bar.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	for label in [score_label, lives_label]:
 		label.label_settings = null
 		label.theme_type_variation = "ScoreLabel"
-		label.add_theme_font_size_override("font_size", int(26 * UI_SCALE))
+		label.add_theme_font_size_override("font_size", int(TOP_FONT * UI_SCALE))
 		label.add_theme_stylebox_override("normal", ScareathonTheme.pill_box(UI_SCALE))
 		label.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
 	lives_label.size_flags_horizontal = Control.SIZE_EXPAND | Control.SIZE_SHRINK_END
@@ -61,9 +68,11 @@ func _style_top_bar() -> void:
 func _build_toast() -> void:
 	_toast_label = Label.new()
 	_toast_label.theme_type_variation = "TitleLabel"
-	_toast_label.add_theme_font_size_override("font_size", int(44 * UI_SCALE))
+	_toast_label.add_theme_font_size_override("font_size", int(32 * UI_SCALE))
 	_toast_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_toast_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART  # long ones wrap, not run off
 	_toast_label.set_anchors_preset(Control.PRESET_CENTER)
+	_toast_label.custom_minimum_size.x = 300 * UI_SCALE
 	_toast_label.grow_horizontal = Control.GROW_DIRECTION_BOTH
 	_toast_label.grow_vertical = Control.GROW_DIRECTION_BOTH
 	_toast_label.modulate.a = 0.0
@@ -91,6 +100,7 @@ func _build_launch_button() -> void:
 	_launch_button.text = "Launch"
 	_launch_button.add_to_group("touch_block")
 	_launch_button.focus_mode = Control.FOCUS_NONE
+	_launch_button.add_theme_font_size_override("font_size", int(18 * UI_SCALE))
 	_launch_button.button_down.connect(func(): PinballEvents.launch_pressed.emit())
 	_launch_button.button_up.connect(func(): PinballEvents.launch_released.emit())
 	_launch_box.add_child(_launch_button)
@@ -143,10 +153,10 @@ func _build_objective() -> void:
 	_objective_label = Label.new()
 	_objective_label.theme_type_variation = "HintLabel"
 	_objective_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	_objective_label.add_theme_font_size_override("font_size", int(13 * UI_SCALE))
+	_objective_label.add_theme_font_size_override("font_size", int(11 * UI_SCALE))
 	_objective_label.set_anchors_preset(Control.PRESET_CENTER_TOP)
 	_objective_label.grow_horizontal = Control.GROW_DIRECTION_BOTH
-	_objective_label.offset_top = 62 * UI_SCALE
+	_objective_label.offset_top = 50 * UI_SCALE
 	_objective_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_objective_label.add_theme_stylebox_override("normal", ScareathonTheme.pill_box(UI_SCALE))
 	_objective_label.visible = false
@@ -157,20 +167,21 @@ func _build_billboard() -> void:
 	_billboard = Billboard.new()
 	_billboard.set_anchors_preset(Control.PRESET_CENTER_TOP)
 	_billboard.grow_horizontal = Control.GROW_DIRECTION_BOTH
-	_billboard.offset_top = 88 * UI_SCALE
+	_billboard.offset_top = 74 * UI_SCALE
 	add_child(_billboard)
 
 # The pause button between the score and balls opens the menu (Resume, the Spirit Codex,
 # How to Play, Restart). The same menu is the title screen when the game loads.
 func _build_menu() -> void:
 	var pause := Button.new()
+	_pause = pause
 	pause.text = "II"
 	pause.focus_mode = Control.FOCUS_NONE
 	pause.add_to_group("touch_block")
-	pause.add_theme_font_size_override("font_size", int(16 * UI_SCALE))
+	pause.add_theme_font_size_override("font_size", int(14 * UI_SCALE))
 	pause.set_anchors_preset(Control.PRESET_CENTER_TOP)
 	pause.grow_horizontal = Control.GROW_DIRECTION_BOTH
-	pause.offset_top = 16 * UI_SCALE
+	pause.offset_top = 12 * UI_SCALE
 	pause.pressed.connect(func(): _menu.open(true, _codex))
 	add_child(pause)
 	_menu = MainMenu.new()
@@ -261,7 +272,29 @@ func _centered_label(text: String, variation: StringName) -> Label:
 	return label
 
 func _render_score() -> void:
-	score_label.text = "Score  %d" % GameManager.score
+	score_label.text = _grouped(GameManager.score)
+	_fit_score()
+
+# Shrinks the score's font until it fits left of the pause button
+func _fit_score() -> void:
+	if _pause == null:
+		return
+	var room: float = size.x * 0.5 - _pause.get_combined_minimum_size().x * 0.5 - TOP_GAP * UI_SCALE \
+		- $HBoxContainer.offset_left - score_label.get_theme_stylebox("normal").get_minimum_size().x
+	var font := score_label.get_theme_font("font")
+	var font_size := int(TOP_FONT * UI_SCALE)
+	while font_size > SCORE_FONT_MIN * UI_SCALE and font.get_string_size(score_label.text, HORIZONTAL_ALIGNMENT_LEFT, -1, font_size).x > room:
+		font_size -= 1
+	score_label.add_theme_font_size_override("font_size", font_size)
+
+# 1234567 -> "1,234,567", the way pinball scores are shown
+static func _grouped(value: int) -> String:
+	var digits := str(absi(value))
+	var out := ""
+	while digits.length() > 3:
+		out = "," + digits.right(3) + out
+		digits = digits.left(-3)
+	return ("-" if value < 0 else "") + digits + out
 
 func _render_lives() -> void:
 	lives_label.text = "Balls  %d" % max(GameManager.lives, 0)
