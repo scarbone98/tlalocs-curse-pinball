@@ -58,12 +58,23 @@ func _ready() -> void:
 		walls.add_child(shape)
 	add_child(walls)
 
-	# The table's own flippers and slingshots, so the flipper area plays exactly the same
+	# The table's own flippers and slingshot kick, so the flipper area plays the same. The
+	# table's flipper area sits left of centre (its plunger lane is on the right), so the
+	# copies move over to the chamber's centre line, and the right side mirrors the left.
 	var table := get_parent()
-	for path in ["padels/l", "padels/r", "layer_1_colliders/left_bumper_green", "layer_1_colliders/right_bumper_green"]:
-		var copy := table.get_node(path).duplicate() as Node2D
-		add_child(copy)
-		copy.position = table.get_node(path).global_position
+	var left_flipper := table.get_node("padels/l") as Node2D
+	_add_copy(left_flipper, left_flipper.global_position + Vector2(Geometry.SHIFT, 0))
+	var right_flipper := _add_copy(table.get_node("padels/r"), Vector2.ZERO)
+	right_flipper.position = _mirror(left_flipper.global_position + Vector2(Geometry.SHIFT, 0))
+	var sling := table.get_node("layer_1_colliders/left_bumper_green") as Node2D
+	var sling_at := sling.global_position + Vector2(Geometry.SHIFT, 0)
+	_add_copy(sling, sling_at)
+	var right_sling := _add_copy(sling, _mirror(sling_at))
+	var kick := right_sling.get_node("CollisionShape2D") as CollisionShape2D
+	var segment := (kick.shape as SegmentShape2D).duplicate() as SegmentShape2D
+	segment.a.x = -segment.a.x
+	segment.b.x = -segment.b.x
+	kick.shape = segment
 
 	for at in Geometry.COINS:
 		_add_coin(at)
@@ -79,6 +90,15 @@ func _ready() -> void:
 	drain.add_child(drain_shape)
 	drain.body_entered.connect(func(body): if body == _ball: _finish(false, "The gold slips away"))
 	add_child(drain)
+
+func _add_copy(original: Node, at: Vector2) -> Node2D:
+	var copy := original.duplicate() as Node2D
+	add_child(copy)
+	copy.position = at
+	return copy
+
+func _mirror(at: Vector2) -> Vector2:
+	return Vector2(2.0 * Geometry.CENTRE - at.x, at.y)
 
 func _add_coin(at: Vector2) -> void:
 	var coin := Area2D.new()

@@ -28,30 +28,38 @@ SX, SY = 720.0 / ART_W, 1280.0 / ART_H
 TOP = [(0, 0), (720, 0), (720, 300), (656, 300), (646, 232), (618, 170), (572, 118), (508, 82),
        (436, 63), (360, 58), (284, 63), (212, 82), (148, 118), (102, 170), (74, 232), (64, 300),
        (0, 300)]
-# Side walls: straight down, then angled in to land on top of each inlane rail's cap
-LEFT = [(0, 290), (64, 290), (64, 880), (130, 1000), (121, 1003), (121, 1123), (117, 1163),
-        (174, 1210), (278, 1264), (279, 1282), (0, 1282)]
-RIGHT = [(720, 290), (656, 290), (656, 880), (547, 999), (556, 1003), (557, 1112), (564, 1162),
-         (486, 1219), (396, 1264), (397, 1282), (720, 1282)]
-# From the main table (node_2d.tscn: layer_1_colliders/CollisionPolygon2D5, 6, 8, 9 and
-# ball_trap_plugs), in scene coordinates
-RAILS = [
-    [(122, 1003), (130, 1000), (140, 1005), (142, 1083), (144, 1092), (157, 1105), (181, 1121),
-     (254, 1167), (240, 1172), (238, 1186), (242, 1200), (231, 1198), (217, 1189), (142, 1139),
-     (126, 1128), (121, 1123), (121, 1116)],
-    [(537, 1005), (547, 999), (555, 1003), (556, 1047), (557, 1112), (553, 1122), (491, 1165),
-     (453, 1189), (442, 1199), (440, 1186), (436, 1173), (421, 1169), (428, 1167), (472, 1137),
-     (534, 1092)],
-]
-SLINGS = [
-    [(189, 1002), (184, 1008), (185, 1064), (238, 1098), (248, 1094), (249, 1083), (197, 1003)],
-    [(482, 1004), (426, 1085), (427, 1094), (433, 1099), (444, 1098), (490, 1068), (492, 1007),
-     (488, 1001)],
-]
-PLUGS = [
-    [(242, 1188), (226, 1188), (190, 1214), (196, 1219), (234, 1238), (246, 1210)],
-    [(440, 1188), (456, 1188), (492, 1214), (486, 1219), (448, 1238), (436, 1210)],
-]
+# The main table's flipper area is centred on x 341 (its plunger lane takes the right
+# side), so the pieces copied from it are shifted to the chamber's centre line, 360.
+# Only the left side is written out; the right side is its mirror image.
+SHIFT = 19
+CENTRE = 360
+
+
+def shifted(points):
+    return [(x + SHIFT, y) for x, y in points]
+
+
+def mirrored(points):
+    return [(2 * CENTRE - x, y) for x, y in reversed(points)]
+
+
+# Side wall: straight down, then angled in to land on top of the inlane rail's cap
+LEFT = [(0, 290), (64, 290), (64, 880)] + shifted(
+    [(130, 1000), (121, 1003), (121, 1123), (117, 1163), (174, 1210), (278, 1264), (279, 1282)]
+) + [(0, 1282)]
+# From the main table's left side (node_2d.tscn: layer_1_colliders/CollisionPolygon2D5
+# and 8, ball_trap_plugs/left), in scene coordinates
+RAIL = shifted([(122, 1003), (130, 1000), (140, 1005), (142, 1083), (144, 1092), (157, 1105),
+                (181, 1121), (254, 1167), (240, 1172), (238, 1186), (242, 1200), (231, 1198),
+                (217, 1189), (142, 1139), (126, 1128), (121, 1123), (121, 1116)])
+SLING = shifted([(189, 1002), (184, 1008), (185, 1064), (238, 1098), (248, 1094), (249, 1083),
+                 (197, 1003)])
+PLUG = shifted([(242, 1188), (226, 1188), (190, 1214), (196, 1219), (234, 1238), (246, 1210)])
+
+RIGHT = mirrored(LEFT)
+RAILS = [RAIL, mirrored(RAIL)]
+SLINGS = [SLING, mirrored(SLING)]
+PLUGS = [PLUG, mirrored(PLUG)]
 WALLS = [TOP, LEFT, RIGHT] + RAILS + SLINGS + PLUGS
 
 KING_Y = 250
@@ -59,7 +67,7 @@ KING_X = (220, 500)
 COINS = [(200, 560), (520, 560), (360, 470)]
 COIN_RADIUS = 24
 ENTRY = (360, 380)
-DRAIN_AT = (336, 1272)
+DRAIN_AT = (CENTRE, 1272)
 DRAIN_SIZE = (115, 20)
 
 T = (0, 0, 0, 0)
@@ -120,15 +128,16 @@ def paint_stage():
                 for dx, dy in ((1, 0), (-1, 0), (0, 1), (0, -1)))
             if kind == "floor":
                 # Tiled gold-leaf floor, darker toward the flippers
-                tile = FLOOR[1] if (px // 8 + py // 8) % 2 else FLOOR[0]
-                if px % 8 == 0 or py % 8 == 0:
+                across = int(abs(px + 0.5 - 128))
+                tile = FLOOR[1] if (across // 8 + py // 8) % 2 else FLOOR[0]
+                if across % 8 == 7 or py % 8 == 0:
                     tile = FLOOR[2] if py < 300 else FLOOR[1]
-                d = math.hypot((px - cx) * SX / SY, py - cy)
+                d = math.hypot((px + 0.5 - cx) * SX / SY, py - cy)
                 if pyramid(px, py):
                     tile = SUN[pyramid(px, py) % 2]
                 elif 30 < d < 34 or 44 < d < 46:
                     tile = SUN[1]
-                elif d < 30 and int(math.degrees(math.atan2(py - cy, px - cx)) // 15) % 2 == 0:
+                elif d < 30 and int(abs(math.degrees(math.atan2(px + 0.5 - cx, py - cy))) // 15) % 2 == 0:
                     tile = SUN[0]
                 img.putpixel((px, py), tile)
             elif kind == "floor":
@@ -137,17 +146,21 @@ def paint_stage():
                 img.putpixel((px, py), GOLD if kind != "sling" else PALE)
             elif kind == "wall":
                 # Gold bricks, offset every other course
+                # measured out from the centre line, so the brickwork mirrors too
                 row = py // 5
-                col = (px + (4 if row % 2 else 0)) // 9
-                edge = py % 5 == 0 or (px + (4 if row % 2 else 0)) % 9 == 0
+                across = int(abs(px + 0.5 - 128)) + (4 if row % 2 else 0)
+                col = across // 9
+                edge = py % 5 == 0 or across % 9 == 0
                 tone = BRICK[(row * 7 + col * 3) % 2 + 1] if not edge else BRICK[0]
                 img.putpixel((px, py), tone)
             elif kind == "sling":
-                img.putpixel((px, py), JADE[2] if (px + py) % 5 else JADE[1])
+                img.putpixel((px, py), JADE[2] if (int(abs(px + 0.5 - 128)) + py) % 5 else JADE[1])
             elif kind == "rail":
                 img.putpixel((px, py), GOLD_D)
             else:
                 img.putpixel((px, py), BRICK[0])
+    for (a, b) in ((LEFT, RIGHT), (RAIL, RAILS[1]), (SLING, SLINGS[1]), (PLUG, PLUGS[1])):
+        assert sorted(b) == sorted((2 * CENTRE - x, y) for x, y in a)
     # A dark line just inside the gold rim, so the floor reads clearly against the walls
     for py in range(ART_H):
         for px in range(ART_W):
@@ -158,7 +171,7 @@ def paint_stage():
     # Jade mound at the drain, like the main table's
     for py in range(ART_H):
         for px in range(ART_W):
-            if kinds[py][px] == "floor" and math.hypot((px - 119.5) * 0.6, py - 428) < 17:
+            if kinds[py][px] == "floor" and math.hypot((px + 0.5 - 128) * 0.6, py - 428) < 17:
                 img.putpixel((px, py), JADE[1] if py > 418 else JADE[2])
     return img
 
@@ -289,6 +302,8 @@ def write_geometry(path):
         "const ENTRY := Vector2(%g, %g)" % ENTRY,
         "const DRAIN_AT := Vector2(%g, %g)" % DRAIN_AT,
         "const DRAIN_SIZE := Vector2(%g, %g)" % DRAIN_SIZE,
+        "const SHIFT := %g  # the table's flipper area, moved to the chamber's centre line" % SHIFT,
+        "const CENTRE := %g" % CENTRE,
         "",
     ]
     Path(path).write_text("\n".join(lines))
@@ -297,7 +312,9 @@ def write_geometry(path):
 def main():
     out = Path("Sprites/el_dorado")
     out.mkdir(parents=True, exist_ok=True)
-    paint_stage().save(out / "stage.png")
+    stage = paint_stage()
+    assert asymmetry(stage) == 0, "the chamber must mirror exactly"
+    stage.save(out / "stage.png")
     king = king_frames()
     coins = [coin_frame(False), coin_frame(True)]
     for frame in king + coins:

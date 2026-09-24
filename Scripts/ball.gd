@@ -7,8 +7,9 @@ extends RigidBody2D
 @export var min_launch_power: float = 0.85
 @export var tap_seconds: float = 0.15
 @export var sweep_seconds: float = 0.9
-## The sprite is drawn about 1.7x the collision circle, like Pokemon Pinball's ball
-## (a 16px sprite colliding as a 4px-radius circle): it looks big but fits the same gaps.
+## The sprite is drawn about 1.35x the collision circle. Pokemon Pinball draws its ball
+## bigger still (a 16px sprite colliding as a 4px-radius circle), but here that spilled
+## too far over the walls and posts the ball passes; this still fits the same gaps.
 ## Its spin copies that game too: every contact sets the spin from how fast the ball is
 ## sliding along the surface, and the ball keeps that spin in the air.
 const SPIN_FRAMES := 16  # Sprites/ball_spin.png, one full turn
@@ -310,7 +311,7 @@ func _build_ramp_trail() -> void:
 	_ramp_trail.lifetime = 0.35
 	_ramp_trail.local_coords = false
 	_ramp_trail.emission_shape = CPUParticles2D.EMISSION_SHAPE_SPHERE
-	_ramp_trail.emission_sphere_radius = 24.0  # around the drawn ball, not the collision circle
+	_ramp_trail.emission_sphere_radius = 20.0  # around the drawn ball, not the collision circle
 	_ramp_trail.gravity = Vector2.ZERO
 	_ramp_trail.initial_velocity_min = 10.0
 	_ramp_trail.initial_velocity_max = 40.0
