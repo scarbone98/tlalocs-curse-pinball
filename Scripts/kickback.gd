@@ -1,9 +1,11 @@
 extends Node2D
 ## Outlane kickback, following Pokemon Pinball's Pikachu saver (pret/pokepinball):
-##  - only the spinner charges it, one step a turn, 15 to be ready
+##  - only the spinner charges it; as on Pokemon Pinball Ruby & Sapphire the charge grows
+##    with how fast the ball goes through, so one hard shot can fill it
 ##  - it guards one outlane at a time; the flippers move it (left flipper, left outlane)
 ##  - saving a ball uses it up, and each new ball starts uncharged
-##  - the temple roulette can award one that guards both outlanes, like its slot reward
+##  - the temple roulette and the market can award one that guards both outlanes, like
+##    Ruby & Sapphire's Pichu: it doesn't get used up, it lasts until the ball drains
 ## The stone frog statue at the guarded outlane wakes up jade when it's ready and leaps
 ## when it fires.
 ##
@@ -13,7 +15,7 @@ extends Node2D
 
 const FROG := preload("res://Sprites/table/kickback_frog.png")
 
-const TURNS_TO_CHARGE := 15  # MAX_PIKACHU_SAVER_CHARGE
+const FULL_CHARGE_SPEED := 1200.0  # one pass at this speed charges it fully
 const CARRY_UP_SECONDS := 0.18
 const CARRY_OUT_SECONDS := 0.1
 const KICK_POINTS := 500
@@ -44,7 +46,7 @@ var side := 0             # the outlane it guards: 0 left, 1 right
 var both_sides := false   # the roulette's version guards both
 
 var _frogs: Array[AnimatedSprite2D] = []
-var _turns := 0
+var _charge := 0.0
 
 func _ready() -> void:
 	for at in FROG_AT:
@@ -82,15 +84,15 @@ func _physics_process(_delta: float) -> void:
 		side = 1
 		_render()
 
-## One turn of the spinner toward lighting the kickback
-func add_spinner_turn() -> void:
+## A ball through the spinner at this speed, toward lighting the kickback
+func add_speed_charge(speed: float) -> void:
 	if charged:
 		return
-	_turns += 1
-	if _turns < TURNS_TO_CHARGE:
+	_charge += speed / FULL_CHARGE_SPEED
+	if _charge < 1.0:
 		_blink_frogs()
 		return
-	_turns = 0
+	_charge = 0.0
 	charged = true
 	_render()
 	PinballEvents.toast.emit("Kickback ready!")
@@ -101,7 +103,7 @@ func add_spinner_turn() -> void:
 func charge() -> bool:
 	if charged and both_sides:
 		return false
-	_turns = 0
+	_charge = 0.0
 	charged = true
 	both_sides = true
 	_render()
@@ -112,7 +114,7 @@ func charge() -> bool:
 func _reset() -> void:
 	charged = false
 	both_sides = false
-	_turns = 0
+	_charge = 0.0
 	_render()
 
 func _guards(index: int) -> bool:
@@ -128,9 +130,10 @@ func _on_kick_zone_entered(body: Node, index: int) -> void:
 	var ball := body as RigidBody2D
 	if ball.linear_velocity.y < 0.0:
 		return  # already on its way back up the lane
-	charged = false
-	both_sides = false
+	if not both_sides:
+		charged = false  # the both-sides frogs keep guarding until the ball drains
 	_carry_out(ball, CARRY_PATHS[index])
+	PinballEvents.kickback_saved.emit()
 	features._award(KICK_POINTS, _frogs[index].global_position)
 	PinballEvents.toast.emit("Kickback!")
 	PinballEvents.effect.emit("splash", _frogs[index].global_position)

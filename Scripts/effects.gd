@@ -48,8 +48,8 @@ func _burst(kind: String, at: Vector2) -> void:
 	particles.initial_velocity_min = spec[2].x
 	particles.initial_velocity_max = spec[2].y
 	particles.gravity = Vector2(0, spec[3])
-	particles.scale_amount_min = 1.0
-	particles.scale_amount_max = 1.6
+	particles.scale_amount_min = 1.0  # one table-art pixel, never resized
+	particles.scale_amount_max = 1.0
 	var fade := Gradient.new()
 	fade.offsets = PackedFloat32Array([0.0, 0.4, 1.0])
 	fade.colors = PackedColorArray(spec[4])

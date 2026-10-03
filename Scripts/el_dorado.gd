@@ -34,6 +34,8 @@ var features: Node2D  # TableFeatures, for scoring and the table's own flippers
 # The frogs' kick, with gold sparks instead of a water splash, for the coins and the King
 var _gold_kick := _make_gold_kick()
 
+var extra_seconds := 0.0  # more time for the next visit, bought at the market
+var _via_relics := false  # came through the relics' gate (not the bonus lamps)
 var _ball: RigidBody2D
 var _active := false
 var _time_left := 0.0
@@ -173,22 +175,26 @@ func _physics_process(delta: float) -> void:
 	elif not Rect2(Vector2.ZERO, Vector2(720, 1280)).has_point(to_local(_ball.global_position)):
 		_finish(false, "The gold slips away")  # can't happen through the walls, but never strand a ball
 
-## Takes the ball the temple hole is holding and drops it into the chamber
-func enter(ball: RigidBody2D) -> void:
+## Takes the ball the temple hole is holding and drops it into the chamber. The gate
+## opens for all four relics, or for three bonus lamps.
+func enter(ball: RigidBody2D, via_relics := true) -> void:
 	_ball = ball
 	_active = true
-	_time_left = SECONDS
+	_via_relics = via_relics
+	_time_left = SECONDS + extra_seconds
+	extra_seconds = 0.0
 	_hits = 0
 	_warned = false
 	_king_sprite.frame = KING_IDLE
 	ball.stage_origin = ORIGIN
 	ball.global_position = to_global(Geometry.ENTRY)
-	ball.anim.scale = Vector2.ONE * ball.draw_scale
+	ball.anim.scale = ball.draw_scale
 	ball.freeze = false
 	ball.linear_velocity = Vector2(0, 150)
 	_show_camera_on(Rect2(ORIGIN, Vector2(720, 1280)))
 	PinballEvents.el_dorado_changed.emit(true)
-	PinballEvents.billboard.emit(Billboard.EL_DORADO, "Strike the Gilded King!")
+	PinballEvents.mode_changed.emit()
+	PinballEvents.banner.emit("Strike the Gilded King!", Billboard.EL_DORADO)
 	_show_progress()
 	AudioSfx.play("multiball")
 
@@ -226,6 +232,7 @@ func _finish(won: bool, message: String) -> void:
 	_active = false
 	PinballEvents.toast.emit(message)
 	PinballEvents.el_dorado_changed.emit(false)
+	PinballEvents.mode_changed.emit()
 	var ball := _ball
 	ball.freeze_mode = RigidBody2D.FREEZE_MODE_KINEMATIC
 	ball.set_deferred("freeze", true)
@@ -234,7 +241,10 @@ func _finish(won: bool, message: String) -> void:
 	get_tree().create_timer(1.5 if won else 0.8).timeout.connect(func():
 		ball.stage_origin = Vector2.ZERO
 		_show_camera_on(Rect2(0, 0, 720, 1280))
-		features.journey.el_dorado_finished()
+		if _via_relics:
+			features.journey.el_dorado_finished()
+		else:
+			GameManager.clear_bonus_lamps()
 		features.temple.eject(ball))
 
 func _show_camera_on(area: Rect2) -> void:

@@ -16,13 +16,17 @@ const SCENES := [0, 1, 2, 3, 4]  # the four cities, then El Dorado (Scripts/bill
 const SCENE_SECONDS := 3.0
 const HOW_TO_PLAY := [
 	"Flippers: tap the left or right side of the screen, or Left / Right.",
-	"Launch: hold Launch (or Space) and let go in the gold for a skill shot.",
-	"Travel the four cities. Each has a feat; do it to win that city's gold relic.",
-	"Ramps, the tiki and the temple call up spirits. Hit one 3 times to catch it for your Codex.",
-	"Knock the tiki over up its lane, top left, and topple the golden idol in the middle.",
+	"Launch: tap Launch (or Space). Bump the table with Shift / Up, or swipe.",
+	"Right rail lights Summon arrows: with 2, the golden temple calls a spirit. Hit the warriors to break its glyphs, then hit it 3 times to catch it.",
+	"Left rail lights Awaken arrows: with 3, the crystal skull opens its jaws; feed it to awaken a spirit.",
+	"Hit the idol's spinning tower 3 times (top left) to sink it into its pit, then hit the golden idol to claim it.",
+	"Roll over the stone buttons between the torches to light them; light all six for a ball saver.",
+	"Hit the golden button on the left inlane wall to wake the jaguars in the walls.",
+	"While they're out, fill both jaguars' pips to Travel: a ramp picks the way, then shoot Tlaloc's mouth to go.",
+	"The bottom lanes light the roulette: shoot Tlaloc's mouth to spin it for prizes.",
+	"Catches light bonus lamps; 3 lamps (or all four relics) open El Dorado in Tlaloc's mouth.",
+	"The blue flippers' lane pays jade beads and charges the frog kickback. Spend beads at the crystal skull.",
 	"Hit Tlaloc's face to stir him. Wake him and the storm brings a second ball.",
-	"All four relics open El Dorado: shoot the temple and strike the Gilded King.",
-	"The spinner charges the frog kickback. Flip to move it to the outlane in danger.",
 ]
 
 var _paused_game := false  # opened as the pause menu rather than the title
@@ -78,7 +82,7 @@ func _process(delta: float) -> void:
 
 func _build() -> void:
 	var dim := ColorRect.new()
-	dim.color = Color(0.05, 0.02, 0.12, 0.78)
+	dim.color = Color(0.05, 0.02, 0.12, 0.94)  # the HUD mustn't show through behind the title
 	dim.set_anchors_preset(Control.PRESET_FULL_RECT)
 	dim.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(dim)
@@ -96,11 +100,13 @@ func _build() -> void:
 	_mask_atlas.atlas = MASK
 	_mask_atlas.region = Rect2(Vector2(MASK_SIZE.x, 0), MASK_SIZE)
 	column.add_child(_pixel_picture(_mask_atlas, MASK_SIZE * 8.0))
-	column.add_child(_label("Tlaloc's Curse", "TitleLabel", 104))
+	var title := _label("Tlaloc's Curse", "TitleLabel", 80)
+	title.custom_minimum_size.x = 640  # wider than the buttons, so it breaks between the words
+	column.add_child(title)
 	column.add_child(_label("The journey to El Dorado", "HintLabel", 34))
 
 	var frame := PanelContainer.new()
-	frame.add_theme_stylebox_override("panel", ScareathonTheme.pill_box(2.0))
+	frame.add_theme_stylebox_override("panel", TempleTheme.pill_box(2.0))
 	frame.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 	_picture_atlas = AtlasTexture.new()
 	_picture_atlas.atlas = BILLBOARD
@@ -139,7 +145,7 @@ func _build() -> void:
 	_how_to.add_child(how_box)
 	how_box.add_child(_label("How to Play", "TitleLabel", 72))
 	for line in HOW_TO_PLAY:
-		var text := _label(line, "HintLabel", 30)
+		var text := _label(line, "HintLabel", 26)
 		text.custom_minimum_size = Vector2(560, 0)
 		how_box.add_child(text)
 	var back := Button.new()
@@ -181,7 +187,7 @@ func _label(text: String, variation: StringName, size: int) -> Label:
 	var label := Label.new()
 	label.text = text
 	label.theme_type_variation = variation
-	label.add_theme_font_size_override("font_size", size)
+	label.add_theme_font_size_override("font_size", TempleTheme.snap(size))
 	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	return label

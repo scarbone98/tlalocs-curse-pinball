@@ -5,5 +5,5 @@
 [resource]
 script = ExtResource("1_2ti8e")
 animation_names = Array[String](["default"])
-target_paths = Array[NodePath]([NodePath("AnimatedSprite2D"), NodePath("particles")])
+target_paths = Array[NodePath]([NodePath("AnimatedSprite2D")])
 metadata/_custom_type_script = "uid://cx4e450ifrntn"

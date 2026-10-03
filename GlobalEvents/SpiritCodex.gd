@@ -8,7 +8,7 @@ extends Node
 const SAVE_PATH := "user://settings.cfg"  # shared with the high score
 const SAVE_SECTION := "codex"
 const AWAKENED_SECTION := "awakened"
-const RARE_CHANCE := 0.1
+const RARE_CHANCE := 0.3
 
 # In journey order, one row each of Sprites/table/spirits.png (tools/make_spirit_sprites.py)
 const SPECIES := [
@@ -40,8 +40,9 @@ func _ready() -> void:
 			caught[spirit.id] = int(config.get_value(SAVE_SECTION, spirit.id, 0))
 			awakened[spirit.id] = bool(config.get_value(AWAKENED_SECTION, spirit.id, false))
 
-## A spirit to rise in the given city: usually one of its three common ones, sometimes its rare
-func pick(city: int) -> int:
+## A spirit to rise in the given city: usually one of its three common ones, sometimes its
+## rare one, but only when the catch was called with all three Summon arrows lit
+func pick(city: int, rare_allowed := false) -> int:
 	var common: Array[int] = []
 	var rare := -1
 	for i in SPECIES.size():
@@ -50,7 +51,7 @@ func pick(city: int) -> int:
 				rare = i
 			else:
 				common.append(i)
-	if rare >= 0 and randf() < RARE_CHANCE:
+	if rare >= 0 and rare_allowed and randf() < RARE_CHANCE:
 		return rare
 	return common[randi() % common.size()]
 

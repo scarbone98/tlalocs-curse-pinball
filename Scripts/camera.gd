@@ -20,8 +20,22 @@ const SWITCH_MARGIN := 80.0
 ## few pixels, and the shake dies away in a fraction of a second.
 const SHAKE_DECAY := 14.0
 
+## Like Pokemon Pinball Ruby & Sapphire's camera, the view leans ahead of the ball the way
+## it's heading, easing there rather than snapping, and shifts over a little while the
+## ball waits in the plunger lane.
+const LOOK_AHEAD_PER_SPEED := 0.12
+const MAX_LOOK_AHEAD := 150.0
+const LOOK_EASE := 3.0
+const PLUNGER_LANE_X := 655.0
+const PLUNGER_SHIFT := 48.0
+## A nudge jolts the table a few pixels the way it was pushed, and settles back
+const NUDGE_JOLT := 9.0
+const NUDGE_SETTLE := 18.0
+
 var _followed: Node2D
 var _shake := 0.0
+var _look := Vector2.ZERO
+var _jolt := Vector2.ZERO
 
 func _ready() -> void:
 	drag_vertical_enabled = true
@@ -33,6 +47,7 @@ func _ready() -> void:
 	position_smoothing_enabled = true
 	position_smoothing_speed = FOLLOW_SPEED
 	PinballEvents.rumble.connect(func(strength: float): _shake = maxf(_shake, strength))
+	PinballEvents.nudged.connect(func(direction: Vector2): _jolt = -direction * NUDGE_JOLT)
 
 func _process(dt):
 	var target := _pick_target()
@@ -40,11 +55,19 @@ func _process(dt):
 		return
 	var first := _followed == null
 	_followed = target
-	global_position = target.global_position  # the drag margins and smoothing do the rest
+	var want := Vector2.ZERO
+	var body := target as RigidBody2D
+	if body:
+		want.y = clampf(body.linear_velocity.y * LOOK_AHEAD_PER_SPEED, -MAX_LOOK_AHEAD, MAX_LOOK_AHEAD)
+		if target.global_position.x > PLUNGER_LANE_X:
+			want.x = -PLUNGER_SHIFT
+	_look = _look.lerp(want, 1.0 - exp(-LOOK_EASE * dt))
+	global_position = target.global_position + _look  # the drag margins and smoothing do the rest
 	if first:
 		reset_smoothing()
 	_shake *= exp(-SHAKE_DECAY * dt)
-	offset = Vector2(randf_range(-1.0, 1.0), randf_range(-1.0, 1.0)) * _shake if _shake > 0.3 else Vector2.ZERO
+	_jolt *= exp(-NUDGE_SETTLE * dt)
+	offset = _jolt + (Vector2(randf_range(-1.0, 1.0), randf_range(-1.0, 1.0)) * _shake if _shake > 0.3 else Vector2.ZERO)
 
 func _pick_target() -> Node2D:
 	var followed_ok := is_instance_valid(_followed) and _followed.is_in_group("ball")

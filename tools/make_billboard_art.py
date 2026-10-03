@@ -259,7 +259,7 @@ def main():
         coin_pile(2),                                                      # treasure
         framed(frames_of("Sprites/table/kickback_frog.png", 3)[1], 2),     # kickback
         framed(frames_of("Sprites/table/spirit.png", 3)[0], 2),            # water spirit
-        framed(frames_of("Sprites/table/serpent.png", 3)[0], 1),           # travel
+        framed(frames_of("Sprites/table/wall_jaguar.png", 3)[0], 1),       # travel
     ]
     pictures = cities + [el_dorado()] + prizes
     pictures += [framed(r, 3) for r in relics]

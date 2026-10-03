@@ -1,9 +1,8 @@
 """Generate the sprites for the journey to El Dorado on the main table.
 
-  serpent.png      stone serpent head set into the side walls (idle, struck)
-  serpent_pip.png  one of the three hit pips above each head (off, on)
+  serpent_pip.png  one of the three hit pips above each jaguar head in the side walls
+                   (off, on); the heads are the hand-drawn jaguar (tools/make_v2_table.py)
   relics.png       the four gold relics: mask, sun, pyramid, jaguar (4 dark, then 4 lit)
-  temple_hole.png  the hole in the middle (idle, flash, El Dorado gate A, gate B)
 
 Drawn at the table art's native resolution (map_f1.png is 256x424) with colors
 sampled from it, so they share its pixel grid once the scene scales them up.
@@ -54,56 +53,6 @@ def strip(frames):
     for i, frame in enumerate(frames):
         sheet.paste(frame, (i * w, 0))
     return sheet
-
-
-# A feathered serpent's head coming out of the left wall, facing right (flipped in game
-# for the right wall). A side view, so it's placed pixel by pixel rather than mirrored.
-SERPENT = [
-    "....Y.....Y.........",
-    "...oJo...oJo..Y.....",
-    "..oJgJo.oJgJooJo....",
-    "..oJgJooJgJooJgJo...",
-    "...oJgJoJgJoJgJo....",
-    "....ojJJjJJjJJo.....",
-    "ooooooooooooooooo...",
-    "oLLLLLLLLLLLLLLLLoo.",
-    "oSSSSSsssssSSSSSLLLo",
-    "oSSSSSoEEEoSSSSSSSLo",
-    "oSsSSSoEKEoSSSSSSSSo",
-    "oSSSSSSoooSSSSSSSsSo",
-    "oSsSSSSSSSSSSSSSSSSo",
-    "oSSSSSSSSSSSSSSSSSo.",
-    "oSsSSSSSWoWooWooWo..",
-    "oSSSSSSMMMMMMMMMMM..",
-    "oSsSSSSMMRRRRRRMMM..",
-    "oSSSSSSMMMMMMMRoRo..",
-    "osssssssWooWoooo....",
-    "osssssssssssssso....",
-    "ossssssssssssso.....",
-    "oJjJjJjooooooo......",
-    "oJgJgJo.............",
-    "ooooooo.............",
-]
-SERPENT_IDLE = {".": T, "o": INK, "S": STONE, "s": STONE_D, "L": STONE_L, "J": JADE,
-                "j": JADE_D, "g": GREEN, "Y": GOLD, "E": GOLD, "K": INK, "W": WHITE, "M": INK, "R": EMBER}
-SERPENT_STRUCK = dict(SERPENT_IDLE, S=STONE_L, s=STONE, L=WHITE, E=WHITE, K=EMBER, J=GREEN, g=PALE, R=ORANGE)
-
-
-# While it waits, the serpent flicks its forked tongue out past its jaws
-SERPENT_TONGUE = list(SERPENT)
-SERPENT_TONGUE[15] = "oSSSSSSMMMMMMMMMMMoR"
-SERPENT_TONGUE[16] = "oSsSSSSMMRRRRRRRRRRR"
-SERPENT_TONGUE[17] = "oSSSSSSMMMMMMMMMMMoR"
-
-
-def serpent(struck, rows=SERPENT):
-    """A feathered serpent's head coming out of the left wall, facing right. 20x24."""
-    key = SERPENT_STRUCK if struck else SERPENT_IDLE
-    img = Image.new("RGBA", (20, len(rows)), T)
-    for y, row in enumerate(rows):
-        for x, ch in enumerate(row.ljust(20, ".")):
-            img.putpixel((x, y), key[ch])
-    return img
 
 
 PIP_OFF = ["oooo", "oDDo", "oddo", "oooo"]
@@ -164,43 +113,15 @@ RELICS = [
 RELIC_LIT = {".": T, "o": INK, "G": GOLD, "O": ORANGE, "P": PALE, "E": EMBER, "W": WHITE}
 RELIC_DARK = dict(RELIC_LIT, G=DIM_L, O=DIM, P=DIM_L, E=DIM, W=DIM_L)
 
-# Temple hole: a stepped temple sunk into the floor with a corbelled doorway, drawn on the
-# left and mirrored. The gate frames fill it with El Dorado's gold.
-def hole(state):
-    """A stepped temple sunk into the floor with a corbelled doorway, 22x16."""
-    c = Canvas(22, 16)
-    lit, mid, dark = {"idle": (STONE_L, STONE, STONE_D), "flash": (PALE, GOLD, ORANGE),
-                      "gate_a": (GOLD, GOLD_D, ORANGE), "gate_b": (PALE, GOLD, GOLD_D)}[state]
-    # three courses, each with a lit top edge and a shadowed underside
-    for x0, y0, y1 in ((6, 1, 3), (3, 4, 7), (1, 8, 14)):
-        c.rect(x0, y0, 10, y1, mid)
-        c.rect(x0, y0, 10, y0, lit)
-        c.rect(x0, y1, 10, y1, dark)
-    for y in (10, 12):
-        c.rect(1, y, 2, y, dark)              # jamb blocks
-    # corbelled doorway, narrowing toward the top
-    inside, deep = {"idle": (NAVY, INK), "flash": (BLUE_D, NAVY),
-                    "gate_a": (ORANGE, GOLD), "gate_b": (GOLD, PALE)}[state]
-    c.rect(8, 6, 10, 14, INK); c.rect(6, 8, 10, 14, INK); c.rect(4, 10, 10, 14, INK)
-    c.rect(9, 7, 10, 14, inside); c.rect(7, 9, 10, 14, inside); c.rect(5, 11, 10, 14, inside)
-    c.rect(8, 11, 10, 14, deep)
-    c.mirror()
-    c.outline(INK)
-    return c.image()
-
-
 def main():
     OUT_DIR.mkdir(parents=True, exist_ok=True)
-    strip([serpent(False), serpent(True), serpent(False, SERPENT_TONGUE)]).save(OUT_DIR / "serpent.png")
     strip([from_rows(PIP_OFF, PIP_KEY), from_rows(PIP_ON, PIP_KEY)]).save(OUT_DIR / "serpent_pip.png")
     relics = [from_rows(r, RELIC_DARK) for r in RELICS] + [from_rows(r, RELIC_LIT) for r in RELICS]
     strip(relics).save(OUT_DIR / "relics.png")
-    holes = [hole(state) for state in ("idle", "flash", "gate_a", "gate_b")]
     pips = [from_rows(PIP_OFF, PIP_KEY), from_rows(PIP_ON, PIP_KEY)]
-    for img in holes + relics + pips:
+    for img in relics + pips:
         assert asymmetry(img) == 0, "front-facing sprites must mirror exactly"
-    strip(holes).save(OUT_DIR / "temple_hole.png")
-    print("wrote serpent, pips, relics and temple hole sprites")
+    print("wrote pips and relics sprites")
 
 
 if __name__ == "__main__":

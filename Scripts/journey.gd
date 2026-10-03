@@ -2,15 +2,17 @@ extends Node2D
 ## The journey to El Dorado, like Pokemon Pinball's map moves toward Mewtwo.
 ##
 ## Each city has a feat; doing it there earns that city's gold relic and moves the
-## journey on to the next city still missing its relic. Two stone serpents sit in the
-## side walls where the Digletts would be: hitting one three times before its pips
-## fade opens the road, and the next shot into the temple hole takes it, skipping a
-## feat you're stuck on. Progress at a city is kept if you leave. With all four relics lit, El Dorado opens at the temple hole. After a
+## journey on to the next city still missing its relic. Two jaguars (the hand-drawn
+## jaguar) lurk in slots in the side walls with only their snouts showing. Hitting the
+## golden button on the tip of the left inlane wall brings them out for a while, as
+## Chikorita wakes the Linoone on Pokemon Pinball Ruby's field; while they're out,
+## filling both heads' three pips before they fade starts Travel mode, like Ruby &
+## Sapphire's. For a minute (with a ball saver) shoot the left
+## ramp to head for the next city or the right ramp to skip one, then sink the temple
+## hole to arrive. Progress at a city is kept if you leave. With all four relics lit, El Dorado opens at the temple hole. After a
 ## trip there the relics reset and the ramp feat gets longer.
 
-const SERPENT := preload("res://Sprites/table/serpent.png")
-const SERPENT_PIP := preload("res://Sprites/table/serpent_pip.png")
-const RELICS := preload("res://Sprites/table/relics.png")
+const SERPENT := preload("res://Sprites/table/wall_jaguar.png")  # the hand-drawn jaguar (tools/make_table.py)
 
 # Sloped wedges set into the side walls, so a ball rolls off rather than resting on
 # top or tucking in beside them (the walls there run from y 868 to 949)
@@ -18,16 +20,42 @@ const LEFT_WEDGE := [Vector2(131, 868), Vector2(176, 892), Vector2(178, 915), Ve
 const RIGHT_WEDGE := [Vector2(545, 864), Vector2(500, 889), Vector2(498, 912), Vector2(545, 942)]
 const SENSOR_GROW := 8.0  # the hit sensor reaches this far past the wedge
 const SERPENT_ART := [Vector2(52, 300), Vector2(186, 299)]  # table-art pixels
-const PIP_ART_OFFSET := [Vector2(4, -14), Vector2(-4, -14)]  # three pips above each head
-# An arc around the golden idol's plinth (Scripts/idol.gd)
-const RELIC_ART := [Vector2(91.5, 199.5), Vector2(104.5, 195.5), Vector2(135.5, 195.5), Vector2(148.5, 199.5)]
+# The jaguars' slots in the walls (tools/make_table.py paints them) and how much of a
+# head shows: its snout while it lurks, nearly all of it once it's out
+const SLOT_X_ART := [47.0, 193.0]
+const HEAD_SIZE := Vector2(20, 24)  # one frame of Sprites/table/wall_jaguar.png
+const PEEK := 5.0
+const OUT := 17.0
+const EMERGE_PER_SECOND := 40.0  # art pixels a second as a head slides out or back
+# The golden button on the left inlane wall's tip that wakes them (scene units)
+const BUTTON_AT := Vector2(207, 815)
+const BUTTON_RADIUS := 36.0  # it's set into the wall's tip, so it reaches out past the face
+const OUT_SECONDS := 25.0
+const BUTTON_POINTS := 1000
+const LURK_POINTS := 100  # a hit on a head still in its slot
+enum { HEAD_WATCHING, HEAD_ROARING, HEAD_BLINKING }
+# Two each side of the temple hole, like an arch over it
+const RELIC_AT := Vector2(339, 700)  # where a relic's points pop up, over Tlaloc
+const RELICS := preload("res://Sprites/table/relics.png")  # tools/make_journey_sprites.py: 4 dark, then 4 lit
+# The four relic idols in an arch over Tlaloc's face, lit as each is won (scene units)
+const RELIC_ARCH := [Vector2(238, 729), Vector2(300, 683), Vector2(378, 683), Vector2(440, 729)]
 
 const HITS_TO_TRAVEL := 3
-const PIP_FADE_SECONDS := 10.0  # like a Diglett's count, the pips go out if you stop hitting
-const HIT_COOLDOWN := 1.0  # one rattle against a serpent counts once
+const PIP_FADE_SECONDS := 10.0  # like a Diglett's count, a jaguar's hits are forgotten if you stop hitting
+const HIT_COOLDOWN := 1.0  # one rattle against a head counts once
 const HIT_POINTS := 750
-const HIT_PUSH := 350.0
-const TRAVEL_POINTS := 2500
+const HIT_KICK := 900.0  # a jaguar that's out knocks the ball back, like a bumper
+const RECOIL := 8.0      # art pixels a struck jaguar is knocked back into its slot
+const BREATH_SECONDS := 1.8  # idle: a head eases a pixel out of its slot and back as it breathes
+const CLAW := preload("res://Sprites/table/claw_swipe.png")  # tools/make_table.py
+const CLAW_REACH := 26.0     # scene units in front of the slot the swipe rakes
+const SNEAK := 10.0      # how far a lurking jaguar sneaks out now and then
+const SNEAK_EVERY := Vector2(4.0, 9.0)
+const SNEAK_SECONDS := 1.4
+const TRAVEL_POINTS := 12500
+const TRAVEL_SECONDS := 60.0
+const TRAVEL_SAVER := 30.0
+const TRAVEL_REST := 30.0  # after a trip the heads' pips won't start another for a while
 const RELIC_POINTS := 10000
 
 const CITIES := [
@@ -37,34 +65,71 @@ const CITIES := [
 	{"name": "Palenque", "goal": "Light all top lanes", "feat": "lanes", "need": 1},
 ]
 
-enum { SERPENT_IDLE, SERPENT_HIT }
 
 var features: Node2D  # TableFeatures, which owns the shared sprite and scoring helpers
 var city := 0
 var relics := [false, false, false, false]
 var el_dorado_open := false
-var road_open := false  # a serpent's pips are full; the temple hole travels instead of spinning
+var road_open := false  # a serpent's pips are full: Travel mode is on
+var traveling := false  # Travel mode: pick a way with a ramp, then the temple hole
+var travel_steps := 0   # 1 the next city (left ramp), 2 skip one (right ramp); 0 not yet picked
+var _travel_left := 0.0
+var _rest_left := 0.0
 var trips := 0  # visits to El Dorado; each one makes the ramp feat longer
 
 var _progress := [0, 0, 0, 0]
 var _hits := [0, 0]
 var _since_hit := [0.0, 0.0]
 var _cooldown := [0.0, 0.0]
-var _serpents: Array[AnimatedSprite2D] = []
-var _pips: Array = [[], []]
+var _serpents: Array[Sprite2D] = []
+var _wedges: Array[CollisionPolygon2D] = []
+var _head_frame := [HEAD_WATCHING, HEAD_WATCHING]
+var _shown := [PEEK, PEEK]
 var _relic_lamps: Array[AnimatedSprite2D] = []
+var _breath := [0.0, 0.0]
+var _claws: Array[AnimatedSprite2D] = []
+var _out_left := 0.0
+var _button_cooldown := 0.0
+var _button_sprite: AnimatedSprite2D
+var _pressed_left := 0.0
+const PRESSED_SECONDS := 0.35  # the gold button stays sunk this long, then glows while the jaguars are out
+var _blink_left := 3.0
+var _sneak_left := [0.0, 0.0]
+var _sneak_wait := [5.0, 7.0]
 var _clock := 0.0
 
 func _ready() -> void:
 	_build_serpent(0, LEFT_WEDGE, Vector2.RIGHT)
 	_build_serpent(1, RIGHT_WEDGE, Vector2.LEFT)
-	for i in RELIC_ART.size():
-		_relic_lamps.append(features._sprite(RELICS, 8, RELIC_ART[i] * features.MAP_SCALE))
-	PinballEvents.ramp_made.connect(func(_side, _combo): _feat_done("ramps"))
+	var button := Area2D.new()
+	button.position = BUTTON_AT
+	button.monitorable = false
+	var button_shape := CollisionShape2D.new()
+	var circle := CircleShape2D.new()
+	circle.radius = BUTTON_RADIUS
+	button_shape.shape = circle
+	button.add_child(button_shape)
+	button.body_entered.connect(_on_button)
+	add_child(button)
+	_button_sprite = features.gold_button("jaguar_button")
+	for side in 2:
+		var claw: AnimatedSprite2D = features._sprite(CLAW, 3, Vector2.ZERO, 16.0)
+		claw.flip_h = side == 1
+		claw.sprite_frames.set_animation_loop("default", false)
+		claw.animation_finished.connect(claw.hide)
+		claw.z_index = 2
+		claw.z_as_relative = false
+		claw.hide()
+		_claws.append(claw)
+	for at in RELIC_ARCH:
+		_relic_lamps.append(features._sprite(RELICS, 8, at))
+	_render_relics()
+	PinballEvents.ramp_made.connect(func(side, _combo):
+		_feat_done("ramps")
+		_pick_way(side))
 	PinballEvents.spirit_caught.connect(func(): _feat_done("spirit"))
 	PinballEvents.curse_changed.connect(func(active): if active: _feat_done("curse"))
 	PinballEvents.top_lanes_completed.connect(func(): _feat_done("lanes"))
-	_render()
 	_announce_goal.call_deferred()
 	# The first launch shows where the journey starts
 	PinballEvents.ball_launched.connect(func():
@@ -74,8 +139,10 @@ func _build_serpent(side: int, wedge: Array, facing: Vector2) -> void:
 	var body := StaticBody2D.new()
 	var shape := CollisionPolygon2D.new()
 	shape.polygon = PackedVector2Array(wedge)
+	shape.disabled = true  # only there while the head is out of its slot
 	body.add_child(shape)
 	add_child(body)
+	_wedges.append(shape)
 
 	var centre := Vector2.ZERO
 	for p in wedge:
@@ -92,72 +159,181 @@ func _build_serpent(side: int, wedge: Array, facing: Vector2) -> void:
 	add_child(sensor)
 
 	var art: Vector2 = SERPENT_ART[side]
-	var head: AnimatedSprite2D = features._sprite(SERPENT, 3, art * features.MAP_SCALE)
+	var head := Sprite2D.new()
+	head.texture = SERPENT
+	head.region_enabled = true
+	head.scale = features.MAP_SCALE
 	head.flip_h = side == 1
+	features.add_child(head)
 	_serpents.append(head)
-	for i in HITS_TO_TRAVEL:
-		var at: Vector2 = art + PIP_ART_OFFSET[side] + Vector2((i - 1) * 5 * facing.x, 0)
-		_pips[side].append(features._sprite(SERPENT_PIP, 2, at * features.MAP_SCALE))
+	_render_head(side)
+
+# Only the part of a head that's out of its slot shows: the frame is cropped to the
+# columns nearest the snout, and set against the slot
+func _render_head(side: int) -> void:
+	var head := _serpents[side]
+	var shown := clampf(roundf(_shown[side]) + _breath[side], 0.0, HEAD_SIZE.x)
+	head.region_rect = Rect2(_head_frame[side] * HEAD_SIZE.x + HEAD_SIZE.x - shown, 0, shown, HEAD_SIZE.y)
+	var x: float = SLOT_X_ART[side] + (shown / 2.0 if side == 0 else -shown / 2.0)
+	head.position = Vector2(x, SERPENT_ART[side].y) * features.MAP_SCALE
+
+# The jaguar rakes its claws at the ball as it knocks it away
+func _swipe(side: int, at: Vector2) -> void:
+	var claw := _claws[side]
+	claw.position = Vector2(_serpents[side].global_position.x + (CLAW_REACH if side == 0 else -CLAW_REACH), at.y)
+	claw.show()
+	claw.frame = 0
+	claw.play()
+
+func _head_out(side: int) -> bool:
+	return _shown[side] >= OUT - 0.5
+
+func _on_button(body: Node) -> void:
+	if _button_cooldown > 0.0 or not features._is_ball_on_playfield(body):
+		return
+	_button_cooldown = 1.0
+	_pressed_left = PRESSED_SECONDS
+	features._award(BUTTON_POINTS, BUTTON_AT)
+	PinballEvents.effect.emit("sparks", BUTTON_AT)
+	if _out_left <= 0.0:
+		PinballEvents.toast.emit("The jaguars wake!")
+		AudioSfx.play("roar")
+	_out_left = OUT_SECONDS
 
 func _physics_process(delta: float) -> void:
 	_clock += delta
+	_pressed_left = maxf(_pressed_left - delta, 0.0)
+	features.show_gold_button(_button_sprite, _pressed_left, _out_left > 0.0)
+	_button_cooldown = maxf(_button_cooldown - delta, 0.0)
+	if _out_left > 0.0:
+		_out_left -= delta
+		if _out_left <= 0.0:
+			PinballEvents.toast.emit("The jaguars slink back")
+	_blink_left -= delta
+	for side in 2:
+		var breath := 1.0 if fposmod(_clock / BREATH_SECONDS + side * 0.5, 1.0) < 0.5 else 0.0
+		if breath != _breath[side]:
+			_breath[side] = breath
+			_render_head(side)
+	for side in 2:
+		_sneak_wait[side] -= delta
+		_sneak_left[side] = maxf(_sneak_left[side] - delta, 0.0)
+		if _sneak_wait[side] <= 0.0:
+			_sneak_wait[side] = randf_range(SNEAK_EVERY.x, SNEAK_EVERY.y)
+			_sneak_left[side] = SNEAK_SECONDS
+		var want := OUT if _out_left > 0.0 else (SNEAK if _sneak_left[side] > 0.0 else PEEK)
+		var before := roundf(_shown[side])
+		_shown[side] = move_toward(_shown[side], want, EMERGE_PER_SECOND * delta)
+		var out := _head_out(side)
+		if _wedges[side].disabled == out:
+			_wedges[side].set_deferred("disabled", not out)
+		if _blink_left <= 0.0 and _head_frame[side] == HEAD_WATCHING:
+			_head_frame[side] = HEAD_BLINKING
+			get_tree().create_timer(0.15).timeout.connect(func():
+				if _head_frame[side] == HEAD_BLINKING:
+					_head_frame[side] = HEAD_WATCHING
+					_render_head(side))
+		if roundf(_shown[side]) != before or _blink_left <= 0.0:
+			_render_head(side)
+	if _blink_left <= 0.0:
+		_blink_left = randf_range(2.5, 6.0)
 	for side in 2:
 		_cooldown[side] = maxf(_cooldown[side] - delta, 0.0)
 		_since_hit[side] += delta
 		if _hits[side] > 0 and not road_open and _since_hit[side] >= PIP_FADE_SECONDS:
 			_hits[side] = 0
-			_render()
-	# The next relic to earn blinks; a lit El Dorado makes all four shimmer
-	for i in _relic_lamps.size():
-		var lit: bool = relics[i]
-		if el_dorado_open:
-			lit = int(_clock * 6.0 + i) % 3 != 0
-		elif i == city and not relics[i]:
-			lit = int(_clock * 3.0) % 2 == 0
-		_relic_lamps[i].frame = i + (4 if lit else 0)
-	if road_open:
-		var flash := int(_clock * 6.0) % 2
-		for side in 2:
-			for pip in _pips[side]:
-				pip.frame = flash
+	_rest_left = maxf(_rest_left - delta, 0.0)
+	if traveling:
+		_travel_left -= delta
+		if ceili(_travel_left) != ceili(_travel_left + delta):
+			_announce_goal()
+		if _travel_left <= 0.0:
+			PinballEvents.toast.emit("The road closes")
+			_end_travel()
 
 func _on_serpent_hit(body: Node, side: int, facing: Vector2) -> void:
 	if _cooldown[side] > 0.0 or not features._is_ball_on_playfield(body):
 		return
 	_cooldown[side] = HIT_COOLDOWN
+	var was_out := _head_out(side)
+	# struck, it's knocked back into its slot, then slides out again
+	_shown[side] = maxf(_shown[side] - RECOIL, 0.0)
+	_render_head(side)
+	if not was_out:
+		features._award(LURK_POINTS, _serpents[side].global_position)
+		return  # still in its slot: the button brings it out
 	var ball := body as RigidBody2D
-	ball.linear_velocity += facing * HIT_PUSH
+	ball.linear_velocity = ball.linear_velocity * 0.2 + facing.rotated(randf_range(-0.3, 0.3)) * HIT_KICK
+	_swipe(side, ball.global_position)
 	features._award(HIT_POINTS, _serpents[side].global_position)
 	AudioSfx.play("bumper")
 	PinballEvents.effect.emit("sparks", ball.global_position - facing * 20.0)
 	PinballEvents.rumble.emit(5.0)
-	_serpents[side].frame = SERPENT_HIT
-	get_tree().create_timer(0.25).timeout.connect(func(): _serpents[side].frame = SERPENT_IDLE)
+	_head_frame[side] = HEAD_ROARING
+	_render_head(side)
+	get_tree().create_timer(0.25).timeout.connect(func():
+		_head_frame[side] = HEAD_WATCHING
+		_render_head(side))
 	if road_open or el_dorado_open:
 		return
 	_hits[side] += 1
 	_since_hit[side] = 0.0
-	if _hits[side] >= HITS_TO_TRAVEL:
-		road_open = true
-		PinballEvents.toast.emit("Road open!")
-		_announce_goal()
-	_render()
+	_hits[side] = mini(_hits[side], HITS_TO_TRAVEL)
+	if _hits[0] >= HITS_TO_TRAVEL and _hits[1] >= HITS_TO_TRAVEL and _rest_left <= 0.0 			and not features.mode_running():
+		_start_travel()
 
-## Moves on to the next city still missing its relic (a finished feat, the serpents and
+func _start_travel() -> void:
+	road_open = true
+	traveling = true
+	travel_steps = 0
+	_travel_left = TRAVEL_SECONDS
+	PinballEvents.banner.emit("The road opens!", Billboard.PRIZE + 4)
+	GameManager.grant_ball_save(TRAVEL_SAVER)
+	PinballEvents.mode_changed.emit()
+	_announce_goal()
+
+func _pick_way(side: String) -> void:
+	if not traveling:
+		return
+	travel_steps = 1 if side == "left" else 2
+	PinballEvents.toast.emit("Next city: shoot Tlaloc's mouth!" if travel_steps == 1 else "Skip a city: shoot Tlaloc's mouth!")
+	_announce_goal()
+
+## The temple hole caught the ball during Travel mode with a way picked
+func arrive() -> void:
+	if not traveling or travel_steps == 0:
+		return
+	var steps := travel_steps
+	_end_travel()
+	for i in steps:
+		travel(i == steps - 1)
+
+func _end_travel() -> void:
+	_rest_left = TRAVEL_REST
+	traveling = false
+	road_open = false
+	travel_steps = 0
+	_hits = [0, 0]
+	PinballEvents.mode_changed.emit()
+	_announce_goal()
+
+## Moves on to the next city still missing its relic (a finished feat, Travel mode and
 ## the temple's roulette all call this). Nowhere left to go once all four are found.
-func travel() -> void:
+func travel(announce := true) -> void:
 	road_open = false
 	_hits = [0, 0]
-	_render()
 	if not relics.has(false):
 		_announce_goal()
 		return
 	city = (city + 1) % CITIES.size()
 	while relics[city]:
 		city = (city + 1) % CITIES.size()
+	if not announce:
+		return  # a city passed through on the way
 	features._award(TRAVEL_POINTS, _serpents[0].global_position.lerp(_serpents[1].global_position, 0.5))
 	PinballEvents.billboard.emit(Billboard.CITY + city, "Travel to %s!" % CITIES[city].name)
 	AudioSfx.play("ramp")
+	PinballEvents.traveled.emit()
 	_announce_goal()
 
 func _feat_done(feat: String) -> void:
@@ -168,8 +344,9 @@ func _feat_done(feat: String) -> void:
 		_announce_goal()
 		return
 	relics[city] = true
+	_render_relics()
 	features._award(RELIC_POINTS, _relic_lamps[city].global_position)
-	PinballEvents.effect.emit("gold", _relic_lamps[city].global_position)
+	PinballEvents.effect.emit("gold", RELIC_AT)
 	PinballEvents.rumble.emit(4.0)
 	PinballEvents.billboard.emit(Billboard.RELIC + city, "Relic of %s!" % CITIES[city].name)
 	AudioSfx.play("catch")
@@ -185,6 +362,7 @@ func _feat_done(feat: String) -> void:
 func el_dorado_finished() -> void:
 	trips += 1
 	relics = [false, false, false, false]
+	_render_relics()
 	el_dorado_open = false
 	_progress = [0, 0, 0, 0]
 	features.temple.set_gate_open(false)
@@ -197,9 +375,11 @@ func _need() -> int:
 func _announce_goal() -> void:
 	var text: String
 	if el_dorado_open:
-		text = "El Dorado is open! Shoot the temple"
-	elif road_open:
-		text = "Road open! Shoot the temple to travel"
+		text = "El Dorado is open! Shoot Tlaloc's mouth"
+	elif traveling:
+		var left := maxi(ceili(_travel_left), 0)
+		var way := "shoot Tlaloc's mouth" if travel_steps > 0 else "left ramp: next city, right: skip one"
+		text = "Travel: %s   %d:%02d" % [way, left / 60, left % 60]
 	else:
 		var goal: String = CITIES[city].goal
 		if goal.contains("%d"):
@@ -209,7 +389,7 @@ func _announce_goal() -> void:
 		text = "%s: %s" % [CITIES[city].name, goal]
 	PinballEvents.objective_changed.emit(text)
 
-func _render() -> void:
-	for side in 2:
-		for i in _pips[side].size():
-			_pips[side][i].frame = 1 if i < _hits[side] else 0
+func _render_relics() -> void:
+	for i in _relic_lamps.size():
+		_relic_lamps[i].frame = i + (4 if relics[i] else 0)
+

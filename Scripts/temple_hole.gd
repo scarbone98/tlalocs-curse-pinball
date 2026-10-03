@@ -1,77 +1,121 @@
 extends Node2D
-## The temple hole in the middle of the table, like Pokemon Pinball's Ditto and
-## Bellsprout holes. A shot up into it (not a ball falling back over it) is caught,
-## held for a moment, and spun on the temple's roulette before being sent back down
-## to the flippers. With the Awakening lit it starts that instead; with the road open
-## (a serpent's pips full) it travels to the next city. Once all four relics are lit it's El Dorado's gate, and the ball goes
-## through to the bonus stage.
+## Tlaloc's mouth, in the great stone face in the middle of the table: Pokemon Pinball
+## Ruby & Sapphire's centre hole. When something waits there he opens his mouth, with the
+## magic whirl (the hand-drawn magicWhirl.png) turning in it, and a shot up into it (not
+## a ball falling back over it) is swallowed, held a moment, then sent back down to the
+## flippers:
+##  - El Dorado's gate, opened by all four relics or by three bonus lamps: the ball goes
+##    through to the bonus stage
+##  - an Awakening with all its offerings found: the spirit awakens
+##  - Travel mode with a way picked: the journey arrives at its city
+##  - the roulette, lit by completing the bottom lanes: the temple's reel spins and stops
+##    by itself on a prize. Each spin draws from a richer table than the last.
+## With nothing waiting his mouth stays shut and the ball rolls over him.
 
-const HOLE := preload("res://Sprites/table/temple_hole.png")
-const WHIRL := preload("res://Sprites/table/whirl.png")  # spins in the hole while El Dorado's gate is open
-const WHIRL_TURNS_PER_SECOND := 0.6
+const WHIRL := preload("res://Sprites/table/whirl.png")  # the hand-drawn magicWhirl.png, turning over his open mouth
 
-const AT := Vector2(337, 650)
-const CATCH_RADIUS := 20.0  # the ball's centre has to come this close
+const AT := Vector2(339, 838)  # Tlaloc's mouth, in the centre face (Sprites/face_sockets.png)
+const CATCH_RADIUS := 24.0  # the ball's centre has to come this close
+# While his mouth is open the whirl draws a ball that comes near it in, harder the closer it gets
+const PULL_RADIUS := 110.0
+const PULL := 1400.0  # scene units/s² at the mouth, fading to nothing at PULL_RADIUS
 const HOLD_SECONDS := 1.1
 const REARM_SECONDS := 1.5  # after spitting a ball out, so it can't be caught again at once
 const EJECT_SPEED := 450.0
 const EJECT_SPREAD := 150.0
+# The reel stops by itself after 100 to 299 frames, as on Ruby's field
+const SPIN_SECONDS := Vector2(100.0 / 60.0, 299.0 / 60.0)
 
-enum { HOLE_IDLE, HOLE_FLASH, GATE_A, GATE_B }
+enum { MOUTH_SHUT, MOUTH_OPEN }  # the face's frames
 
-# Weight, then what it does. Kickback and spirit fall back to points when they can't apply.
-const PRIZES := [
-	[3, "points_small"], [2, "points_big"], [2, "kickback"], [2, "spirit"], [2, "travel"], [1, "awaken"],
+# The roulette's prize tables: each spin of the game draws from the next table, up to
+# the last. [weight, prize] - prizes that can't apply right now pay points instead.
+const PRIZE_TABLES := [
+	[[4, "points_small"], [3, "beads_small"], [3, "saver_short"], [2, "bonus_x"], [1, "kickback"]],
+	[[3, "points_small"], [3, "points_big"], [3, "beads_small"], [2, "saver_short"], [2, "bonus_x"], [2, "kickback"], [1, "spirit"]],
+	[[3, "points_big"], [2, "beads_big"], [2, "saver_long"], [2, "bonus_x"], [2, "kickback"], [2, "spirit"], [1, "upgrade"], [1, "travel"]],
+	[[3, "points_huge"], [2, "beads_big"], [2, "saver_long"], [3, "bonus_x2"], [2, "spirit"], [2, "upgrade"], [2, "travel"], [1, "awaken"], [1, "bonus_lamp"]],
 ]
+const SPINS_PER_TABLE := 2
+# What each prize shows on the billboard's reel (Scripts/billboard.gd PRIZES order)
+const PRIZE_PICTURE := {
+	"points_small": "points_small", "points_big": "points_big", "points_huge": "points_big",
+	"beads_small": "points_small", "beads_big": "points_big", "saver_short": "kickback", "saver_long": "kickback",
+	"bonus_x": "points_big", "bonus_x2": "points_big", "kickback": "kickback", "spirit": "spirit",
+	"upgrade": "points_big", "travel": "travel", "awaken": "spirit", "bonus_lamp": "points_big",
+}
 const PRIZE_CAPTIONS := {
-	"points_small": "Temple offering!", "points_big": "Temple treasure!", "kickback": "Kickback both sides!",
-	"spirit": "A spirit rises!", "travel": "The road opens!", "awaken": "The spirits stir!",
+	"points_small": "Temple offering!", "points_big": "Temple treasure!", "points_huge": "Temple hoard!",
+	"beads_small": "5 jade beads!", "beads_big": "15 jade beads!",
+	"saver_short": "Ball saver 30s!", "saver_long": "Ball saver 60s!",
+	"bonus_x": "Bonus +1!", "bonus_x2": "Bonus +2!", "kickback": "Kickback both sides!",
+	"spirit": "A spirit rises!", "upgrade": "Ball upgrade!", "travel": "The road opens!",
+	"awaken": "The spirits stir!", "bonus_lamp": "A bonus lamp!",
 }
 
 var features: Node2D  # TableFeatures, which owns the shared sprite and scoring helpers
-var gate_open := false
+var gate_open := false       # all four relics lit
+var roulette_lit := false
+var spins := 0
 
-var _sprite: AnimatedSprite2D
 var _whirl: AnimatedSprite2D
+var _was_open := false
 var _held: RigidBody2D
 var _rearm := 0.0
 var _clock := 0.0
 
 func _ready() -> void:
-	_sprite = features._sprite(HOLE, 4, AT)
 	_whirl = features._sprite(WHIRL, 3, AT, 8.0)
-	_whirl.scale *= 0.7
-	_whirl.modulate.a = 0.85
+	_whirl.z_index = 1  # over the face
+	_whirl.z_as_relative = false
 	_whirl.play()
 	_whirl.hide()
 
 func set_gate_open(open: bool) -> void:
 	gate_open = open
 
+## Completing the bottom lanes lights the roulette
+func light_roulette() -> void:
+	if roulette_lit:
+		return
+	roulette_lit = true
+	PinballEvents.toast.emit("Temple roulette lit!")
+
+func _el_dorado_open() -> bool:
+	return gate_open or GameManager.bonus_lamps >= GameManager.BONUS_LAMPS_FOR_EL_DORADO
+
+func _waiting() -> bool:
+	return _el_dorado_open() or features.awakening.finishing \
+		or (features.journey.traveling and features.journey.travel_steps > 0) or roulette_lit
+
 func _physics_process(delta: float) -> void:
 	_clock += delta
 	_rearm = maxf(_rearm - delta, 0.0)
-	_whirl.visible = gate_open
-	if gate_open:
-		_whirl.rotation = -fposmod(_clock * WHIRL_TURNS_PER_SECOND, 1.0) * TAU
-	if _held:
-		_sprite.frame = HOLE_FLASH if int(_clock * 8.0) % 2 == 0 else HOLE_IDLE
-	elif gate_open:
-		_sprite.frame = GATE_A if int(_clock * 4.0) % 2 == 0 else GATE_B
-	elif features.journey.road_open or features.awakening.lit:
-		_sprite.frame = HOLE_FLASH if int(_clock * 3.0) % 2 == 0 else HOLE_IDLE  # something waits here
-	else:
-		_sprite.frame = HOLE_IDLE
-	if _held or _rearm > 0.0:
+	# his mouth opens, the whirl turning in it, while something waits (or he's holding the ball)
+	var open := _held != null or _waiting()
+	_whirl.visible = open
+	if open and features._face_sprite:
+		features._face_sprite.frame = MOUTH_OPEN
+	elif _was_open and features._face_sprite and not GameManager.curse_active:
+		features._face_sprite.frame = MOUTH_SHUT  # nothing waiting any more: he shuts it
+	_was_open = open
+	if _held or _rearm > 0.0 or not _waiting():
 		return
 	var balls := get_tree().get_nodes_in_group("ball")
 	if balls.size() != 1:
 		return  # multiball rolls straight over it
 	var ball := balls[0] as RigidBody2D
-	if ball.freeze or ball.linear_velocity.y >= 0.0 or not features._is_ball_on_playfield(ball):
+	if ball.freeze or not features._is_ball_on_playfield(ball):
 		return
-	if ball.global_position.distance_to(AT) < CATCH_RADIUS:
+	var to_mouth := AT - ball.global_position
+	var near := to_mouth.length()
+	if near < CATCH_RADIUS:
 		_catch(ball)
+	elif near < PULL_RADIUS:
+		# the whirl draws it in, and takes the edge off its speed as it spirals toward the mouth
+		var strength := 1.0 - near / PULL_RADIUS
+		ball.linear_velocity += to_mouth.normalized() * PULL * strength * delta
+		ball.linear_velocity *= 1.0 - 0.8 * strength * delta
 
 func _catch(ball: RigidBody2D) -> void:
 	_held = ball
@@ -80,30 +124,35 @@ func _catch(ball: RigidBody2D) -> void:
 	ball.linear_velocity = Vector2.ZERO
 	var sink := create_tween().set_process_mode(Tween.TWEEN_PROCESS_PHYSICS)
 	sink.tween_property(ball, "global_position", AT, 0.1)
-	sink.parallel().tween_property(ball.anim, "scale", ball.anim.scale * 0.6, 0.1)
+	sink.parallel().tween_property(ball.anim, "modulate:a", 0.0, 0.1)  # into his mouth
 	AudioSfx.play("kickback")
 	PinballEvents.rumble.emit(4.0)
-	PinballEvents.effect.emit("gold" if gate_open else "dust", AT)
-	if gate_open:
-		PinballEvents.toast.emit("To El Dorado!")
-		get_tree().create_timer(HOLD_SECONDS).timeout.connect(func(): features.el_dorado.enter(ball))
+	if _el_dorado_open():
+		PinballEvents.effect.emit("gold", AT)
+		var via_relics := gate_open
+		get_tree().create_timer(HOLD_SECONDS).timeout.connect(func(): features.el_dorado.enter(ball, via_relics))
 		return
-	if features.awakening.lit and not features.awakening.active:
+	PinballEvents.effect.emit("dust", AT)
+	if features.awakening.finishing:
 		get_tree().create_timer(HOLD_SECONDS).timeout.connect(func():
-			features.awakening.start()
+			features.awakening.finish()
 			eject(ball))
 		return
-	if features.journey.road_open:
-		PinballEvents.toast.emit("The road leads on...")
+	if features.journey.traveling and features.journey.travel_steps > 0:
 		get_tree().create_timer(HOLD_SECONDS).timeout.connect(func():
-			features.journey.travel()
+			features.journey.arrive()
 			eject(ball))
 		return
-	# The prize is picked now so the billboard's reel can spin while the ball is held
+	# The roulette: the prize is picked now so the billboard's reel can spin while the ball is held
+	roulette_lit = false
 	var prize := _pick_prize()
-	PinballEvents.billboard_spin.emit(Billboard.PRIZE + Billboard.PRIZES.find(prize), HOLD_SECONDS, PRIZE_CAPTIONS[prize])
-	get_tree().create_timer(HOLD_SECONDS).timeout.connect(func():
+	var seconds := randf_range(SPIN_SECONDS.x, SPIN_SECONDS.y)
+	var picture: int = Billboard.PRIZE + Billboard.PRIZES.find(PRIZE_PICTURE[prize])
+	PinballEvents.billboard_spin.emit(picture, seconds, PRIZE_CAPTIONS[prize])
+	get_tree().create_timer(seconds).timeout.connect(func():
 		_award_prize(prize)
+		spins += 1
+		PinballEvents.roulette_spun.emit()
 		eject(ball))
 
 ## Sends a held ball back down toward the flippers (the bonus stage returns it here too)
@@ -111,43 +160,62 @@ func eject(ball: RigidBody2D) -> void:
 	_held = null
 	_rearm = REARM_SECONDS
 	ball.global_position = AT
-	ball.anim.scale = Vector2.ONE * ball.draw_scale
+	ball.anim.modulate.a = 1.0
 	ball.freeze = false
 	ball.linear_velocity = Vector2(randf_range(-EJECT_SPREAD, EJECT_SPREAD), EJECT_SPEED)
 	AudioSfx.play("launch")
+	PinballEvents.effect.emit("dust", AT)
 
-# What the roulette lands on. A prize that can't apply right now (the kickback's already
-# lit, a spirit's already up) turns into an offering instead.
 func _pick_prize() -> String:
+	var table: Array = PRIZE_TABLES[mini(spins / SPINS_PER_TABLE, PRIZE_TABLES.size() - 1)]
 	var total := 0
-	for prize in PRIZES:
+	for prize in table:
 		total += prize[0]
 	var roll := randi() % total
 	var pick := "points_small"
-	for prize in PRIZES:
+	for prize in table:
 		roll -= prize[0]
 		if roll < 0:
 			pick = prize[1]
 			break
 	if pick == "kickback" and features.kickback.both_sides:
-		return "points_small"
-	if pick == "spirit" and features.spirit._active:
-		return "points_small"
-	if pick == "awaken" and (features.awakening.active or SpiritCodex.awakenable().is_empty()):
-		return "points_small"
+		return "points_big"
+	if pick in ["spirit", "travel", "awaken"] and features.mode_running():
+		return "points_big"
+	if pick == "awaken" and SpiritCodex.awakenable().is_empty():
+		return "points_big"
 	return pick
 
 func _award_prize(prize: String) -> void:
+	var at := AT + Vector2(0, -40)
 	match prize:
+		"points_small":
+			features._award(5000, at)
+		"points_big":
+			features._award(15000, at)
+		"points_huge":
+			features._award(50000, at)
+		"beads_small":
+			GameManager.add_beads(5)
+		"beads_big":
+			GameManager.add_beads(15)
+		"saver_short":
+			GameManager.grant_ball_save(30.0)
+		"saver_long":
+			GameManager.grant_ball_save(60.0)
+		"bonus_x":
+			GameManager.add_bonus_multiplier(1)
+		"bonus_x2":
+			GameManager.add_bonus_multiplier(2)
 		"kickback":
 			features.kickback.charge()
 		"spirit":
 			features.spirit.summon()
+		"upgrade":
+			features.upgrade_ball()
 		"travel":
-			features.journey.travel()
+			features.journey._start_travel()
 		"awaken":
 			features.awakening.start()
-		"points_big":
-			features._award(15000, AT + Vector2(0, -40))
-		_:
-			features._award(5000, AT + Vector2(0, -40))
+		"bonus_lamp":
+			GameManager.add_bonus_lamps(1)
