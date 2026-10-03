@@ -1,13 +1,11 @@
-"""Generate the sprites that fill Tlaloc's shrine, the striped temple top right.
-
-The table art paints the shrine's panels as flat dark purple. This draws what goes
-in them at the art's native resolution (map_f1.png is 256x424), so they share its
+"""Generate the sprites set into Tlaloc's ziggurat, top right (painted by
+tools/make_v2_table.py, whose fire bowls burn the hand-drawn fire.png). These are
+drawn at the art's native resolution (map_f1.png is 256x424), so they share its
 pixel grid once the scene scales them up:
 
   tlaloc_mask.png  the rain god's goggle-eyed mask for the middle panel
                    (asleep, stirring, cursed)
   rain_lamp.png    one raindrop lamp of the curse meter in the top panel (off, on)
-  brazier.png      fire bowls either side of the doorway (4 flame frames)
 
 Run from the repo root:  python3 tools/make_shrine_sprites.py
 """
@@ -28,11 +26,8 @@ STRIPE_W = (0xC6, 0xD8, 0xE9, 255)
 TEAL = (0x1A, 0x86, 0xA3, 255)
 TEAL_L = (0x8B, 0xE6, 0xEE, 255)
 NAVY = (0x0F, 0x26, 0x41, 255)
-STONE_D = (0x57, 0x6E, 0x78, 255)
-STONE = (0x74, 0x8C, 0x9A, 255)
 GOLD = (0xF8, 0xD0, 0x00, 255)
 ORANGE = (0xF8, 0xA0, 0x08, 255)
-EMBER = (0xBE, 0x56, 0x2E, 255)
 PALE = (0xF0, 0xF0, 0x90, 255)
 WHITE = (0xDE, 0xF1, 0xEE, 255)
 RAIN = (0xA8, 0xD8, 0xF8, 255)
@@ -111,70 +106,14 @@ DROP = [
 DROP_OFF = {".": T, "o": INK, "D": STRIPE_B, "d": NAVY, "s": NAVY}
 DROP_ON = {".": T, "o": INK, "D": WHITE, "d": RAIN, "s": TEAL}
 
-# Stone fire bowl; the flame on top flickers through four frames.
-BOWL = [
-    "oooooooooo",
-    "oSSSSSSSSo",
-    ".oSssssSo.",
-    "..oSssSo..",
-    "...oSSo...",
-    "...oSSo...",
-    "..oSSSSo..",
-    "..oooooo..",
-]
-BOWL_KEY = {".": T, "o": INK, "S": STONE, "s": STONE_D}
-# The flame stands straight, leans one way, leans the other, then gutters low
-FLAME_UP = [
-    "....pp....",
-    "....GG....",
-    "...GGGG...",
-    "...GOOG...",
-    "..GOOOOG..",
-    "..GOPPOG..",
-    ".EOPPPPOE.",
-]
-FLAME_LEAN = [
-    "...p......",
-    "...GG.....",
-    "...GGGG...",
-    "..GGOOG...",
-    "..GOOOOG..",
-    "..GOPPOG..",
-    ".EOPPPPOE.",
-]
-FLAME_LOW = [
-    "..........",
-    "....pp....",
-    "...GGGG...",
-    "...GOOG...",
-    "..GOOOOG..",
-    "..GOPPOG..",
-    ".EOPPPPOE.",
-]
-FLAMES = [FLAME_UP, FLAME_LEAN, [r[::-1] for r in FLAME_LEAN], FLAME_LOW]
-FLAME_KEY = {".": T, "p": PALE, "G": GOLD, "O": ORANGE, "P": PALE, "E": EMBER}
-
-
-def brazier_frames():
-    frames = []
-    for flame in FLAMES:
-        img = Image.new("RGBA", (10, 15), T)
-        img.alpha_composite(from_rows(flame, FLAME_KEY), (0, 0))
-        img.alpha_composite(from_rows([r.ljust(10, ".") for r in BOWL], BOWL_KEY), (0, 7))
-        frames.append(img)
-    return frames
-
-
 def main():
     OUT_DIR.mkdir(parents=True, exist_ok=True)
     masks = mask_frames()
-    bowl = from_rows(BOWL, BOWL_KEY)
-    for img in masks + [from_rows(DROP, DROP_OFF), from_rows(DROP, DROP_ON), bowl]:
+    for img in masks + [from_rows(DROP, DROP_OFF), from_rows(DROP, DROP_ON)]:
         assert asymmetry(img) == 0, "shrine sprites must mirror exactly"
     strip(masks).save(OUT_DIR / "tlaloc_mask.png")
     strip([from_rows(DROP, DROP_OFF), from_rows(DROP, DROP_ON)]).save(OUT_DIR / "rain_lamp.png")
-    strip(brazier_frames()).save(OUT_DIR / "brazier.png")
-    print("wrote tlaloc mask, rain lamp and brazier sprites")
+    print("wrote tlaloc mask and rain lamp sprites")
 
 
 if __name__ == "__main__":

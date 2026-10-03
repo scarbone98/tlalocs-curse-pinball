@@ -1,5 +1,5 @@
 extends Node2D
-## The three temple torches on the wall peaks. Unlit they only smoulder; knocking the
+## The three torches standing on the wall peaks (the hand-drawn torch.png). Unlit they only smoulder; knocking the
 ## ball into a peak lights its torch with a flare, and it burns for a while before
 ## dying back. Light all three before any goes out and the torches blaze
 ## up and hold a ball saver for a while, like Pokemon Pinball's Pikachu saver: drain in
@@ -10,7 +10,8 @@ const TORCH := preload("res://Sprites/table/torch.png")
 # Scene positions of the painted lamps on the peaks (measured from Sprites/map_f1.png)
 const AT := [Vector2(319, 549), Vector2(442, 642), Vector2(208, 815)]
 const SENSOR_RADIUS := 14.0  # the ball has to strike the peak, not just pass by
-const FRAME := Vector2(9, 12)  # Sprites/table/torch.png: four blazing frames, then four embers
+const FRAME := Vector2(16, 24)  # Sprites/table/torch.png: six burning frames, then six embers
+const FLAME_TOP := Vector2(0, -52)  # where the flame leaps from, above the painted lamp
 const HIT_COOLDOWN := 0.6
 const LIGHT_POINTS := 500
 const RELIGHT_POINTS := 250
@@ -30,10 +31,10 @@ var _rest_left := 0.0
 
 func _ready() -> void:
 	var frames := SpriteFrames.new()
-	for anim in [[&"blaze", 0], [&"ember", 4]]:
+	for anim in [[&"blaze", 0], [&"ember", 6]]:
 		frames.add_animation(anim[0])
-		frames.set_animation_speed(anim[0], 8.0)
-		for i in 4:
+		frames.set_animation_speed(anim[0], 10.0)
+		for i in 6:
 			var atlas := AtlasTexture.new()
 			atlas.atlas = TORCH
 			atlas.region = Rect2(Vector2((anim[1] + i) * FRAME.x, 0), FRAME)
@@ -43,9 +44,9 @@ func _ready() -> void:
 		torch.sprite_frames = frames
 		torch.position = AT[i]
 		torch.scale = features.MAP_SCALE
-		torch.offset = Vector2(0, -4)  # the flame's base sits on the painted lamp
+		torch.offset = Vector2(0, -11)  # the torch's foot stands on the painted lamp
 		torch.play(&"ember")
-		torch.frame = randi() % 4
+		torch.frame = randi() % 6
 		features.add_child(torch)
 		features._torches.append(torch)  # the curse makes them flicker faster
 		_torches.append(torch)
@@ -85,7 +86,7 @@ func _on_hit(body: Node, index: int) -> void:
 		return
 	_cooldown[index] = HIT_COOLDOWN
 	var torch := _torches[index]
-	PinballEvents.effect.emit("fire", AT[index] + Vector2(0, -12))
+	PinballEvents.effect.emit("fire", AT[index] + FLAME_TOP)
 	AudioSfx.play("torch")
 	# a flare as it catches (or roars again, if it's already alight)
 	var flare := create_tween()
@@ -112,4 +113,4 @@ func _ablaze() -> void:
 	PinballEvents.toast.emit("Torches ablaze! Ball saver")
 	PinballEvents.rumble.emit(4.0)
 	for at in AT:
-		PinballEvents.effect.emit("fire", at + Vector2(0, -12))
+		PinballEvents.effect.emit("fire", at + FLAME_TOP)

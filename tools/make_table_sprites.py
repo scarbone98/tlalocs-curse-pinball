@@ -144,79 +144,6 @@ ARROW_KEY = {
     "w": (0xFF, 0xF1, 0xC2, 255), "B": GOLD, "b": ORANGE,
 }
 
-# Temple torch flames that sit on the three orange wall lamps.
-TORCH_FRAMES = [
-    [
-        "....p....",
-        "....G....",
-        "...GG....",
-        "...GOG...",
-        "..GOOG...",
-        "..GOPOG..",
-        "..OOPPO..",
-        ".EOPPPOE.",
-        ".EOPwPOE.",
-        ".EOPPPOE.",
-        "..EOOOE..",
-        "...EEE...",
-    ],
-    [
-        ".....p...",
-        ".....G...",
-        "....GG...",
-        "...GOG...",
-        "...GOOG..",
-        "..GOPOG..",
-        "..OOPPO..",
-        ".EOPPPOE.",
-        ".EOPwPOE.",
-        ".EOPPPOE.",
-        "..EOOOE..",
-        "...EEE...",
-    ],
-    [
-        ".........",
-        "...p.....",
-        "...GG....",
-        "..GOG....",
-        "..GOOG...",
-        "..GOPOG..",
-        "..OPPOO..",
-        ".EOPPPOE.",
-        ".EOPwPOE.",
-        ".EOPPPOE.",
-        "..EOOOE..",
-        "...EEE...",
-    ],
-    [
-        "....p....",
-        "...GG....",
-        "...GOG...",
-        "..GOOG...",
-        "..GOPOG..",
-        "..GOPPO..",
-        "..OPPPO..",
-        ".EOPPPOE.",
-        ".EOPwPOE.",
-        ".EOPPPOE.",
-        "..EOOOE..",
-        "...EEE...",
-    ],
-]
-TORCH_KEY = {".": T, "p": glow(PALE, 160), "G": GOLD, "O": ORANGE, "P": PALE, "w": WHITE, "E": EMBER}
-# Unlit, the torches smoulder: a low ember glow in the bowl, flickering through four frames
-TORCH_EMBERS = [
-    [".........", ".........", ".........", ".........", ".........", ".........",
-     ".........", "....p....", "...EOE...", "..EOOOE..", "..EOPOE..", "...EEE..."],
-    [".........", ".........", ".........", ".........", ".........", ".........",
-     "....p....", "....E....", "...EOE...", "..EOOOE..", "..EOPOE..", "...EEE..."],
-    [".........", ".........", ".........", ".........", ".........", ".........",
-     ".........", ".........", "...EOE...", "..EOPOE..", "..EOOOE..", "...EEE..."],
-    [".........", ".........", ".........", ".........", ".........", ".........",
-     ".........", "...p.....", "...EOE...", "..EOOOE..", "..EOPOE..", "...EEE..."],
-]
-EMBER_KEY = dict(TORCH_KEY, O=EMBER, P=ORANGE, E=glow(EMBER, 200))
-
 # Raindrop for the curse storm particles.
 # Two pixels wide with a blue edge so drops read against the light sand floor
 RAINDROP = [
@@ -235,8 +162,6 @@ def main():
     strip([from_rows(LAMP_UNLIT, LAMP_KEY), from_rows(LAMP_LIT, LAMP_KEY)]).save(OUT_DIR / "lane_lamp.png")
     strip([from_rows(BAR_UNLIT, BAR_KEY), from_rows(BAR_LIT, BAR_KEY)]).save(OUT_DIR / "bonus_bar.png")
     strip([from_rows(ARROW_UNLIT, ARROW_KEY), from_rows(ARROW_LIT, ARROW_KEY)]).save(OUT_DIR / "arrow_insert.png")
-    strip([from_rows(f, TORCH_KEY) for f in TORCH_FRAMES] + [from_rows(f, EMBER_KEY) for f in TORCH_EMBERS]).save(
-        OUT_DIR / "torch.png")
     from_rows(RAINDROP, RAIN_KEY).save(OUT_DIR / "raindrop.png")
     print("wrote", sorted(p.name for p in OUT_DIR.iterdir()))
 

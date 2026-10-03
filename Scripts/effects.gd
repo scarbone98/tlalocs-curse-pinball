@@ -3,7 +3,8 @@ extends Node2D
 ## sent over the event bus (PinballEvents.effect) so any part of the table can ask
 ## for one. Strong rumbles also buzz the phone, where the browser allows it.
 ##
-##   splash  water off a frog or the kickback
+##   splash  water off the kickback
+##   spores  a puff off a mushroom bumper
 ##   sparks  gold off the slingshots, serpents, coins and the Gilded King
 ##   dust    stone off a wall the ball slams into
 ##   gold    a shower of gold for a relic or the El Dorado jackpot
@@ -15,6 +16,7 @@ const VIBRATE_MS_PER_STRENGTH := 6
 # kind -> [amount, lifetime, speed range, gravity, colors from bright to faded]
 const KINDS := {
 	"splash": [12, 0.4, Vector2(140, 300), 500.0, [Color("#e6fbff"), Color("#8be6ee"), Color(0.1, 0.53, 0.64, 0.0)]],
+	"spores": [12, 0.45, Vector2(90, 220), 120.0, [Color("#f8f8f8"), Color("#f040c8"), Color(0.55, 0.25, 0.75, 0.0)]],
 	"sparks": [10, 0.3, Vector2(200, 380), 200.0, [Color("#fffbd6"), Color("#f8d000"), Color(0.97, 0.63, 0.03, 0.0)]],
 	"dust": [6, 0.3, Vector2(60, 140), 0.0, [Color("#b4c4cc"), Color("#748c9a"), Color(0.34, 0.43, 0.47, 0.0)]],
 	"gold": [32, 0.7, Vector2(160, 420), 380.0, [Color("#fffbd6"), Color("#f8d000"), Color(0.75, 0.54, 0.06, 0.0)]],

@@ -7,6 +7,8 @@ extends Node2D
 ## through to the bonus stage.
 
 const HOLE := preload("res://Sprites/table/temple_hole.png")
+const WHIRL := preload("res://Sprites/table/whirl.png")  # spins in the hole while El Dorado's gate is open
+const WHIRL_TURNS_PER_SECOND := 0.6
 
 const AT := Vector2(337, 650)
 const CATCH_RADIUS := 20.0  # the ball's centre has to come this close
@@ -30,12 +32,18 @@ var features: Node2D  # TableFeatures, which owns the shared sprite and scoring 
 var gate_open := false
 
 var _sprite: AnimatedSprite2D
+var _whirl: AnimatedSprite2D
 var _held: RigidBody2D
 var _rearm := 0.0
 var _clock := 0.0
 
 func _ready() -> void:
 	_sprite = features._sprite(HOLE, 4, AT)
+	_whirl = features._sprite(WHIRL, 3, AT, 8.0)
+	_whirl.scale *= 0.7
+	_whirl.modulate.a = 0.85
+	_whirl.play()
+	_whirl.hide()
 
 func set_gate_open(open: bool) -> void:
 	gate_open = open
@@ -43,6 +51,9 @@ func set_gate_open(open: bool) -> void:
 func _physics_process(delta: float) -> void:
 	_clock += delta
 	_rearm = maxf(_rearm - delta, 0.0)
+	_whirl.visible = gate_open
+	if gate_open:
+		_whirl.rotation = -fposmod(_clock * WHIRL_TURNS_PER_SECOND, 1.0) * TAU
 	if _held:
 		_sprite.frame = HOLE_FLASH if int(_clock * 8.0) % 2 == 0 else HOLE_IDLE
 	elif gate_open:
