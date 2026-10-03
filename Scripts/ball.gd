@@ -7,14 +7,19 @@ extends RigidBody2D
 @export var min_launch_power: float = 0.85
 @export var tap_seconds: float = 0.15
 @export var sweep_seconds: float = 0.9
-## The sprite is drawn about 1.35x the collision circle. Pokemon Pinball draws its ball
-## bigger still (a 16px sprite colliding as a 4px-radius circle), but here that spilled
-## too far over the walls and posts the ball passes; this still fits the same gaps.
-## Its spin copies that game too: every contact sets the spin from how fast the ball is
-## sliding along the surface, and the ball keeps that spin in the air.
+## The hand-drawn ball (tools/source_art/pinball_sprite.png) is drawn at 3x, about 1.2x
+## the collision circle. Pokemon Pinball draws its ball bigger still (a 16px sprite
+## colliding as a 4px-radius circle), but here that spilled too far over the walls and
+## posts the ball passes; this still fits the same gaps. It stays upright and its 16
+## frames roll it round, which is what makes it look solid. Its spin copies Pokemon
+## Pinball: every contact sets the spin from how fast the ball is sliding along the
+## surface, and the ball keeps that spin in the air.
 const SPIN_FRAMES := 16  # Sprites/ball_spin.png, one full turn per row
 const SPIN_SHEET := preload("res://Sprites/ball_spin.png")
-const SPIN_SIZE := 20
+const SPIN_SIZE := 16
+## The roll is drawn no faster than this (about 3 turns a second, 48 frames a second), so
+## each hand-drawn frame still shows on screen and the ball reads as turning, not strobing
+const MAX_DRAWN_SPIN := TAU * 3.0
 ## Tuned to Pokemon Pinball's engine (pret/pokepinball). Its field is about 160x310px,
 ## so 1px there is about 4.3 units here, and it runs one physics step per 60Hz frame:
 ##  - no friction or drag, only gravity: 11/256 px/frame^2 (660 here, project settings)
@@ -115,6 +120,7 @@ func _ready() -> void:
 	if anim:
 		anim.stop()
 		draw_scale = anim.scale.x
+		set_tier(0)
 
 func _physics_process(delta: float) -> void:
 	if anim:
@@ -305,7 +311,7 @@ func _update_spin(state: PhysicsDirectBodyState2D, v: Vector2) -> void:
 	if state.get_contact_count() == 0:
 		return
 	var normal := state.get_contact_local_normal(0)
-	_spin = normal.cross(v) / _drawn_radius()
+	_spin = clampf(normal.cross(v) / _drawn_radius(), -MAX_DRAWN_SPIN, MAX_DRAWN_SPIN)
 	# how fast it was going into the surface it just met
 	var into := -_moved_v.dot(normal)
 	if into > IMPACT_SPEED and _impact_cooldown <= 0.0:

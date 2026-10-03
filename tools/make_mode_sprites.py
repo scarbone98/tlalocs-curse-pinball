@@ -6,9 +6,7 @@ pixel grid. Run from the repo root:  python3 tools/make_mode_sprites.py
 
   Sprites/table/kickback_frog.png   3 frames: stone (uncharged), jade (charged), leap
   Sprites/table/spirit.png          3 frames: ajolote water spirit idle x2, hit flash
-  Sprites/table/ripple.png          4 frames: water ring the spirit rises from / sinks into
 """
-import math
 from pathlib import Path
 
 from PIL import Image
@@ -113,31 +111,13 @@ SPIRIT_KEY_ALT = dict(SPIRIT_KEY, g=GOLD)  # gills shimmer between frames
 SPIRIT_KEY_HIT = dict(SPIRIT_KEY, o=GOLD, C=CREAM, L=FOAM, m=ORANGE, g=GOLD)
 
 
-def ripple_frame(i):
-    w, h = 22, 8
-    img = Image.new("RGBA", (w, h), T)
-    rx = [3.0, 6.0, 8.5, 10.5][i]
-    alpha = [255, 230, 170, 100][i]
-    ring, inner = rgba("#DEF1EE", alpha), rgba("#8BE6EE", alpha)
-    for y in range(h):
-        for x in range(w):
-            dx, dy = (x + 0.5 - w / 2) / rx, (y + 0.5 - h / 2) / (rx * 0.36)
-            d = math.hypot(dx, dy)
-            if abs(d - 1.0) < 0.5 / max(1.0, rx * 0.36):
-                img.putpixel((x, y), ring)
-            elif i < 3 and abs(d - 0.6) < 0.4 / max(1.0, rx * 0.36):
-                img.putpixel((x, y), inner)
-    return img
-
-
 def main():
     OUT_DIR.mkdir(parents=True, exist_ok=True)
     strip([from_rows(FROG_SIT, FROG_STONE), from_rows(FROG_SIT, FROG_AWAKE), from_rows(FROG_LEAP, FROG_AWAKE)]).save(
         OUT_DIR / "kickback_frog.png")
     strip([from_rows(SPIRIT, SPIRIT_KEY), from_rows(SPIRIT, SPIRIT_KEY_ALT), from_rows(SPIRIT, SPIRIT_KEY_HIT)]).save(
         OUT_DIR / "spirit.png")
-    strip([ripple_frame(i) for i in range(4)]).save(OUT_DIR / "ripple.png")
-    print("wrote kickback frog, spirit and ripple sprites")
+    print("wrote kickback frog and spirit sprites")
 
 
 if __name__ == "__main__":

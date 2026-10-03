@@ -1,15 +1,15 @@
 extends Node2D
 ## Catch mode, like Catch 'Em mode in Pokemon Pinball: every third ramp shot (or a
 ## full Chac Mool bowl, or the roulette) a spirit of the current city rises out of the
-## temple floor, now and then its rare one. Hit it three times before it sinks back
+## temple floor in a whirl of magic, now and then its rare one. Hit it three times before it sinks back
 ## down to catch it; every catch goes in the Spirit Codex, which is kept between games.
 
 const SPIRITS := preload("res://Sprites/table/spirits.png")  # tools/make_spirit_sprites.py
 const SPIRIT_SIZE := Vector2(18, 14)
-const RIPPLE := preload("res://Sprites/table/ripple.png")
+const WHIRL := preload("res://Sprites/table/whirl.png")  # the hand-drawn magicWhirl.png
+const WHIRL_SECONDS := 0.7
 
 const SPAWN_AT := Vector2(337, 760)  # below the temple hole, above the face
-const RIPPLE_OFFSET := Vector2(0, 26)
 const HIT_RADIUS := 26.0
 const RAMPS_TO_SUMMON := 3
 const HITS_TO_CATCH := 3
@@ -38,7 +38,7 @@ var _cooldown := 0.0
 var _clock := 0.0
 var _area: Area2D
 var _spirit: AnimatedSprite2D
-var _ripple: AnimatedSprite2D
+var _whirl: AnimatedSprite2D
 var _frames := {}  # species -> SpriteFrames for its row of the sheet
 
 func _ready() -> void:
@@ -54,10 +54,8 @@ func _ready() -> void:
 	_area.body_entered.connect(_on_body_entered)
 	add_child(_area)
 
-	_ripple = features._sprite(RIPPLE, 4, SPAWN_AT + RIPPLE_OFFSET, 10.0)
-	_ripple.sprite_frames.set_animation_loop("default", false)
-	_ripple.animation_finished.connect(_ripple.hide)
-	_ripple.hide()
+	_whirl = features._sprite(WHIRL, 3, SPAWN_AT, 12.0)
+	_whirl.hide()
 	_spirit = AnimatedSprite2D.new()
 	_spirit.scale = features.MAP_SCALE
 	_spirit.position = SPAWN_AT
@@ -170,7 +168,16 @@ func _dismiss() -> void:
 	_spirit.hide()
 	_splash()
 
+# The spirit comes and goes in a spinning whirl that flares up and closes again
 func _splash() -> void:
-	_ripple.show()
-	_ripple.frame = 0
-	_ripple.play()
+	_whirl.show()
+	_whirl.play()
+	_whirl.rotation = 0.0
+	_whirl.scale = features.MAP_SCALE * 0.4
+	_whirl.modulate.a = 1.0
+	var spin := _whirl.create_tween().set_parallel()
+	spin.tween_property(_whirl, "rotation", -TAU, WHIRL_SECONDS)
+	spin.tween_property(_whirl, "scale", features.MAP_SCALE * 1.2, WHIRL_SECONDS * 0.5).set_ease(Tween.EASE_OUT)
+	spin.tween_property(_whirl, "scale", features.MAP_SCALE * 0.2, WHIRL_SECONDS * 0.5).set_delay(WHIRL_SECONDS * 0.5)
+	spin.tween_property(_whirl, "modulate:a", 0.0, WHIRL_SECONDS * 0.3).set_delay(WHIRL_SECONDS * 0.7)
+	spin.chain().tween_callback(_whirl.hide)

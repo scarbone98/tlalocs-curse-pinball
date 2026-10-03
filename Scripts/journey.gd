@@ -19,7 +19,8 @@ const RIGHT_WEDGE := [Vector2(545, 864), Vector2(500, 889), Vector2(498, 912), V
 const SENSOR_GROW := 8.0  # the hit sensor reaches this far past the wedge
 const SERPENT_ART := [Vector2(52, 300), Vector2(186, 299)]  # table-art pixels
 const PIP_ART_OFFSET := [Vector2(4, -14), Vector2(-4, -14)]  # three pips above each head
-const RELIC_ART := [Vector2(98.5, 197.5), Vector2(112.5, 193.5), Vector2(126.5, 193.5), Vector2(140.5, 197.5)]
+# An arc around the golden idol's plinth (Scripts/idol.gd)
+const RELIC_ART := [Vector2(91.5, 199.5), Vector2(104.5, 195.5), Vector2(135.5, 195.5), Vector2(148.5, 199.5)]
 
 const HITS_TO_TRAVEL := 3
 const PIP_FADE_SECONDS := 10.0  # like a Diglett's count, the pips go out if you stop hitting

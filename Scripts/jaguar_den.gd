@@ -7,7 +7,7 @@ extends Node2D
 
 const JAGUAR := preload("res://Sprites/table/jaguar.png")
 
-const ART_AT := Vector2(195.9, 204.0)   # table-art pixels, in the shadow under the arch
+const ART_AT := Vector2(201.0, 205.0)   # table-art pixels: peering out of the wall over the den
 const SENSOR_AT := Vector2(527, 670)     # the top of the pocket the ball can reach
 const SENSOR_RADIUS := 12.0
 const STEPS := 3

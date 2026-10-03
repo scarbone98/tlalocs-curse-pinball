@@ -20,7 +20,7 @@ static var LIB: Dictionary = {
 	"torch": preload("res://Audio/sfx/torch.wav"),
 	"shrine": preload("res://Audio/sfx/shrine.wav"),
 	"shrine_out": preload("res://Audio/sfx/shrine_out.wav"),
-	"chac_mool": preload("res://Audio/sfx/chac_mool.wav"),
+	"tiki": preload("res://Audio/sfx/chac_mool.wav"),
 	"roar": preload("res://Audio/sfx/roar.wav"),
 	"extra_ball": preload("res://Audio/sfx/extra_ball.wav"),
 }

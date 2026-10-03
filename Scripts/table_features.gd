@@ -4,8 +4,9 @@ extends Node2D
 ## The table art has empty lamp inserts painted in (lane circles, bonus bars,
 ## arrow inserts, wall lamps). This builds sprites on top of each one and runs
 ## the rules behind them: lane rollovers, bonus multiplier, the Tlaloc face
-## target and the curse storm mode. Tlaloc's shrine, top right, shows the curse:
-## his mask wakes as the face is hit and its raindrop lamps fill toward the storm.
+## target and the curse storm mode. Tlaloc's ziggurat, top right, shows the curse:
+## his mask wakes in its shrine as the face is hit and the raindrop lamps on its tiers
+## fill toward the storm.
 
 # The 256x424 table art is stretched to 720x1280, so feature sprites use the same scale
 const MAP_SCALE := Vector2(720.0 / 256.0, 1280.0 / 424.0)
@@ -16,7 +17,8 @@ const ARROW_INSERT := preload("res://Sprites/table/arrow_insert.png")
 const RAINDROP := preload("res://Sprites/table/raindrop.png")
 const TLALOC_MASK := preload("res://Sprites/table/tlaloc_mask.png")
 const RAIN_LAMP := preload("res://Sprites/table/rain_lamp.png")
-const BRAZIER := preload("res://Sprites/table/brazier.png")
+const FIRE := preload("res://Sprites/table/fire.png")
+const FIRE_BOWL := preload("res://Sprites/table/fire_bowl.png")
 const RampShots := preload("res://Scripts/ramp_shots.gd")
 const Kickback := preload("res://Scripts/kickback.gd")
 const SpiritCapture := preload("res://Scripts/spirit_capture.gd")
@@ -24,7 +26,8 @@ const Journey := preload("res://Scripts/journey.gd")
 const Spinner := preload("res://Scripts/spinner.gd")
 const Torches := preload("res://Scripts/torches.gd")
 const ShrineDoor := preload("res://Scripts/shrine_door.gd")
-const ChacMool := preload("res://Scripts/chac_mool.gd")
+const Tiki := preload("res://Scripts/tiki.gd")
+const Idol := preload("res://Scripts/idol.gd")
 const JaguarDen := preload("res://Scripts/jaguar_den.gd")
 const Awakening := preload("res://Scripts/awakening.gd")
 const Effects := preload("res://Scripts/effects.gd")
@@ -42,11 +45,13 @@ const ARROWS := [
 	[Vector2(190, 366), 22.0], [Vector2(103, 374), 22.0], [Vector2(179, 555), 0.0],
 	[Vector2(86, 725), -22.0], [Vector2(592, 725), 22.0],
 ]
-# The shrine's empty panels, in table-art pixels (see tools/make_shrine_sprites.py)
-const SHRINE_MASK_ART := Vector2(223.5, 42.5)
-# Raindrop lamps either side of the mask, in fill order: bottom pair, then top pair
-const SHRINE_LAMPS_ART := [Vector2(202.5, 46.5), Vector2(245.5, 46.5), Vector2(202.5, 38.5), Vector2(245.5, 38.5)]
-const SHRINE_BRAZIERS_ART := [Vector2(202, 75.5), Vector2(246, 75.5)]
+# The ziggurat's painted sockets, in table-art pixels (see tools/make_v2_table.py)
+const SHRINE_MASK_ART := Vector2(224, 14.5)
+# Raindrop lamps on its tiers, in fill order: bottom pair, then top pair
+const SHRINE_LAMPS_ART := [Vector2(203, 52), Vector2(245, 52), Vector2(208, 40), Vector2(240, 40)]
+# Fire bowls either side of the doorway; the flames burn up out of them
+const SHRINE_FIRES_ART := [Vector2(204, 71), Vector2(244, 71)]
+const FIRE_FRAMES := 15
 
 const TOP_LANE_POINTS := 250
 const TOP_LANES_COMPLETE_POINTS := 2000
@@ -124,7 +129,7 @@ func _ready() -> void:
 	journey = Journey.new()
 	temple = TempleHole.new()
 	awakening = Awakening.new()
-	for mode in [RampShots.new(), kickback, spirit, journey, temple, Spinner.new(), Torches.new(), ShrineDoor.new(), ChacMool.new(), JaguarDen.new(), awakening]:
+	for mode in [RampShots.new(), kickback, spirit, journey, temple, Spinner.new(), Torches.new(), ShrineDoor.new(), Tiki.new(), Idol.new(), JaguarDen.new(), awakening]:
 		mode.features = self
 		add_child(mode)
 	add_child(Effects.new())
@@ -229,11 +234,12 @@ func _build_shrine() -> void:
 	_shrine_mask = _sprite(TLALOC_MASK, 4, SHRINE_MASK_ART * MAP_SCALE)
 	for at in SHRINE_LAMPS_ART:
 		_shrine_lamps.append(_sprite(RAIN_LAMP, 2, at * MAP_SCALE))
-	for at in SHRINE_BRAZIERS_ART:
-		var brazier := _sprite(BRAZIER, 4, at * MAP_SCALE, 8.0)
-		brazier.frame = randi() % 4
-		brazier.play()
-		_torches.append(brazier)  # flares up with the torches during the curse
+	for at in SHRINE_FIRES_ART:
+		var flame := _sprite(FIRE, FIRE_FRAMES, (at + Vector2(0, -5)) * MAP_SCALE, 12.0)
+		flame.frame = randi() % FIRE_FRAMES
+		flame.play()
+		_torches.append(flame)  # flares up with the torches during the curse
+		_sprite(FIRE_BOWL, 1, (at + Vector2(0, 1.5)) * MAP_SCALE)
 	_render_shrine()
 
 func _build_storm() -> void:
