@@ -1,4 +1,5 @@
 extends Control
+class_name Hud
 
 # The table viewport is 720 wide, twice the 360 the shared theme was tuned for.
 const UI_SCALE := 2.0
@@ -25,9 +26,18 @@ var _objective_label: Label
 var _billboard: Billboard
 var _codex: CodexScreen
 var _pause: Button
+var _status_label: Label   # jade beads and the ball saver, under the balls count
+var _shown_score := 0      # the score rolls up toward the real one rather than jumping
+var _saver_left := 0.0
+var market: Market
+
+## The score counts up, like Pokemon Pinball Ruby & Sapphire's, quickly enough that a
+## big award still lands within a second or so
+const SCORE_ROLL_PER_SECOND := 1.2e6
+const SCORE_ROLL_MIN_SECONDS := 0.6
 
 func _ready() -> void:
-	theme = ScareathonTheme.build(UI_SCALE)
+	theme = TempleTheme.build(UI_SCALE)
 	process_mode = Node.PROCESS_MODE_ALWAYS
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_style_top_bar()
@@ -35,7 +45,14 @@ func _ready() -> void:
 	_build_launch_button()
 	_build_objective()
 	_build_billboard()
+	_build_status()
 	_build_menu()
+	add_child(ModeBanner.new())
+	add_child(BonusTally.new())
+	market = Market.new()
+	market.add_to_group("market")
+	add_child(market)
+	move_child(_menu, -1)  # the pause menu goes over everything
 
 	# Connect to global events
 	PinballEvents.set_score.connect(_on_set_score)
@@ -45,6 +62,8 @@ func _ready() -> void:
 	PinballEvents.launch_power_changed.connect(_on_launch_power_changed)
 	PinballEvents.game_over.connect(_on_game_over)
 	PinballEvents.objective_changed.connect(_on_objective_changed)
+	PinballEvents.beads_changed.connect(func(_beads): _render_status())
+	PinballEvents.ball_saver_changed.connect(_on_saver_changed)
 	resized.connect(_fit_score)
 
 	_render_score()
@@ -60,15 +79,15 @@ func _style_top_bar() -> void:
 	for label in [score_label, lives_label]:
 		label.label_settings = null
 		label.theme_type_variation = "ScoreLabel"
-		label.add_theme_font_size_override("font_size", int(TOP_FONT * UI_SCALE))
-		label.add_theme_stylebox_override("normal", ScareathonTheme.pill_box(UI_SCALE))
+		label.add_theme_font_size_override("font_size", TempleTheme.snap(int(TOP_FONT * UI_SCALE)))
+		label.add_theme_stylebox_override("normal", TempleTheme.pill_box(UI_SCALE))
 		label.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
 	lives_label.size_flags_horizontal = Control.SIZE_EXPAND | Control.SIZE_SHRINK_END
 
 func _build_toast() -> void:
 	_toast_label = Label.new()
 	_toast_label.theme_type_variation = "TitleLabel"
-	_toast_label.add_theme_font_size_override("font_size", int(32 * UI_SCALE))
+	_toast_label.add_theme_font_size_override("font_size", TempleTheme.snap(int(20 * UI_SCALE)))
 	_toast_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_toast_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART  # long ones wrap, not run off
 	_toast_label.set_anchors_preset(Control.PRESET_CENTER)
@@ -77,6 +96,7 @@ func _build_toast() -> void:
 	_toast_label.grow_vertical = Control.GROW_DIRECTION_BOTH
 	_toast_label.modulate.a = 0.0
 	_toast_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_toast_label.add_theme_stylebox_override("normal", TempleTheme.pill_box(UI_SCALE))  # on a slab, readable over the table
 	add_child(_toast_label)
 
 func _build_launch_button() -> void:
@@ -100,7 +120,7 @@ func _build_launch_button() -> void:
 	_launch_button.text = "Launch"
 	_launch_button.add_to_group("touch_block")
 	_launch_button.focus_mode = Control.FOCUS_NONE
-	_launch_button.add_theme_font_size_override("font_size", int(18 * UI_SCALE))
+	_launch_button.add_theme_font_size_override("font_size", TempleTheme.snap(int(18 * UI_SCALE)))
 	_launch_button.button_down.connect(func(): PinballEvents.launch_pressed.emit())
 	_launch_button.button_up.connect(func(): PinballEvents.launch_released.emit())
 	_launch_box.add_child(_launch_button)
@@ -110,11 +130,11 @@ func _build_power_meter() -> Control:
 	meter.custom_minimum_size = Vector2(0, 22 * UI_SCALE)
 	meter.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	meter.modulate.a = 0.0
-	meter.add_theme_stylebox_override("panel", ScareathonTheme.pill_box(UI_SCALE))
+	meter.add_theme_stylebox_override("panel", TempleTheme.pill_box(UI_SCALE))
 
 	var inset := 3 * UI_SCALE
 	_power_fill = ColorRect.new()
-	_power_fill.color = ScareathonTheme.BLOOD
+	_power_fill.color = TempleTheme.TERRACOTTA
 	_power_fill.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_power_fill.anchor_bottom = 1.0
 	_power_fill.offset_left = inset
@@ -126,7 +146,7 @@ func _build_power_meter() -> Control:
 	var band := Panel.new()
 	var band_box := StyleBoxFlat.new()
 	band_box.draw_center = false
-	band_box.border_color = ScareathonTheme.AMBER
+	band_box.border_color = TempleTheme.GOLD
 	band_box.set_border_width_all(int(2 * UI_SCALE))
 	band_box.set_corner_radius_all(int(3 * UI_SCALE))
 	band.add_theme_stylebox_override("panel", band_box)
@@ -146,21 +166,59 @@ func _on_launch_power_changed(power: float, charging: bool) -> void:
 	_power_meter.modulate.a = 1.0 if charging else 0.0
 	_power_fill.anchor_right = _power_to_meter(power)
 	var in_sweet_spot := power >= SKILL_SHOT_POWER.x and power <= SKILL_SHOT_POWER.y
-	_power_fill.color = ScareathonTheme.AMBER if in_sweet_spot else ScareathonTheme.BLOOD
+	_power_fill.color = TempleTheme.GOLD if in_sweet_spot else TempleTheme.TERRACOTTA
 
 # The journey's current goal, in the hint's spot once the controls hint has gone
 func _build_objective() -> void:
 	_objective_label = Label.new()
 	_objective_label.theme_type_variation = "HintLabel"
 	_objective_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	_objective_label.add_theme_font_size_override("font_size", int(11 * UI_SCALE))
+	_objective_label.add_theme_font_size_override("font_size", TempleTheme.snap(int(8 * UI_SCALE)))
 	_objective_label.set_anchors_preset(Control.PRESET_CENTER_TOP)
 	_objective_label.grow_horizontal = Control.GROW_DIRECTION_BOTH
-	_objective_label.offset_top = 50 * UI_SCALE
+	_objective_label.offset_top = 76 * UI_SCALE  # under the jade pill, so the two never overlap
 	_objective_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	_objective_label.add_theme_stylebox_override("normal", ScareathonTheme.pill_box(UI_SCALE))
+	_objective_label.add_theme_stylebox_override("normal", TempleTheme.pill_box(UI_SCALE))
 	_objective_label.visible = false
 	add_child(_objective_label)
+
+# Jade beads and, while one runs, the ball saver's countdown, under the balls count
+func _build_status() -> void:
+	_status_label = Label.new()
+	_status_label.theme_type_variation = "HintLabel"
+	_status_label.add_theme_font_size_override("font_size", TempleTheme.snap(int(10 * UI_SCALE)))
+	_status_label.set_anchors_preset(Control.PRESET_TOP_RIGHT)
+	_status_label.grow_horizontal = Control.GROW_DIRECTION_BEGIN
+	_status_label.offset_right = -12 * UI_SCALE
+	_status_label.offset_top = 48 * UI_SCALE
+	_status_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	_status_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_status_label.add_theme_stylebox_override("normal", TempleTheme.pill_box(UI_SCALE))
+	add_child(_status_label)
+	_render_status()
+
+func _on_saver_changed(seconds: float) -> void:
+	_saver_left = seconds
+	_render_status()
+
+func _render_status() -> void:
+	var text := "Jade %d" % GameManager.beads
+	if _saver_left > 0.0:
+		text += "   Saver %d" % ceili(_saver_left)
+	_status_label.text = text
+
+func _process(delta: float) -> void:
+	if _saver_left > 0.0 and not get_tree().paused:
+		var before := ceili(_saver_left)
+		_saver_left = GameManager.ball_save_left()
+		if ceili(_saver_left) != before:
+			_render_status()
+	if _shown_score != GameManager.score:
+		var gap := GameManager.score - _shown_score
+		var step := maxf(SCORE_ROLL_PER_SECOND * delta, absf(gap) * delta / SCORE_ROLL_MIN_SECONDS)
+		_shown_score = GameManager.score if absf(gap) <= step else _shown_score + int(signf(gap) * step)
+		score_label.text = grouped(_shown_score)
+		_fit_score()
 
 # Pops up under the objective line for the big moments (see Scripts/billboard.gd)
 func _build_billboard() -> void:
@@ -178,7 +236,7 @@ func _build_menu() -> void:
 	pause.text = "II"
 	pause.focus_mode = Control.FOCUS_NONE
 	pause.add_to_group("touch_block")
-	pause.add_theme_font_size_override("font_size", int(14 * UI_SCALE))
+	pause.add_theme_font_size_override("font_size", TempleTheme.snap(int(14 * UI_SCALE)))
 	pause.set_anchors_preset(Control.PRESET_CENTER_TOP)
 	pause.grow_horizontal = Control.GROW_DIRECTION_BOTH
 	pause.offset_top = 12 * UI_SCALE
@@ -272,7 +330,9 @@ func _centered_label(text: String, variation: StringName) -> Label:
 	return label
 
 func _render_score() -> void:
-	score_label.text = _grouped(GameManager.score)
+	if GameManager.score < _shown_score:
+		_shown_score = GameManager.score  # a fresh game starts back at zero at once
+	score_label.text = grouped(_shown_score)
 	_fit_score()
 
 # Shrinks the score's font until it fits left of the pause button
@@ -285,10 +345,10 @@ func _fit_score() -> void:
 	var font_size := int(TOP_FONT * UI_SCALE)
 	while font_size > SCORE_FONT_MIN * UI_SCALE and font.get_string_size(score_label.text, HORIZONTAL_ALIGNMENT_LEFT, -1, font_size).x > room:
 		font_size -= 1
-	score_label.add_theme_font_size_override("font_size", font_size)
+	score_label.add_theme_font_size_override("font_size", TempleTheme.snap(font_size))
 
 # 1234567 -> "1,234,567", the way pinball scores are shown
-static func _grouped(value: int) -> String:
+static func grouped(value: int) -> String:
 	var digits := str(absi(value))
 	var out := ""
 	while digits.length() > 3:

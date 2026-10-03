@@ -4,9 +4,11 @@ extends AnimatableBody2D
 @export var action_name: StringName = &"left_flipper"
 @export var rest_angle_deg: float = 0   # angle when released
 @export var up_angle_deg: float = 65.0      # angle when pressed
-## Pokemon Pinball's flippers take about 5 frames (79ms) each way
-@export var up_speed_deg: float = 820.0     # how fast it flips up
-@export var down_speed_deg: float = 820.0   # how fast it returns
+## Pokemon Pinball Ruby & Sapphire's flippers snap up in about 3 frames (50ms), drop
+## back in about 5 (83ms), and stay up at least 2 frames after the button is let go
+@export var up_speed_deg: float = 1300.0    # how fast it flips up
+@export var down_speed_deg: float = 780.0   # how fast it returns
+@export var min_hold_seconds: float = 2.0 / 60.0
 
 ## A moving AnimatableBody only nudges a RigidBody, so while swinging up we set the
 ## ball's speed off the flipper ourselves: kick_base plus the surface speed at the contact
@@ -21,11 +23,14 @@ var _target: float
 var _ball_radius := 19.0
 var _tip_local := Vector2.ZERO    # flipper tip relative to the pivot, in local space
 var _half_thickness := 12.0
+var _held_up := 0.0  # how long it has been all the way up
+var _sprite: Sprite2D
 
 func _ready() -> void:
 	rotation = deg_to_rad(rest_angle_deg)
 	_target = rotation
 	_measure_shape()
+	_sprite = get_node_or_null(^"Sprite2D") as Sprite2D
 	var ball := get_tree().get_first_node_in_group("ball") as RigidBody2D
 	if ball:
 		var shape := ball.get_node_or_null("CollisionShape2D") as CollisionShape2D
@@ -57,6 +62,10 @@ func _measure_shape() -> void:
 
 func _physics_process(delta: float) -> void:
 	var pressed := Input.is_action_pressed(action_name)
+	var at_top := absf(wrapf(deg_to_rad(up_angle_deg) - rotation, -PI, PI)) < 0.01
+	_held_up = _held_up + delta if at_top else 0.0
+	if not pressed and at_top and _held_up < min_hold_seconds:
+		pressed = true  # a tap still holds at the top for a moment
 	_target = deg_to_rad(up_angle_deg if pressed else rest_angle_deg)
 	var speed_deg := up_speed_deg if pressed else down_speed_deg
 
@@ -68,6 +77,20 @@ func _physics_process(delta: float) -> void:
 	if pressed and turned != 0.0:
 		for ball in get_tree().get_nodes_in_group("ball"):  # multiball: every ball in play
 			_kick_ball(ball as RigidBody2D, turned / delta)
+	_layer_over_ball()
+
+# The ball (z 1) is drawn in front of the flipper once it's lower down the table than the
+# flipper's middle, and behind it while it's higher up, so the flipper reads as standing up
+# off the table: the nearest ball decides
+func _layer_over_ball() -> void:
+	if _sprite == null:
+		return
+	var nearest: Node2D = null
+	for node in get_tree().get_nodes_in_group("ball"):
+		var ball := node as Node2D
+		if nearest == null or ball.global_position.distance_squared_to(_sprite.global_position) 				< nearest.global_position.distance_squared_to(_sprite.global_position):
+			nearest = ball
+	_sprite.z_index = 2 if nearest and nearest.global_position.y < _sprite.global_position.y else 0
 
 func _kick_ball(ball: RigidBody2D, omega: float) -> void:
 	if ball == null or ball.collision_mask == 0 or _tip_local == Vector2.ZERO:

@@ -1,7 +1,7 @@
-"""Generate the sprites set into Tlaloc's ziggurat, top right (painted by
-tools/make_v2_table.py, whose fire bowls burn the hand-drawn fire.png). These are
-drawn at the art's native resolution (map_f1.png is 256x424), so they share its
-pixel grid once the scene scales them up:
+"""Generate Tlaloc's mask (the title screen's) and the raindrop lamps of the curse meter
+under the stone face in the table's top-left corner. Drawn at the art's native
+resolution (map_f1.png is 256x424), so they share its pixel grid once the scene
+scales them up:
 
   tlaloc_mask.png  the rain god's goggle-eyed mask for the middle panel
                    (asleep, stirring, cursed)

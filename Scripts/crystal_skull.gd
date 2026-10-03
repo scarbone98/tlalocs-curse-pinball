@@ -1,0 +1,140 @@
+extends Node2D
+## The crystal skull at the top of the brown lane, right of the arena, in front of the
+## palms: like Sharpedo and Wailmer on Pokemon Pinball Ruby & Sapphire's fields it eats
+## a ball shot up the lane and spits it back out, but only with its jaws open. They open
+## when it has something to give: a lit Awakening to start, or the jade market
+## (Scripts/market.gd) when there are beads enough to buy something and it hasn't opened
+## for a while. With its jaws shut it's solid, and the ball bounces off it. It's drawn in
+## two pieces, the ball between them: over the lower jaw, under the top, so a ball it
+## takes goes into its mouth. It shuts its jaws on the ball and opens them again to spit
+## it back out, and it bobs slowly up and down all the while, floating.
+
+const TOP := preload("res://Sprites/table/skull_top.png")  # tools/make_table.py: jaws shut, open
+const JAW := preload("res://Sprites/table/skull_jaw.png")
+
+const AT := Vector2(526, 513)          # the skull sprite, at the lane's top (as in the layout mock-up)
+const MOUTH := Vector2(523, 543)       # its mouth, where it takes the ball
+const CATCH_RADIUS := 20.0
+const HOLD_SECONDS := 1.0
+const SPIT_VELOCITY := Vector2(-170, 620)  # back down the lane
+const REARM_SECONDS := 1.2
+const EAT_POINTS := 1500
+const EAT_BEADS := 3
+const MARKET_REST := 30.0  # seconds after a visit before the market opens again
+const JAW_RADIUS := 20.0   # the shut jaws the ball bounces off
+enum { CALM, OPEN }  # Sprites/table/skull_top.png: jaws shut, jaws open
+const BOB_SECONDS := 2.4    # one slow bob, a pixel up and back
+const OPEN_TO_SPIT := 0.25  # it opens its jaws this long before the ball comes back out
+
+var features: Node2D  # TableFeatures, which owns the shared sprite and scoring helpers
+
+var _sprite: AnimatedSprite2D  # the top
+var _jaw: AnimatedSprite2D
+var _held: RigidBody2D
+var _rearm := 0.0
+var _market_rest := 0.0
+var _jaws: CollisionShape2D
+var _chewing := false  # the ball's inside, its jaws shut on it
+var _opening := false  # opening up to spit it out
+var _clock := 0.0
+
+func _ready() -> void:
+	_jaw = features._sprite(JAW, 1, AT)  # under the ball
+	_sprite = features._sprite(TOP, 2, AT)
+	_sprite.z_index = 3  # over the ball, and in front of the palms
+	_sprite.z_as_relative = false
+	var body := StaticBody2D.new()
+	body.position = MOUTH
+	_jaws = CollisionShape2D.new()
+	var circle := CircleShape2D.new()
+	circle.radius = JAW_RADIUS
+	_jaws.shape = circle
+	body.add_child(_jaws)
+	add_child(body)
+
+func _physics_process(delta: float) -> void:
+	_rearm = maxf(_rearm - delta, 0.0)
+	_market_rest = maxf(_market_rest - delta, 0.0)
+	_clock += delta
+	var bob := -1.0 if fposmod(_clock / BOB_SECONDS, 1.0) < 0.5 else 0.0
+	_sprite.offset.y = bob
+	_jaw.offset.y = bob
+	var open := lit()
+	var jaws_open := _opening or (_held != null and not _chewing) or (_held == null and open)
+	_sprite.frame = OPEN if jaws_open else CALM
+	_jaw.visible = jaws_open
+	if _held or _rearm > 0.0:
+		return
+	if _jaws.disabled != open:
+		_jaws.set_deferred("disabled", open)
+	if not open:
+		return
+	for node in get_tree().get_nodes_in_group("ball"):
+		var ball := node as RigidBody2D
+		if not ball.freeze and ball.linear_velocity.y < 0.0 and features._is_ball_on_playfield(ball) \
+				and ball.global_position.distance_to(MOUTH) < CATCH_RADIUS:
+			_eat(ball)
+			return
+
+## True when a shot into the skull would do something more than pay out (for the lane's arrows)
+func lit() -> bool:
+	return (features.awakening.lit and not features.mode_running()) \
+		or (_market_rest <= 0.0 and GameManager.beads >= Market.WARES[0][2])
+
+func _eat(ball: RigidBody2D) -> void:
+	_held = ball
+	ball.freeze_mode = RigidBody2D.FREEZE_MODE_KINEMATIC
+	ball.set_deferred("freeze", true)
+	ball.linear_velocity = Vector2.ZERO
+	_sprite.frame = OPEN
+	_jaw.visible = true
+	# over the jaw and in under the top, then gone down its throat
+	var gulp := create_tween().set_process_mode(Tween.TWEEN_PROCESS_PHYSICS)
+	gulp.tween_property(ball, "global_position", MOUTH + Vector2(0, -14), 0.18)
+	gulp.tween_property(ball.anim, "modulate:a", 0.0, 0.1)
+	gulp.tween_callback(func():
+		ball.anim.visible = false
+		ball.anim.modulate.a = 1.0
+		_chewing = true  # snap: jaws shut on it
+		AudioSfx.play("bumper", 0.0, Vector2.ONE * 0.7))
+	features._award(EAT_POINTS, AT + Vector2(0, -40))
+	AudioSfx.play("shrine")
+	PinballEvents.rumble.emit(3.0)
+	get_tree().create_timer(HOLD_SECONDS, false).timeout.connect(_decide)
+
+func _decide() -> void:
+	if features.awakening.lit and not features.mode_running():
+		features.awakening.start()
+		_spit()
+		return
+	if _market_rest <= 0.0 and GameManager.beads >= Market.WARES[0][2]:
+		var market: Market = get_tree().get_first_node_in_group("market")
+		if market:
+			_market_rest = MARKET_REST
+			market.features = features
+			market.closed.connect(_spit, CONNECT_ONE_SHOT)
+			market.open()
+			return
+	GameManager.add_beads(EAT_BEADS)
+	PinballEvents.toast.emit("+%d jade" % EAT_BEADS)
+	_spit()
+
+# It opens its jaws, then the ball comes back out
+func _spit() -> void:
+	_opening = true
+	_chewing = false
+	get_tree().create_timer(OPEN_TO_SPIT, false).timeout.connect(_release)
+
+func _release() -> void:
+	_opening = false
+	var ball := _held
+	_held = null
+	_rearm = REARM_SECONDS
+	if ball == null or not is_instance_valid(ball):
+		return
+	ball.global_position = MOUTH
+	ball.anim.visible = true
+	ball.freeze = false
+	ball.linear_velocity = SPIT_VELOCITY
+	AudioSfx.play("shrine_out")
+	PinballEvents.effect.emit("sparks", MOUTH)

@@ -98,7 +98,7 @@ func _label(text: String, variation: StringName, size: int) -> Label:
 	var label := Label.new()
 	label.text = text
 	label.theme_type_variation = variation
-	label.add_theme_font_size_override("font_size", size)
+	label.add_theme_font_size_override("font_size", TempleTheme.snap(size))
 	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	return label

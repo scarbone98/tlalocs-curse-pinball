@@ -21,23 +21,16 @@ const DIVINE := 34         # the same sixteen, awakened
 
 const SHOW_SECONDS := 2.6
 const FADE_SECONDS := 0.25
-const SPIN_START_FPS := 18.0
 
 var _picture: TextureRect
 var _caption: Label
 var _atlas: AtlasTexture
 var _tween: Tween
-var _spin_left := 0.0
-var _spin_total := 0.0
-var _spin_result := 0
-var _spin_caption := ""
-var _spin_step := 0.0
-var _spin_index := 0
 var _hide_at := 0.0
 
 func _ready() -> void:
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
-	add_theme_stylebox_override("panel", ScareathonTheme.pill_box(2.0))
+	add_theme_stylebox_override("panel", TempleTheme.pill_box(2.0))
 	var box := VBoxContainer.new()
 	box.alignment = BoxContainer.ALIGNMENT_CENTER
 	box.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -54,47 +47,22 @@ func _ready() -> void:
 	_caption = Label.new()
 	_caption.theme_type_variation = "HintLabel"
 	_caption.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	_caption.add_theme_font_size_override("font_size", 26)
+	_caption.add_theme_font_size_override("font_size", TempleTheme.snap(26))
 	box.add_child(_caption)
 	modulate.a = 0.0
 	visible = false
 	PinballEvents.billboard.connect(show_picture)
-	PinballEvents.billboard_spin.connect(spin)
+	# (the roulette spins on the floor under Tlaloc instead: Scripts/floor_roulette.gd)
 
 ## Shows one picture with a caption for a couple of seconds
 func show_picture(index: int, caption: String) -> void:
-	_spin_left = 0.0
 	_set_frame(index)
 	_caption.text = caption
 	_fade_in()
 	_hide_at = _now() + SHOW_SECONDS
 
-## Spins through the roulette's prizes, slowing down, and lands on `result`
-func spin(result: int, seconds: float, caption: String) -> void:
-	_spin_left = seconds
-	_spin_total = seconds
-	_spin_result = result
-	_spin_caption = caption
-	_spin_step = 0.0
-	_caption.text = "..."
-	_fade_in()
-	_hide_at = INF
-
-func _process(delta: float) -> void:
-	if _spin_left > 0.0:
-		_spin_left -= delta
-		# the reel starts fast and slows, like a slot machine coming to rest
-		var fps := SPIN_START_FPS * maxf(_spin_left / _spin_total, 0.15)
-		_spin_step += delta * fps
-		if _spin_step >= 1.0:
-			_spin_step = 0.0
-			_spin_index = (_spin_index + 1) % PRIZES.size()
-			_set_frame(PRIZE + _spin_index)
-		if _spin_left <= 0.0:
-			_set_frame(_spin_result)
-			_caption.text = _spin_caption
-			_hide_at = _now() + SHOW_SECONDS
-	elif visible and _now() >= _hide_at:
+func _process(_delta: float) -> void:
+	if visible and _now() >= _hide_at:
 		_fade_out()
 
 func _set_frame(index: int) -> void:

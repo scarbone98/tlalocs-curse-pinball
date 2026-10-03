@@ -1,12 +1,12 @@
 extends RigidBody2D
 
-## Pokemon Pinball's plunger fires at 5.5 px/frame (1420 at this table's scale)
+## The plunger is a spring under the ball, like Pokemon Pinball Ruby & Sapphire's: hold
+## launch and it pulls down (the ball resting on it sinks with it) the longer it's held,
+## then let go and it fires the ball as hard as it was pulled. Scripts/plunger.gd is the
+## spring.
 @export var launch_speed: float = -1420.0
-## Holding launch sweeps power between this and full; a quick tap is always full power.
-## Even the weakest launch clears the plunger lane.
-@export var min_launch_power: float = 0.85
-@export var tap_seconds: float = 0.15
-@export var sweep_seconds: float = 0.9
+@export var min_launch_power: float = 0.5   # a tap; a weak one rolls back down the lane
+@export var pull_seconds: float = 1.0       # to pull it all the way down
 ## The hand-drawn ball (tools/source_art/pinball_sprite.png) is drawn at 3x, about 1.2x
 ## the collision circle. Pokemon Pinball draws its ball bigger still (a 16px sprite
 ## colliding as a 4px-radius circle), but here that spilled too far over the walls and
@@ -20,16 +20,24 @@ const SPIN_SIZE := 16
 ## The roll is drawn no faster than this (about 3 turns a second, 48 frames a second), so
 ## each hand-drawn frame still shows on screen and the ball reads as turning, not strobing
 const MAX_DRAWN_SPIN := TAU * 3.0
-## Tuned to Pokemon Pinball's engine (pret/pokepinball). Its field is about 160x310px,
-## so 1px there is about 4.3 units here, and it runs one physics step per 60Hz frame:
-##  - no friction or drag, only gravity: 11/256 px/frame^2 (660 here, project settings)
-##  - walls hand back a quarter of the speed going into them (bounce 0.25)
-##  - two speed limits per axis. The ball can hold up to 8 px/frame (max_velocity)
-##    but never moves more than 5 px/frame (max_travel). A hard shot therefore flies
-##    at a flat top speed until gravity has eaten the banked speed, then arcs over.
-@export var bounce: float = 0.25
-@export var max_velocity: float = 2050.0
-@export var max_travel: float = 1280.0
+## Tuned to Pokemon Pinball Ruby & Sapphire's engine (pret/pokepinballrs), at 60 frames
+## a second. The table's ramps and orbits were laid out for the Game Boy game's reach,
+## 1px there to 4.3 units here, so the GBA's numbers use that scale too and a good shot
+## still makes the ramps:
+##  - no friction or drag. Gravity weakens as the ball falls faster, so falls float:
+##    12/256 px/frame^2 (726 here) while it's slow, 8/256 (484) once it falls faster
+##    than 1.25 px/frame (322), and 4/256 (242) past 2.5 px/frame (645)
+##  - walls hand back about a quarter of the speed going into them (bounce 0.26)
+##  - one limit on the ball's whole speed, not one per axis, higher down around the
+##    flippers so the flipper zone plays faster. The GBA's are 5.25 and 6.25 px/frame
+##    (1355 and 1613 here), raised about a fifth so the table's ramps, laid out for the
+##    Game Boy game's faster ball, still make as often as before.
+##    The plunger lane is left out, so a launch always makes it round the orbit.
+@export var bounce: float = 0.26
+@export var max_speed: float = 1650.0
+@export var max_speed_low: float = 1900.0
+const GRAVITY_BANDS := [[645.0, 242.0], [322.0, 484.0], [-INF, 726.0]]  # falling faster than -> gravity
+const PLUNGER_LANE_X := 655.0
 ## The side ramps are water channels (collision layer 2, switched on by the gates). Like
 ## Pokemon Pinball's ramps they're plain physics with the table's own gravity: a good
 ## shot makes it round, a weak one rolls back out of the mouth.
@@ -55,8 +63,8 @@ const IMPACT_RUMBLE_PER_SPEED := 1.0 / 400.0
 const IMPACT_MAX_RUMBLE := 3.0  # a wall never shakes as hard as the table's big moments
 const IMPACT_COOLDOWN := 0.12
 const ART_PER_SCENE := Vector2(256.0 / 720.0, 424.0 / 1280.0)
-# The right ramp's top branch runs on into the shrine doorway, painted on the base art
-const SHRINE_CHUTE := Rect2(585, 160, 85, 150)
+# Inside the golden temple, where the rails end (Scripts/temple.gd), counts as on the rails
+const SHRINE_CHUTE := Rect2(439, 42, 281, 290)
 
 var can_launch: bool = false
 var spawn_xform: Transform2D
@@ -72,14 +80,14 @@ var _ramp_trail: CPUParticles2D
 var _stuck_anchor := Vector2.ZERO
 var _stuck_time := 0.0
 var _off_ramp_time := 0.0
-var _banked_v := Vector2.ZERO  # the velocity the ball holds, up to max_velocity
-var _moved_v := Vector2.ZERO   # what it actually moved at last step, up to max_travel
-var draw_scale := 1.0  # the sprite's scale as set in the scene (the temple hole shrinks it)
+var _moved_v := Vector2.ZERO   # what it moved at last step
+var draw_scale := Vector2.ONE  # the sprite's scale as set in the scene (the table art's own)
 var stage_origin := Vector2.ZERO  # top left of the table the ball is on (El Dorado is below)
 var _spin := 0.0   # radians per second, clockwise
+## Set by Scripts/rails.gd while the ball rides a rail: carries it along the track
+var rail_guide := Callable()
 var _impact_cooldown := 0.0
 var _turn := 0.0   # how far the sprite has turned
-const BANK_TOLERANCE := 30.0  # a step of gravity against the ball (660/120) still keeps it
 static var _ramp_art: Image
 static var _tier_frames := {}  # tier -> SpriteFrames for that row of the spin sheet
 
@@ -94,6 +102,7 @@ func _ready() -> void:
 	mat.friction = 0.0
 	mat.bounce = bounce
 	physics_material_override = mat
+	gravity_scale = 0.0  # gravity is applied in _integrate_forces, by speed band
 	linear_damp_mode = DAMP_MODE_REPLACE
 	linear_damp = 0.0
 	angular_damp_mode = DAMP_MODE_REPLACE
@@ -119,25 +128,25 @@ func _ready() -> void:
 	max_contacts_reported = 4  # to read the surface the ball is rolling on
 	if anim:
 		anim.stop()
-		draw_scale = anim.scale.x
+		draw_scale = anim.scale
 		set_tier(0)
 
 func _physics_process(delta: float) -> void:
 	if anim:
 		# The body itself never rotates (no friction); the frames show the spin instead
 		anim.rotation = -rotation
-		_turn = fposmod(_turn + _spin * delta, TAU)
+		# the hand-drawn frames roll the other way round from the physics' spin
+		_turn = fposmod(_turn - _spin * delta, TAU)
 		anim.frame = int(_turn / TAU * SPIN_FRAMES) % SPIN_FRAMES
 
 	if freeze:
-		# held by the temple or the kickback; whatever it banked before doesn't carry over
-		_banked_v = Vector2.ZERO
+		# held by the temple or the kickback
 		_moved_v = Vector2.ZERO
 	_impact_cooldown = maxf(_impact_cooldown - delta, 0.0)
 	_watch_for_stuck(delta)
 	_watch_ramp_exit(delta)
 
-## Shows the ball as stone, jade, turquoise or gold (one row each of the spin sheet)
+## Shows the ball as iron, silver, emerald or gold (one row each of the spin sheet)
 func set_tier(tier: int) -> void:
 	if anim == null:
 		return
@@ -154,16 +163,23 @@ func set_tier(tier: int) -> void:
 	anim.frame = shown
 
 func _watch_ramp_exit(delta: float) -> void:
-	if (collision_mask & RAMP_LAYER_BIT) == 0 or _over_ramp_art():
+	# (a rail carrying the ball along its track keeps it on the rail itself)
+	if (collision_mask & RAMP_LAYER_BIT) == 0 or rail_guide.is_valid() or _over_ramp_art():
 		_off_ramp_time = 0.0
 		return
 	_off_ramp_time += delta
 	if _off_ramp_time >= off_ramp_grace:
-		_off_ramp_time = 0.0
-		collision_layer = _restore_layers
-		collision_mask = _restore_mask
-		z_index = _restore_z
-		PinballEvents.ball_left_ramp.emit(self)
+		drop_off_rail()
+
+## Back down onto the playfield from the rails (off their art, or off the end of one)
+func drop_off_rail() -> void:
+	_off_ramp_time = 0.0
+	if (collision_mask & RAMP_LAYER_BIT) == 0:
+		return
+	collision_layer = _restore_layers
+	collision_mask = _restore_mask
+	z_index = _restore_z
+	PinballEvents.ball_left_ramp.emit(self)
 
 func _over_ramp_art() -> bool:
 	if _ramp_art == null:
@@ -209,19 +225,17 @@ func _begin_charge() -> void:
 func _release_charge() -> void:
 	if not _charging:
 		return
+	var power := _current_power()  # read before letting go, while it still knows how far it's pulled
 	_charging = false
-	var power := _current_power()
 	PinballEvents.launch_power_changed.emit(power, false)
 	_launch(power)
 
-# Starts at full power, then sweeps down to min_launch_power and back while held
+## How far the spring is pulled down, 0 at rest to 1 all the way
+func pull() -> float:
+	return clampf(_charge_seconds / pull_seconds, 0.0, 1.0) if _charging else 0.0
+
 func _current_power() -> float:
-	var held := _charge_seconds
-	if held < tap_seconds:
-		return 1.0
-	var t := fposmod((held - tap_seconds) / sweep_seconds, 2.0)
-	var sweep := t if t <= 1.0 else 2.0 - t
-	return lerpf(1.0, min_launch_power, sweep)
+	return lerpf(min_launch_power, 1.0, pull())
 
 func _launch(power: float = 1.0) -> void:
 	if not can_launch:
@@ -249,7 +263,7 @@ func spawn_extra_ball(from: Vector2, velocity: Vector2) -> RigidBody2D:
 	extra.linear_velocity = velocity
 	var extra_anim := extra.get_node_or_null(^"AnimatedSprite2D") as AnimatedSprite2D
 	if extra_anim:
-		extra_anim.scale = Vector2.ONE * draw_scale
+		extra_anim.scale = draw_scale
 	get_parent().add_child(extra)
 	extra.spawn_xform = spawn_xform
 	return extra
@@ -284,7 +298,6 @@ func _integrate_forces(state: PhysicsDirectBodyState2D) -> void:
 		state.angular_velocity = 0.0
 		state.transform = spawn_xform
 		state.sleeping = false
-		_banked_v = Vector2.ZERO
 		_moved_v = Vector2.ZERO
 
 		_cooldown_frames -= 1
@@ -294,15 +307,19 @@ func _integrate_forces(state: PhysicsDirectBodyState2D) -> void:
 			collision_mask = _restore_mask
 		return
 
+	if rail_guide.is_valid() and rail_guide.call(self, state):
+		_moved_v = state.linear_velocity
+		return
 	var v := state.linear_velocity
-	v = _add_back_banked(v)
+	v.y += _gravity(v.y) * state.step
 	_update_spin(state, v)
 	var on_ramp := (collision_mask & RAMP_LAYER_BIT) != 0
 	if on_ramp != _was_on_ramp:
 		_was_on_ramp = on_ramp
 		_ramp_trail.emitting = on_ramp
-	_banked_v = _clamp_axes(v, max_velocity)
-	_moved_v = _clamp_axes(_banked_v, max_travel)
+	var local := global_position - stage_origin
+	var cap := max_speed_low if local.y > CRADLE_Y else max_speed
+	_moved_v = v if local.x > PLUNGER_LANE_X and stage_origin == Vector2.ZERO else v.limit_length(cap)
 	state.linear_velocity = _moved_v
 
 # Rolling along a surface turns the ball at speed / radius. The spin radius is the
@@ -325,20 +342,11 @@ func _on_impact(at: Vector2, strength: float) -> void:
 func _drawn_radius() -> float:
 	return anim.sprite_frames.get_frame_texture("default", 0).get_width() * anim.scale.x * 0.5 if anim else 19.0
 
-# The engine only knows the speed the ball moved at. Put the banked excess back on
-# any axis where the ball is still going the same way at least as fast (free flight,
-# or a flipper still pushing it); a hit that stopped or turned it spends the excess.
-func _add_back_banked(v: Vector2) -> Vector2:
-	var excess := _banked_v - _moved_v
-	for axis in 2:
-		if excess[axis] != 0.0 and signf(v[axis]) == signf(excess[axis]) \
-				and absf(v[axis]) >= absf(_moved_v[axis]) - BANK_TOLERANCE:
-			v[axis] += excess[axis]
-	return v
-
-# Pokemon Pinball limits x and y separately, so a diagonal ball can go a bit faster
-func _clamp_axes(v: Vector2, limit: float) -> Vector2:
-	return Vector2(clampf(v.x, -limit, limit), clampf(v.y, -limit, limit))
+func _gravity(falling: float) -> float:
+	for band in GRAVITY_BANDS:
+		if falling > band[0]:
+			return band[1]
+	return GRAVITY_BANDS[-1][1]
 
 const RAMP_LAYER_BIT := 2
 

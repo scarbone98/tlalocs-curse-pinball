@@ -8,14 +8,18 @@
 
 config_version=5
 
+[animation]
+
+compatibility/default_parent_skeleton_in_mesh_instance_3d=true
+
 [application]
 
 config/name="scareathon-pinball"
 run/main_scene="uid://cscmeg24j6nwy"
-config/features=PackedStringArray("4.5", "GL Compatibility")
-config/icon="res://ui/icon.png"
+config/features=PackedStringArray("4.7", "GL Compatibility")
 boot_splash/bg_color=Color(0.07, 0.02, 0.12, 1)
 boot_splash/image="res://ui/splash.png"
+config/icon="res://ui/icon.png"
 
 [autoload]
 
@@ -48,7 +52,6 @@ right_flipper={
 [input_devices]
 
 pointing/emulate_touch_from_mouse=true
-pointing/emulate_mouse_from_touch=true
 
 [physics]
 
@@ -58,6 +61,8 @@ common/max_physics_steps_per_frame=16
 
 [rendering]
 
+textures/canvas_textures/default_texture_filter=0
 renderer/rendering_method="gl_compatibility"
 renderer/rendering_method.mobile="gl_compatibility"
 textures/vram_compression/import_etc2_astc=true
+2d/snap/snap_2d_transforms_to_pixel=true
