@@ -2,8 +2,8 @@ extends Node2D
 ## The temple's mood: the whole table sits in a cool dusk (TableFeatures' CanvasModulate,
 ## darker still in Tlaloc's storm), lit by the things that burn and glow in it. Each torch
 ## throws a warm, flickering pool of light (bright while it blazes, low on embers), the
-## golden temple glows, Tlaloc's whirl casts violet while his mouth is open, a lit gold
-## button glows, and a faint light rides with the ball so it never gets lost in the dark.
+## golden temple glows, Tlaloc's whirl casts violet while his mouth is open, and a lit gold
+## button glows.
 ## The pools are banded, a few flat rings rather than a smooth fade, to sit with the pixel art.
 
 const MOOD := Color(0.56, 0.54, 0.68)   # dusk over the table
@@ -15,13 +15,11 @@ const TORCH_EMBER := 0.45
 const FLICKER := 0.18            # how much a flame's light wavers
 const FLAME_ABOVE := Vector2(0, -22)  # the flame sits above a torch's centre (Scripts/torches.gd)
 const TEMPLE_AT := Vector2(588, 170)
-const BALL_LIGHT := 0.5
 
 var features: Node2D  # TableFeatures
 
 var _pool: GradientTexture2D
 var _torch_lights: Array[PointLight2D] = []
-var _ball_lights := {}  # ball -> PointLight2D
 var _whirl_light: PointLight2D
 var _button_lights: Array = []  # [sprite, light]
 var _clock := 0.0
@@ -72,13 +70,3 @@ func _process(delta: float) -> void:
 	_whirl_light.visible = features.temple._whirl.visible
 	for pair: Array in _button_lights:
 		(pair[1] as PointLight2D).visible = (pair[0] as AnimatedSprite2D).visible
-	# a faint light rides with every ball in play
-	for node in get_tree().get_nodes_in_group("ball"):
-		var ball := node as Node2D
-		if not _ball_lights.has(ball):
-			_ball_lights[ball] = _light(ball.global_position, Color(1.0, 0.95, 0.85), BALL_LIGHT, 0.5)
-		(_ball_lights[ball] as PointLight2D).global_position = ball.global_position
-	for ball in _ball_lights.keys():
-		if not is_instance_valid(ball):
-			(_ball_lights[ball] as PointLight2D).queue_free()
-			_ball_lights.erase(ball)

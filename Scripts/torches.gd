@@ -16,6 +16,9 @@ const PAIRS := [
 	[Vector2(157.5, 730.6), Vector2(98.4, 784.9)],
 	[Vector2(188.4, 778.9), Vector2(126.6, 833.2)],
 ]
+# Torches that just burn, for the look of the place: on the side walls, by the outlanes,
+# beside the stone face (scene units)
+const DECOR := [Vector2(40, 870), Vector2(612, 858), Vector2(40, 1135), Vector2(632, 1105), Vector2(165, 105), Vector2(35, 300)]
 # The stone buttons in the lane, one per pair (scene units, from the layout mock-up)
 const BUTTONS := [Vector2(84.4, 715.5), Vector2(112.5, 772.8), Vector2(143.4, 824.2)]
 const BUTTON_RADIUS := 22.0
@@ -66,6 +69,15 @@ func _ready() -> void:
 			features._torches.append(torch)  # the curse makes them flicker faster
 			both.append(torch)
 		_torches.append(both)
+	for at in DECOR:
+		var torch := AnimatedSprite2D.new()
+		torch.sprite_frames = frames
+		torch.position = at
+		torch.scale = features.MAP_SCALE
+		torch.play(&"blaze")
+		torch.frame = randi() % 6
+		features.add_child(torch)
+		features._torches.append(torch)  # lit like the others (Scripts/lighting.gd), and the curse quickens them
 
 	for i in BUTTONS.size():
 		var button: AnimatedSprite2D = features._sprite(BUTTON, 2, BUTTONS[i])
