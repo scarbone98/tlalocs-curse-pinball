@@ -6,13 +6,18 @@ extends Node2D
 ## pit's mouth: a shot up the lane just bounces off them, until the ball rolls over the
 ## gold button beside them, which lowers them for a while. Then each shot up the lane
 ## strikes the tower: its top drum sinks away and the idol drops a step, rocking. With the
-## drums gone the idol stands on the pit floor and the next shot claims it: points, one
-## more on the bonus multiplier, and a young spirit that breaks out of it and wanders the
-## table (Scripts/hatchling.gd). A while later the tower rises again with a new idol on
-## top, and the spikes come back up.
+## drums gone the idol stands on the pit floor and the next shot claims it: points and one
+## more on the bonus multiplier. Each strike throws off crystal shards. A while later the
+## tower rises again with a new idol on top, and the spikes come back up (never on a ball
+## still in the pit: they wait for it to roll out).
 
 const DRUM := preload("res://Sprites/table/tower_drum.png")    # tools/make_table.py
 const IDOL := preload("res://Sprites/table/idol.png")          # tools/make_tiki_idol.py
+const IDOL_SPIN := preload("res://Sprites/table/idol_spin.png")  # tools/make_table.py: it turns on its tower
+const SHARD := preload("res://Sprites/table/shard.png")
+const IDOL_SPIN_FPS := 6.0
+# Between the spikes and the tower's foot, where a ball can be when the spikes come back up
+const PIT := Rect2(214, 470, 76, 98)
 const SPIKES := preload("res://Sprites/table/spikes.png")
 
 enum { GLEAM, GLINT, STRUCK, ROCK_LEFT, ROCK_RIGHT, TOPPLED }  # Sprites/table/idol.png
@@ -65,7 +70,8 @@ var _struck_left := 0.0
 var _rock_left := 0.0
 var _reset_left := 0.0
 var _clock := 0.0
-var _warned := 0.0
+var _turning: Sprite2D  # the idol turning, while it rides the tower
+var _shards: CPUParticles2D
 var _button: AnimatedSprite2D
 var _pressed_left := 0.0
 
@@ -77,6 +83,10 @@ func _ready() -> void:
 	_idol = _sheet_sprite(IDOL, IDOL_FRAMES)
 	_idol.z_index = 3  # in front of the palm behind the tower (the palms are z 2)
 	_idol.z_as_relative = false
+	_turning = _sheet_sprite(IDOL_SPIN, 4)
+	_turning.z_index = 3
+	_turning.z_as_relative = false
+	_shards = _shard_burst()
 	_spikes = _sheet_sprite(SPIKES, SPIKE_FRAMES)
 	_spikes.position = SPIKES_ART * features.MAP_SCALE
 
@@ -163,7 +173,6 @@ func _place() -> void:
 func _physics_process(delta: float) -> void:
 	_clock += delta
 	_cooldown = maxf(_cooldown - delta, 0.0)
-	_warned = maxf(_warned - delta, 0.0)
 	_pressed_left = maxf(_pressed_left - delta, 0.0)
 	features.show_gold_button(_button, _pressed_left, _spikes_down())
 	_struck_left = maxf(_struck_left - delta, 0.0)
@@ -173,9 +182,11 @@ func _physics_process(delta: float) -> void:
 		_drums[i].frame = DRUM_FRAMES - 1 - turn if i == 1 else turn  # the middle one turns the other way
 	# the spikes sink into the floor (or rise back up) a frame at a time
 	var was_down := _spikes_down()
-	_spikes_down_left = maxf(_spikes_down_left - delta, 0.0)
+	if _spikes_down_left > 0.0 and _spikes_down_left <= delta and _ball_in_pit():
+		pass  # hold them down till the ball's rolled out of the pit
+	else:
+		_spikes_down_left = maxf(_spikes_down_left - delta, 0.0)
 	if was_down and not _spikes_down():
-		PinballEvents.toast.emit("The spikes rise again")
 		_place()
 	_spike_level = move_toward(_spike_level, SPIKE_FRAMES if _spikes_down() else 0.0, delta / SPIKE_STEP_SECONDS)
 	_spikes.visible = _spike_level < SPIKE_FRAMES
@@ -187,9 +198,47 @@ func _physics_process(delta: float) -> void:
 			_raise()
 			PinballEvents.effect.emit("gold", _idol.position)
 
+func _ball_in_pit() -> bool:
+	for node in get_tree().get_nodes_in_group("ball"):
+		if PIT.has_point((node as Node2D).global_position):
+			return true
+	return false
+
+# A burst of crystal slivers off the tower as it's struck
+func _shard_burst() -> CPUParticles2D:
+	var burst := CPUParticles2D.new()
+	burst.texture = SHARD
+	burst.emitting = false
+	burst.one_shot = true
+	burst.local_coords = true
+	burst.amount = 14
+	burst.lifetime = 0.8
+	burst.explosiveness = 1.0
+	burst.scale = features.MAP_SCALE
+	burst.direction = Vector2(0, -1)
+	burst.spread = 75.0
+	burst.initial_velocity_min = 30.0
+	burst.initial_velocity_max = 70.0
+	burst.gravity = Vector2(0, 120)
+	var fade := Gradient.new()
+	fade.set_color(0, Color.WHITE)
+	fade.set_color(1, Color(1, 1, 1, 0))
+	burst.color_ramp = fade
+	burst.z_index = 3
+	burst.z_as_relative = false
+	features.add_child(burst)
+	return burst
+
 func _render_idol() -> void:
+	_turning.position = _idol.position
+	# turning on its tower; still once it's down on the pit floor, gleaming, waiting
+	var spinning := not _claimed and _standing > 0 and _struck_left <= 0.0 and _rock_left <= 0.0
+	_turning.visible = spinning and _idol.visible
+	if spinning:
+		_turning.frame = int(_clock * IDOL_SPIN_FPS) % 4
 	if _claimed:
 		return
+	_idol.self_modulate.a = 0.0 if _turning.visible else 1.0
 	if _struck_left > 0.0:
 		_idol.frame = STRUCK
 	elif _rock_left > 0.0:
@@ -211,7 +260,6 @@ func _on_button(body: Node) -> void:
 	features._award(BUTTON_POINTS, BUTTON_AT)
 	PinballEvents.effect.emit("sparks", BUTTON_AT)
 	AudioSfx.play("tiki", 0.0, Vector2.ONE * 0.8)
-	PinballEvents.toast.emit("The spikes are down!")
 
 func _on_front_hit(body: Node) -> void:
 	if _cooldown > 0.0 or not features._is_ball_on_playfield(body):
@@ -221,9 +269,6 @@ func _on_front_hit(body: Node) -> void:
 	_cooldown = HIT_COOLDOWN
 	if not _spikes_down():
 		AudioSfx.play("bumper", 0.0, Vector2.ONE * 1.3)
-		if _warned <= 0.0:
-			_warned = 6.0
-			PinballEvents.toast.emit("Spikes! Hit the gold button")
 		return
 	if _standing == 0:
 		return
@@ -235,6 +280,8 @@ func _on_front_hit(body: Node) -> void:
 	features._award(SINK_POINTS, TOWER_FRONT.get_center())
 	AudioSfx.play("tiki", 0.0, Vector2.ONE * (1.0 + 0.12 * (DRUMS - _standing)))
 	PinballEvents.effect.emit("dust", TOWER_FRONT.get_center())
+	_shards.position = (DRUM_ART - Vector2(0, DRUM_STEP * _standing)) * features.MAP_SCALE
+	_shards.restart()
 	PinballEvents.rumble.emit(3.0)
 	PinballEvents.toast.emit("The idol is down!" if _standing == 0 else "Tower %d/%d" % [DRUMS - _standing, DRUMS])
 
@@ -250,8 +297,8 @@ func _on_idol_hit(body: Node) -> void:
 	PinballEvents.effect.emit("gold", _idol.position)
 	PinballEvents.rumble.emit(5.0)
 	AudioSfx.play("upgrade")
-	get_tree().create_timer(0.4, false).timeout.connect(func():
-		_idol.hide()
-		features.hatchling.hatch())
-	_spikes_down_left = 0.0  # the spikes come back up behind it
+	_shards.position = _idol.position
+	_shards.restart()
+	get_tree().create_timer(0.4, false).timeout.connect(_idol.hide)
+	_spikes_down_left = minf(_spikes_down_left, 0.5)  # the spikes come back up behind it, once the ball has rolled out
 	_reset_left = RESET_SECONDS

@@ -17,7 +17,8 @@ const SCENE_SECONDS := 3.0
 const HOW_TO_PLAY := [
 	"Flippers: tap the left or right side of the screen, or Left / Right.",
 	"Launch: tap Launch (or Space). Bump the table with Shift / Up, or swipe.",
-	"Right rail lights Summon arrows: with 2, the golden temple calls a spirit. Hit the warriors to break its glyphs, then hit it 3 times to catch it.",
+	"Shoot up the lane under the right rail to light its three spirit lamps and call a spirit. Hit the warriors to break its glyphs, then hit it 3 times to catch it.",
+	"When Tlaloc's curse breaks, a heart rises in his mouth: hit it 3 times to offer it and stop the rain.",
 	"Left rail lights Awaken arrows: with 3, the crystal skull opens its jaws; feed it to awaken a spirit.",
 	"Hit the idol's spinning tower 3 times (top left) to sink it into its pit, then hit the golden idol to claim it.",
 	"Roll over the stone buttons between the torches to light them; light all six for a ball saver.",

@@ -3,8 +3,8 @@ extends Node2D
 ## rail's upper branch through its pipe, the right rail up its chute). A ball that gets
 ## inside races round the temple's ring a couple of times, like the loop inside the
 ## structure on Pokemon Pinball Sapphire's field, while Tlaloc's eyes blaze. The offering
-## stirs him a step toward his curse, and with two Summon arrows lit it also calls up a
-## spirit to catch (with all three, maybe a rare one). Then the temple sends the ball
+## stirs him a step toward his curse (the spirits come from the right lane now,
+## Scripts/spirit_lane.gd). Then the temple sends the ball
 ## back out through its pipe and all the way down the left rail. The blue gems round the
 ## temple's ring light up one after another as the ball races past them inside.
 
@@ -106,10 +106,8 @@ func _offering() -> void:
 	PinballEvents.toast.emit("An offering to Tlaloc!")
 	PinballEvents.effect.emit("gold", LOOP_CENTRE)
 	features.stir_tlaloc()
-	var arrows: int = features.ramps.arrows["summon"]
-	if arrows >= ARROWS_TO_SUMMON and not features.mode_running():
-		features.ramps.clear_arrows("summon")
-		features.spirit.summon(arrows >= features.ramps.MAX_ARROWS)
+	if features.ramps.arrows["summon"] >= ARROWS_TO_SUMMON:
+		features.ramps.clear_arrows("summon")  # they sent it here; now they start again
 
 func _spit(ball: RigidBody2D) -> void:
 	_held = null

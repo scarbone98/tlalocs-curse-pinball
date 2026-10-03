@@ -91,15 +91,17 @@ func _waiting() -> bool:
 func _physics_process(delta: float) -> void:
 	_clock += delta
 	_rearm = maxf(_rearm - delta, 0.0)
-	# his mouth opens, the whirl turning in it, while something waits (or he's holding the ball)
-	var open := _held != null or _waiting()
+	# his mouth opens, the whirl turning in it, while something waits (or he's holding the
+	# ball); while the curse's heart sits in it, it takes nothing else (Scripts/heart_offering.gd)
+	var heart_in: bool = features.heart != null and features.heart.active
+	var open: bool = not heart_in and (_held != null or _waiting())
 	_whirl.visible = open
 	if open and features._face_sprite:
 		features._face_sprite.frame = MOUTH_OPEN
 	elif _was_open and features._face_sprite and not GameManager.curse_active:
 		features._face_sprite.frame = MOUTH_SHUT  # nothing waiting any more: he shuts it
 	_was_open = open
-	if _held or _rearm > 0.0 or not _waiting():
+	if _held or _rearm > 0.0 or not _waiting() or heart_in:
 		return
 	var balls := get_tree().get_nodes_in_group("ball")
 	if balls.size() != 1:

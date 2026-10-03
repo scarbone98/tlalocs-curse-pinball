@@ -1,19 +1,28 @@
 extends Node2D
-## The roulette, set into the floor just under Tlaloc's chin: when his mouth spins it
-## (Scripts/temple_hole.gd) the prize pictures (Sprites/billboard.png, at the table's own
-## pixel size) flick past, slowing, and come to rest on the prize, then it fades back into
-## the floor.
+## The roulette, set into the floor just under Tlaloc's chin: a stone frame with two carved
+## stone doors (tools/make_table.py). When his mouth spins the roulette (Scripts/temple_hole.gd),
+## or a journey sets off for a new city (Scripts/journey.gd), the doors slide apart and the
+## pictures flick past, slowing, until they come to rest on the result; then the doors close.
 
-const SHEET := preload("res://Sprites/billboard.png")
-const AT := Vector2(339, 962)  # under the face, between the slingshots
+const PICTURES := preload("res://Sprites/table/roulette_pictures.png")  # the four cities, then the five prizes
+const BORDER := preload("res://Sprites/table/roulette_border.png")
+const DOORS := preload("res://Sprites/table/roulette_doors.png")
+const PICTURE := Vector2(48, 30)
+const CITY_FRAMES := 0   # four of them
+const PRIZE_FRAMES := 4  # five of them, in Billboard.PRIZES order
+const AT := Vector2(339, 958)  # under the face, between the slingshots
 const SHOW_SECONDS := 2.2
-const FADE_SECONDS := 0.25
+const DOOR_SECONDS := 0.3
 const SPIN_START_FPS := 18.0
 
 var features: Node2D  # TableFeatures
 
 var _reel: Sprite2D
-var _tween: Tween
+var _doors: Array[Sprite2D] = []
+var _open := 0.0  # 0 shut, 1 slid all the way apart
+var _door_tween: Tween
+var _first := 0
+var _count := 1
 var _spin_left := 0.0
 var _spin_total := 0.0
 var _spin_result := 0
@@ -23,25 +32,42 @@ var _spin_index := 0
 var _hide_left := 0.0
 
 func _ready() -> void:
-	_reel = Sprite2D.new()
-	_reel.texture = SHEET
-	_reel.hframes = SHEET.get_width() / int(Billboard.PICTURE.x)
-	_reel.scale = features.MAP_SCALE
-	_reel.position = AT
-	_reel.modulate.a = 0.0
-	_reel.visible = false
-	features.add_child(_reel)
-	PinballEvents.billboard_spin.connect(spin)
+	features.roulette = self
+	_reel = _piece(PICTURES)
+	_reel.hframes = PICTURES.get_width() / int(PICTURE.x)
+	for side in 2:
+		var door := _piece(DOORS)
+		door.region_enabled = true
+		_doors.append(door)
+	_piece(BORDER)
+	_render_doors()
+	PinballEvents.billboard_spin.connect(func(result: int, seconds: float, caption: String):
+		spin(PRIZE_FRAMES, Billboard.PRIZES.size(), PRIZE_FRAMES + result - Billboard.PRIZE, seconds, caption))
 
-## Spins through the prizes, slowing down, and lands on `result`
-func spin(result: int, seconds: float, caption: String) -> void:
+func _piece(texture: Texture2D) -> Sprite2D:
+	var sprite := Sprite2D.new()
+	sprite.texture = texture
+	sprite.scale = features.MAP_SCALE
+	sprite.position = AT
+	features.add_child(sprite)
+	return sprite
+
+## Opens the doors and spins through `count` pictures from `first`, slowing down, to land on `result`
+func spin(first: int, count: int, result: int, seconds: float, caption: String) -> void:
+	_first = first
+	_count = count
 	_spin_left = seconds
 	_spin_total = seconds
 	_spin_result = result
 	_spin_caption = caption
 	_spin_step = 0.0
 	_hide_left = 0.0
-	_fade(1.0)
+	_reel.frame = first
+	_slide(1.0)
+
+## A journey setting off: the cities spin and stop on where it's going
+func spin_to_city(city: int, caption: String) -> void:
+	spin(CITY_FRAMES, 4, CITY_FRAMES + city, 1.6, caption)
 
 func _process(delta: float) -> void:
 	if _spin_left > 0.0:
@@ -51,8 +77,8 @@ func _process(delta: float) -> void:
 		_spin_step += delta * fps
 		if _spin_step >= 1.0:
 			_spin_step = 0.0
-			_spin_index = (_spin_index + 1) % Billboard.PRIZES.size()
-			_reel.frame = Billboard.PRIZE + _spin_index
+			_spin_index = (_spin_index + 1) % _count
+			_reel.frame = _first + _spin_index
 		if _spin_left <= 0.0:
 			_reel.frame = _spin_result
 			PinballEvents.toast.emit(_spin_caption)
@@ -60,13 +86,26 @@ func _process(delta: float) -> void:
 	elif _hide_left > 0.0:
 		_hide_left -= delta
 		if _hide_left <= 0.0:
-			_fade(0.0)
+			_slide(0.0)
 
-func _fade(to: float) -> void:
-	if _tween:
-		_tween.kill()
-	_reel.visible = true
-	_tween = create_tween()
-	_tween.tween_property(_reel, "modulate:a", to, FADE_SECONDS)
-	if to == 0.0:
-		_tween.tween_callback(_reel.hide)
+func _slide(to: float) -> void:
+	if _door_tween:
+		_door_tween.kill()
+	_door_tween = create_tween()
+	_door_tween.tween_method(func(v: float):
+		_open = v
+		_render_doors(), _open, to, DOOR_SECONDS)
+
+# Each door slides out sideways into the frame: what's left of it shows at its outer edge
+func _render_doors() -> void:
+	var half := PICTURE.x / 2.0
+	var shown := roundf(half * (1.0 - _open))
+	for side in 2:
+		var door := _doors[side]
+		door.visible = shown > 0.0
+		if side == 0:  # the left door: its inner part, pressed against the left side
+			door.region_rect = Rect2(half - shown, 0, shown, PICTURE.y)
+			door.position = AT + Vector2(-half + shown / 2.0, 0) * features.MAP_SCALE
+		else:
+			door.region_rect = Rect2(half, 0, shown, PICTURE.y)
+			door.position = AT + Vector2(half - shown / 2.0, 0) * features.MAP_SCALE

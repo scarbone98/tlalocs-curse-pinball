@@ -196,7 +196,6 @@ func _on_button(body: Node) -> void:
 	features._award(BUTTON_POINTS, BUTTON_AT)
 	PinballEvents.effect.emit("sparks", BUTTON_AT)
 	if _out_left <= 0.0:
-		PinballEvents.toast.emit("The jaguars wake!")
 		AudioSfx.play("roar")
 	_out_left = OUT_SECONDS
 
@@ -207,8 +206,6 @@ func _physics_process(delta: float) -> void:
 	_button_cooldown = maxf(_button_cooldown - delta, 0.0)
 	if _out_left > 0.0:
 		_out_left -= delta
-		if _out_left <= 0.0:
-			PinballEvents.toast.emit("The jaguars slink back")
 	_blink_left -= delta
 	for side in 2:
 		var breath := 1.0 if fposmod(_clock / BREATH_SECONDS + side * 0.5, 1.0) < 0.5 else 0.0
@@ -331,7 +328,7 @@ func travel(announce := true) -> void:
 	if not announce:
 		return  # a city passed through on the way
 	features._award(TRAVEL_POINTS, _serpents[0].global_position.lerp(_serpents[1].global_position, 0.5))
-	PinballEvents.billboard.emit(Billboard.CITY + city, "Travel to %s!" % CITIES[city].name)
+	features.roulette.spin_to_city(city, "Travel to %s!" % CITIES[city].name)  # on the floor under Tlaloc
 	AudioSfx.play("ramp")
 	PinballEvents.traveled.emit()
 	_announce_goal()
