@@ -37,6 +37,9 @@ const ARROWS_TO_SUMMON := 2
 var features: Node2D  # TableFeatures, which owns the shrine's eyes and scoring helpers
 
 var _held: RigidBody2D
+# Multiball: a ball that runs in while another's racing round waits just inside, out of
+# sight, for its turn (ball -> the speed it came in at), rather than flying on off the table
+var _waiting := {}
 var _rearm := 0.0
 var _gems: Array[Sprite2D] = []
 var _gem_angles: Array[float] = []
@@ -80,13 +83,21 @@ func _light_gems(delta: float) -> void:
 func _physics_process(delta: float) -> void:
 	_rearm = maxf(_rearm - delta, 0.0)
 	_light_gems(delta)
-	if _held or _rearm > 0.0:
+	for ball: RigidBody2D in _waiting.keys():
+		if not is_instance_valid(ball) or not ball.is_inside_tree():
+			_waiting.erase(ball)
+	var busy := _held != null or _rearm > 0.0
+	if not busy and not _waiting.is_empty():
+		var next: RigidBody2D = _waiting.keys()[0]
+		var speed: float = _waiting[next]
+		_waiting.erase(next)
+		_swallow(next, speed)
 		return
 	var pipe: Vector2 = Geometry.OPENINGS["left_pipe"][0]
 	var chute: Vector2 = Geometry.OPENINGS["right_top"][0]
 	for node in get_tree().get_nodes_in_group("ball"):
 		var ball := node as RigidBody2D
-		if ball.freeze or (ball.collision_mask & 2) == 0:
+		if ball.freeze or (ball.collision_mask & 2) == 0 or ball == _held or _waiting.has(ball):
 			continue
 		# only a ball riding up a rail into the temple, never one going the other way along it
 		var ride = features.rails._rides.get(ball)
@@ -94,14 +105,37 @@ func _physics_process(delta: float) -> void:
 		if not going_in:
 			continue
 		var p := ball.global_position
-		if p.distance_to(pipe) < CATCH_RADIUS or p.distance_to(chute) < CATCH_RADIUS:
-			_swallow(ball)
-			return
+		# one that's run off its rail's top end is in, wherever it's got to: off the rail
+		# nothing else holds it on the table
+		if ball.get_meta("into_temple", false) or p.distance_to(pipe) < CATCH_RADIUS \
+				or p.distance_to(chute) < CATCH_RADIUS:
+			if busy:
+				_wait(ball)
+			else:
+				_swallow(ball, ball.linear_velocity.length())
+				busy = true
 
-func _swallow(ball: RigidBody2D) -> void:
+# Held just inside the opening it came in by till the temple's free
+func _wait(ball: RigidBody2D) -> void:
+	_waiting[ball] = ball.linear_velocity.length()
+	ball.remove_meta("into_temple")
+	ball.rail_guide = Callable()
+	features.rails._rides.erase(ball)
+	ball.freeze_mode = RigidBody2D.FREEZE_MODE_KINEMATIC
+	ball.set_deferred("freeze", true)
+	ball.linear_velocity = Vector2.ZERO
+	ball.z_index = 1  # under the temple's art, out of sight inside it
+	# in the opening itself, clear of the rail the one inside is sent back down
+	var pipe: Vector2 = Geometry.OPENINGS["left_pipe"][0]
+	var chute: Vector2 = Geometry.OPENINGS["right_top"][0]
+	var p := ball.global_position
+	ball.global_position = chute if p.distance_to(chute) < p.distance_to(pipe) else pipe
+
+func _swallow(ball: RigidBody2D, speed: float) -> void:
 	_held = ball
 	ball.remove_meta("into_temple")
-	var speed := ball.linear_velocity.length()
+	ball.rail_guide = Callable()
+	features.rails._rides.erase(ball)
 	var pipe: Vector2 = Geometry.OPENINGS["left_pipe"][0]
 	var chute: Vector2 = Geometry.OPENINGS["right_top"][0]
 	var came_up := "right" if ball.global_position.distance_to(chute) < ball.global_position.distance_to(pipe) else "left_temple"
