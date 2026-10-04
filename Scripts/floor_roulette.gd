@@ -65,6 +65,14 @@ func spin(first: int, count: int, result: int, seconds: float, caption: String) 
 	_reel.frame = first
 	_slide(1.0)
 
+## Opens the doors on one city, no spin (the journey's first city, say)
+func show_city(city: int, caption: String) -> void:
+	_spin_left = 0.0
+	_reel.frame = CITY_FRAMES + city
+	PinballEvents.toast.emit(caption)
+	_hide_left = SHOW_SECONDS
+	_slide(1.0)
+
 ## A journey setting off: the cities spin and stop on where it's going
 func spin_to_city(city: int, caption: String) -> void:
 	spin(CITY_FRAMES, 4, CITY_FRAMES + city, 1.6, caption)

@@ -131,9 +131,9 @@ func _ready() -> void:
 	PinballEvents.curse_changed.connect(func(active): if active: _feat_done("curse"))
 	PinballEvents.top_lanes_completed.connect(func(): _feat_done("lanes"))
 	_announce_goal.call_deferred()
-	# The first launch shows where the journey starts
+	# The first launch shows where the journey starts, behind the roulette's doors under Tlaloc
 	PinballEvents.ball_launched.connect(func():
-		PinballEvents.billboard.emit(Billboard.CITY + city, "The journey begins: %s" % CITIES[city].name), CONNECT_ONE_SHOT)
+		features.roulette.show_city(city, "The journey begins: %s" % CITIES[city].name), CONNECT_ONE_SHOT)
 
 func _build_serpent(side: int, wedge: Array, facing: Vector2) -> void:
 	var body := StaticBody2D.new()
