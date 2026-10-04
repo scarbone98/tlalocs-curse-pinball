@@ -24,11 +24,17 @@ const MARCH_EVERY := Vector2(20.0, 35.0)
 const LINGER_SECONDS := 0.8           # a ball this long inside the arena sets them marching
 const AWAY_EVERY := Vector2(45.0, 80.0)
 const AWAY_SECONDS := 15.0
-const HOLE := preload("res://Sprites/table/arena_hole.png")  # tools/make_table.py: shut, flipping over, open
-const HOLE_FRAMES := 5
-const HOLE_SHUT := 0
-const HOLE_OPEN := HOLE_FRAMES - 1
-const HOLE_FLIP_SECONDS := 0.25  # the cover flips over this quickly, opening or shutting
+const HOLE := preload("res://Sprites/table/arena_hole.png")  # tools/make_table.py: sun up, turning, edge-on (open), turning, underside up
+const HOLE_FRAMES := 9
+const HOLE_OPEN := 4             # edge-on, the hole either side of it
+const HOLE_FLIP_SECONDS := 0.3   # the cover turns from shut to open (or on round to shut) this quickly
+const Flutter := preload("res://Scripts/flutter.gd")
+const FEATHERS := preload("res://Sprites/table/feathers.png")  # tools/make_table.py
+const FEATHERS_PER_HIT := 5
+const SINK_DEPTH := 76.0         # scene units a warrior sinks to be right down the hole
+const SINK_SECONDS := 0.22
+const HOLE_RIM := 15.0           # below the hole's middle, the near rim it sinks behind
+const CLIP_SHADER := preload("res://Scripts/clip_below.gdshader")
 const HOP_SECONDS := 0.45
 const HOP_HEIGHT := 8.0   # art pixels up at the top of a hop
 const HOP_STAGGER := 0.2
@@ -71,6 +77,8 @@ var _recoil: Array[Vector2] = []  # each one knocked back off its place by a hit
 var _home: Array[Vector2] = []    # where each one's sprite sits on its warrior
 var _stung_left: Array[float] = []  # each one down the hole on its own after a dart, this much longer
 var _solo: Array[bool] = []  # each one hopping on its own (the formation leaves it be)
+var _sink: Array[float] = []  # how far down the hole each one's sunk
+var _shut_at := 0  # the frame the cover turns on round to when it next shuts: it turns right over, alternately
 var _rest_left := 0.0
 var _linger := 0.0
 var _clock := 0.0
@@ -94,6 +102,10 @@ func _ready() -> void:
 		_recoil.append(Vector2.ZERO)
 		_home.append(sprite.position)
 		_solo.append(false)
+		_sink.append(0.0)
+		var clip := ShaderMaterial.new()
+		clip.shader = CLIP_SHADER
+		sprite.material = clip
 		(warrior as Area2D).body_entered.connect(_on_touch.bind(_sprites.size() - 1))
 	_hole = features._sprite(HOLE, HOLE_FRAMES, CENTRE)  # under the warriors (they're drawn after the table's features)
 	_place()
@@ -104,7 +116,9 @@ var _hole_tween: Tween
 
 # The cover flips over like a flipper: through its turning frames to open, or back to shut
 func _flip_hole(open: bool) -> void:
-	var to := HOLE_OPEN if open else HOLE_SHUT
+	var to := HOLE_OPEN if open else _shut_at
+	if open and _hole.frame != HOLE_OPEN:
+		_shut_at = HOLE_FRAMES - 1 if _hole.frame < HOLE_OPEN else 0  # it'll shut by turning on over
 	if _hole.frame == to:
 		return
 	if _hole_tween:
@@ -112,6 +126,19 @@ func _flip_hole(open: bool) -> void:
 	_hole_tween = create_tween()
 	_hole_tween.tween_method(func(v: float): _hole.frame = int(round(v)), float(_hole.frame), float(to),
 		HOLE_FLIP_SECONDS * absf(to - _hole.frame) / HOLE_OPEN)
+	AudioSfx.play("tiki", 0.0, Vector2.ONE * (1.1 if open else 0.9))
+
+# Down into the hole, or up out of it, sinking behind its near rim as the jaguars slide
+# into their slots: the warrior stands on the hole's middle the while
+func _sink_tween(i: int, down: bool) -> Tween:
+	var sprite := _sprites[i]
+	(sprite.material as ShaderMaterial).set_shader_parameter("clip_y", CENTRE.y + HOLE_RIM)
+	var sink := create_tween()
+	sink.tween_method(func(v: float): _sink[i] = v, 0.0 if down else SINK_DEPTH, SINK_DEPTH if down else 0.0, SINK_SECONDS) \
+		.set_ease(Tween.EASE_IN if down else Tween.EASE_OUT).set_trans(Tween.TRANS_QUAD)
+	if not down:
+		sink.tween_callback(func(): (sprite.material as ShaderMaterial).set_shader_parameter("clip_y", 1.0e6))
+	return sink
 
 func _frames() -> SpriteFrames:
 	var frames := SpriteFrames.new()
@@ -159,10 +186,14 @@ func _hop_solo(i: int, out_of_hole: bool) -> void:
 	for shape in warrior.find_children("*", "CollisionShape2D", true, false):
 		(shape as CollisionShape2D).set_deferred("disabled", true)
 	var from := warrior.global_position
+	var hop := create_tween()
 	if out_of_hole:
 		warrior.global_position = CENTRE
+		_sink[i] = SINK_DEPTH
 		warrior.show()
-	var hop := create_tween()
+		hop.tween_interval(HOLE_FLIP_SECONDS)
+		hop.tween_callback(func(): _sink_tween(i, false))
+		hop.tween_interval(SINK_SECONDS)
 	hop.tween_method(func(t: float):
 		var to := _spot(i) if out_of_hole else CENTRE
 		var start := CENTRE if out_of_hole else from
@@ -170,12 +201,19 @@ func _hop_solo(i: int, out_of_hole: bool) -> void:
 		sprite.offset.y = -sin(t * PI) * HOP_HEIGHT, 0.0, 1.0, HOP_SECONDS)
 	hop.tween_callback(func():
 		sprite.offset.y = 0.0
-		_solo[i] = false
 		if out_of_hole:
+			_solo[i] = false
 			for shape in warrior.find_children("*", "CollisionShape2D", true, false):
 				(shape as CollisionShape2D).set_deferred("disabled", false)
 		else:
+			_sink_tween(i, true))
+	if not out_of_hole:
+		hop.tween_interval(SINK_SECONDS)
+		hop.tween_callback(func():
+			_solo[i] = false
 			warrior.hide()  # down the hole
+			_sink[i] = 0.0)
+	hop.tween_callback(func():
 		if _hopping == 0 and not _solo.has(true):
 			_flip_hole(false))
 	AudioSfx.play("tiki", 0.0, Vector2.ONE * 0.9)
@@ -184,6 +222,9 @@ func _on_touch(body: Node, index: int) -> void:
 	if body.is_in_group("ball"):
 		# it's knocked back a little, away from the ball, and steps back after
 		var away := ((_warriors[index] as Node2D).global_position - (body as Node2D).global_position).normalized()
+		# feathers knocked off its headdress, fluttering down
+		Flutter.burst(features, FEATHERS, (_warriors[index] as Node2D).global_position + Vector2(0, -34),
+			FEATHERS_PER_HIT, features.MAP_SCALE, Vector2(10, 6), away * 110.0 + Vector2(0, -70))
 		_recoil[index] = away * RECOIL
 		_flash_left[index] = FLASH_SECONDS
 		_sprites[index].frame = FLASHING
@@ -193,7 +234,7 @@ func _physics_process(delta: float) -> void:
 	for i in _sprites.size():
 		if _recoil[i] != Vector2.ZERO:
 			_recoil[i] = _recoil[i].move_toward(Vector2.ZERO, RECOIL_RETURN * delta)
-		_sprites[i].position = _home[i] + _recoil[i]
+		_sprites[i].position = _home[i] + _recoil[i] + Vector2(0, _sink[i])
 	for i in _warriors.size():
 		if _stung_left[i] > 0.0:
 			_stung_left[i] -= delta
@@ -302,8 +343,12 @@ func _set_here(here: bool) -> void:
 		if here:
 			hop.tween_callback(func():
 				warrior.global_position = CENTRE
+				_sink[i] = SINK_DEPTH
 				warrior.show())
-		hop.tween_method(func(t: float):
+			hop.tween_interval(HOLE_FLIP_SECONDS)
+			hop.tween_callback(func(): _sink_tween(i, false))  # up out of the hole...
+			hop.tween_interval(SINK_SECONDS)
+		hop.tween_method(func(t: float):  # ...and hop
 			warrior.global_position = (spot.lerp(CENTRE, t) if not here else CENTRE.lerp(spot, t))
 			sprite.offset.y = -sin(t * PI) * HOP_HEIGHT, 0.0, 1.0, HOP_SECONDS)
 		hop.tween_callback(func():
@@ -312,7 +357,13 @@ func _set_here(here: bool) -> void:
 				for shape in warrior.find_children("*", "CollisionShape2D", true, false):
 					(shape as CollisionShape2D).set_deferred("disabled", false)
 			else:
+				_sink_tween(i, true))  # hop in, and down it goes
+		if not here:
+			hop.tween_interval(SINK_SECONDS)
+			hop.tween_callback(func():
 				warrior.hide()  # down the hole
+				_sink[i] = 0.0)
+		hop.tween_callback(func():
 			_hopping -= 1
 			if _hopping == 0:
 				_flip_hole(false))

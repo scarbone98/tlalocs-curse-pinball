@@ -1316,6 +1316,57 @@ def road_arrow(direction):
     return sheet
 
 
+# ---------- things that flutter down ----------
+
+FLUTTER_SIZE = (7, 4)  # each piece's frame
+
+
+def _flutter_sheet(shapes, palettes):
+    """Small pieces, a frame each: every shape in every palette (light, mid, dark)"""
+    w, h = FLUTTER_SIZE
+    sheet = Image.new("RGBA", (w * len(shapes) * len(palettes), h), T)
+    i = 0
+    for palette in palettes:
+        for shape in shapes:
+            for y, row in enumerate(shape):
+                for x, ch in enumerate(row):
+                    if ch in "123":
+                        sheet.putpixel((i * w + x, y), palette[int(ch) - 1])
+            i += 1
+    return sheet
+
+
+def feathers():
+    """Feathers knocked off a warrior's headdress (Scripts/warriors.gd): quetzal green, red,
+    blue and gold, each with its darker quill"""
+    shapes = [
+        ["..1....", ".1122..", "1122223", ".33...."],
+        [".......", "1112223", ".122333", "......."],
+        ["...11..", ".11223.", "1223...", "3......"],
+    ]
+    palettes = [
+        [(120, 230, 150, 255), (40, 170, 100, 255), (20, 96, 60, 255)],
+        [(255, 140, 110, 255), (214, 52, 40, 255), (120, 24, 20, 255)],
+        [(130, 190, 255, 255), (48, 112, 220, 255), (24, 52, 130, 255)],
+        [(255, 236, 140, 255), (240, 186, 24, 255), (150, 96, 10, 255)],
+    ]
+    return _flutter_sheet(shapes, palettes)
+
+
+def leaves():
+    """Scraps of palm frond shaken loose (Scripts/palms.gd), in the fronds' greens"""
+    shapes = [
+        ["..12...", ".1223..", "12233..", ".33...."],
+        [".......", "1122333", ".12233.", "......."],
+        ["...12..", "..123..", ".1233..", "33....."],
+    ]
+    palettes = [
+        [(120, 214, 180, 255), (40, 160, 140, 255), (20, 96, 92, 255)],
+        [(150, 226, 150, 255), (70, 176, 110, 255), (30, 110, 74, 255)],
+    ]
+    return _flutter_sheet(shapes, palettes)
+
+
 def spring_sheet():
     """The plunger, drawn round like a real one: a gold cap seen a little from above (its lit
     top face, then its side turning from a bright edge on the left into shadow on the right),
@@ -1509,44 +1560,53 @@ COVER_SUN = [  # a sun, its rays all round, carved on the arena's cover
     ".X.XXX.X.",
     "X...X...X",
 ]
-HOLE_FLIP = [1.0, 0.6, 0.3, 0.08, 0.0]  # how much of the cover faces up in each frame: shut ... open
+HOLE_FLIP = [1.0, 0.72, 0.42, 0.16, 0.0, -0.16, -0.42, -0.72, -1.0]  # how much of the cover faces up, sun side (+) or underside (-): it turns right over, like the frog spinner
 
 
 def arena_hole():
     """A round stone tablet set in the middle of the warriors' arena, a cover over the hole
-    they jump down into. It flips over on its middle like a flipper: shut (a sun carved on
-    it), turning (seen ever more edge-on, the dark hole showing past it), edge-on, then
-    open. Played forward it opens, backward it shuts (Scripts/warriors.gd)."""
+    they jump down into. It turns right over on its middle like the frog spinner: the sun
+    carved on its face squashing edge-on as it opens (the dark hole showing either side of
+    it), and on round to its plain underside as it shuts, or back the other way
+    (Scripts/warriors.gd)."""
     w, h = HOLE_SIZE
     ink, rim, stone, stone_l, carve = (20, 24, 36, 255), (84, 90, 100, 255), (112, 118, 128, 255), (148, 154, 160, 255), (58, 62, 72, 255)
-    underside = (88, 94, 104, 255)
+    under, under_d, brace = (92, 98, 108, 255), (74, 80, 90, 255), (60, 64, 74, 255)
+    edge_l, edge_d = (170, 176, 182, 255), (70, 74, 84, 255)
     pit, pit_d = (34, 26, 30, 255), (16, 12, 18, 255)
     out = Image.new("RGBA", (w * len(HOLE_FLIP), h), T)
     cx, cy = (w - 1) / 2, (h - 1) / 2
+    inset = 0.86  # the cover all but fills the hole
     for f, face in enumerate(HOLE_FLIP):
+        k = abs(face)
         for y in range(h):
             for x in range(w):
                 r = ((x - cx) / (w / 2)) ** 2 + ((y - cy) / (h / 2)) ** 2
                 if r > 1.0:
                     continue
-                if r > 0.78:
+                if r > 0.8:
                     c = ink
-                elif r > 0.55:
-                    c = rim if face == 1.0 or y > cy else (60, 64, 74, 255)
                 else:
                     c = pit if y < cy else pit_d
-                    # the cover, turned so only `face` of it shows: squashed toward its middle
-                    if face > 0.0:
-                        ry = (h / 2) * 0.74 * max(face, 0.08)
-                        across = ((x - cx) / ((w / 2) * 0.74)) ** 2
-                        on = across + ((y - cy) / ry) ** 2 <= 1.0 or (face < 0.2 and abs(y - cy) < 0.6 and across <= 1.0)
-                        if on:
-                            if face == 1.0:
-                                c = stone_l if y < cy - 2 else stone
-                            elif face > 0.2:
-                                c = stone if y < cy else underside
+                    across = ((x - cx) / ((w / 2) * inset)) ** 2
+                    if across <= 1.0:
+                        half = (h / 2) * inset * max(k, 0.0)
+                        dy = y - cy
+                        if k < 0.1:
+                            # edge-on: just its thickness, lit along the top
+                            if -1.0 <= dy < 0.0:
+                                c = edge_l
+                            elif 0.0 <= dy < 1.0:
+                                c = edge_d
+                        elif dy * dy <= half * half * (1.0 - across):
+                            if face > 0:
+                                c = stone_l if dy < -half * 0.4 else stone
                             else:
-                                c = underside if y < cy else rim  # edge-on: just its thickness
+                                c = under if dy < 0 else under_d
+                                if abs(x - cx) < 0.6 or abs(dy) < 0.6:
+                                    c = brace  # the braces across its underside
+                        elif 0.0 <= dy - half * (1.0 - across) ** 0.5 < 1.5 and k < 1.0:
+                            c = edge_d  # its edge, showing below as it turns
                 out.putpixel((f * w + x, y), c)
         if face >= 0.6:  # the sun carved on the cover, squashed with it as it turns
             sun = COVER_SUN
@@ -1933,6 +1993,8 @@ def main():
     spring_sheet().save("Sprites/table/spring.png")
     totem_heads().save("Sprites/table/totem_heads.png")
     totem_door().save("Sprites/table/totem_door.png")
+    feathers().save("Sprites/table/feathers.png")
+    leaves().save("Sprites/table/leaves.png")
     for side, direction in ROAD_ARROWS.items():
         road_arrow(direction).save("Sprites/table/road_arrow_%s.png" % side)
     gem, gem_shadow = rail_gem()
