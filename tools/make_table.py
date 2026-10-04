@@ -39,6 +39,7 @@ and the playfield sprites cut from the hand-drawn sheets in tools/source_art/:
                               (bumperleftlightup.png, bumperrightlightup.png)
   Sprites/table/warrior.png   the arena's warriors (warrior.png, as drawn): four frames turning
                               round, then the fifth for when one's struck
+  Sprites/table/skull_shine.png  the skull's brightest facets, for it to gleam in a light
   Sprites/table/skull_top.png, skull_jaw.png  the skull's top (skullupper.png: shut, open)
                               and lower jaw (skulllower.png), drawn either side of the ball
   Sprites/table/tower_drum.png, spikes.png, torch_button.png  as drawn (spinningtower.png,
@@ -793,6 +794,25 @@ def skull_pieces():
     return top, Image.open(SRC / "skulllower.png").convert("RGBA")
 
 
+def skull_shine(top):
+    """Where the crystal skull catches the light: its brightest facets, as white and
+    pale-blue glints (one frame for each of the top's two), for the game to brighten as a
+    light passes over it."""
+    lums = sorted({sum(p[:3]) for p in top.get_flattened_data() if p[3]})
+    hot, warm = lums[int(len(lums) * 0.85)], lums[int(len(lums) * 0.65)]
+    out = Image.new("RGBA", top.size, T)
+    for y in range(top.height):
+        for x in range(top.width):
+            p = top.getpixel((x, y))
+            if not p[3] or y > top.height * 0.5:
+                continue  # only the crystal dome, not its teeth
+            if sum(p[:3]) >= hot:
+                out.putpixel((x, y), (255, 255, 255, 255))
+            elif sum(p[:3]) >= warm:
+                out.putpixel((x, y), (170, 230, 255, 150))
+    return out
+
+
 # ---------- the temple's gems, lit ----------
 
 GEM_BLUE = (20, 124, 199)
@@ -1301,6 +1321,7 @@ def main():
     Image.open(SRC / "warrior.png").convert("RGBA").save("Sprites/table/warrior.png")
     skull_top, skull_jaw = skull_pieces()
     skull_top.save("Sprites/table/skull_top.png")
+    skull_shine(skull_top).save("Sprites/table/skull_shine.png")
     skull_jaw.save("Sprites/table/skull_jaw.png")
     spring_sheet().save("Sprites/table/spring.png")
     gem, gem_shadow = rail_gem()

@@ -30,6 +30,9 @@ const LAVA_GLOW := preload("res://Sprites/table/lava_glow.png")
 const LAVA_EMBERS := preload("res://Sprites/table/lava_embers.png")
 const LAVA_EMBERS_AT := Vector2(121, 406.5)  # the middle of the embers' box (art pixels)
 const LAVA_BREATH_SECONDS := 2.6
+# The crystal skull gleams as the spotlight passes over it, its glints sliding toward the light
+const SKULL_SHINE := preload("res://Sprites/table/skull_shine.png")  # tools/make_table.py
+const SHINE_REACH := 190.0  # how near the spotlight has to be for the skull to catch it
 const LAMP_SIZE := 0.45
 const EYE_SIZE := 0.3
 const EYE_YELLOW := Color(1.0, 0.9, 0.3)
@@ -43,6 +46,7 @@ var _whirl_light: PointLight2D
 var _sky_light: PointLight2D
 var _lava_glow: Sprite2D
 var _sacrifice_light: PointLight2D
+var _skull_shine: Sprite2D
 var _button_lights: Array = []  # [sprite, light]
 var _lamp_lights: Array = []  # [sprite, light, the first frame that counts as lit]
 var _eye_lights: Array[PointLight2D] = []
@@ -84,6 +88,7 @@ func _ready() -> void:
 	_light(TEMPLE_AT, Color(1.0, 0.8, 0.4), 0.55, 2.6)
 	_sky_light = _light(SKY_AT, SKY_COLOUR, SKY, SKY_SIZE)
 	_lava()
+	_skull_shine = _shine_on(features.skull._sprite)
 	_sacrifice_light = _light(Vector2.ZERO, Color(1.0, 0.72, 0.4), 0.95, 0.85)  # a warm spot on the sacrifice
 	_whirl_light = _light(features.temple.AT, Color(0.85, 0.45, 1.0), 0.9, 1.4)
 	for sprite: AnimatedSprite2D in [features.idol_tower._button, features.journey._button_sprite, features.kickback.button_sprite]:
@@ -103,6 +108,22 @@ func _ready() -> void:
 
 func _lamp(sprite: AnimatedSprite2D, colour: Color, lit_from: int) -> void:
 	_lamp_lights.append([sprite, _light(sprite.global_position, colour, 0.75, LAMP_SIZE), lit_from])
+
+# A layer of glints over the skull, added on top of it, that the spotlight brings out
+func _shine_on(skull: AnimatedSprite2D) -> Sprite2D:
+	var shine := Sprite2D.new()
+	shine.texture = SKULL_SHINE
+	shine.hframes = 2
+	var add := CanvasItemMaterial.new()
+	add.blend_mode = CanvasItemMaterial.BLEND_MODE_ADD
+	add.light_mode = CanvasItemMaterial.LIGHT_MODE_UNSHADED
+	shine.material = add
+	shine.z_index = skull.z_index
+	shine.z_as_relative = false
+	shine.modulate.a = 0.0
+	skull.add_child(shine)
+	shine.scale = Vector2.ONE  # it rides on the skull, which is already at the table's scale
+	return shine
 
 # The lava in the drain: drawn as it glows, not dimmed by the dusk
 func _lava() -> void:
@@ -180,6 +201,12 @@ func _process(delta: float) -> void:
 	if is_instance_valid(followed):
 		_sky_light.global_position = _sky_light.global_position.lerp((followed as Node2D).global_position, minf(SKY_FOLLOW * delta, 1.0))
 	_lava_glow.modulate.a = 0.8 + 0.2 * sin(_clock / LAVA_BREATH_SECONDS * TAU)
+	# the skull gleams as the spotlight passes near it
+	var skull: AnimatedSprite2D = features.skull._sprite
+	var to_light := _sky_light.global_position - skull.global_position
+	_skull_shine.frame = skull.frame
+	_skull_shine.offset = skull.offset + Vector2(clampf(to_light.x / 80.0, -1.0, 1.0), clampf(to_light.y / 80.0, -1.0, 1.0)).round()
+	_skull_shine.modulate.a = clampf(1.3 - to_light.length() / SHINE_REACH, 0.0, 1.0) * (0.65 + 0.2 * sin(_clock * 5.0))
 	var sacrifice: AnimatedSprite2D = features.sacrifices.current()
 	_sacrifice_light.visible = sacrifice.visible and sacrifice.modulate.a > 0.3
 	_sacrifice_light.global_position = sacrifice.global_position
