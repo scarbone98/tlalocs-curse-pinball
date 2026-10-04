@@ -34,8 +34,10 @@ and the playfield sprites cut from the hand-drawn sheets in tools/source_art/:
   Sprites/table/wall_jaguar.png  the jaguar heads set in the side walls, facing into the
                               table from the left: watching, roaring, blinking
   Sprites/table/whirl.png     3 frames of the spirit whirl
-  Sprites/face_sockets.png    the centre face without its eyes (eyeless.png: calm, struck)
-  Sprites/table/face_eye.png  its eyes (yelloweye.png, redeye.png), drawn over the sockets
+  Sprites/face_sockets.png    the centre face without its eyes (from the hand-drawn
+                              Sprites/tlaloc.png: mouth shut, mouth open)
+  Sprites/table/face_eye.png  its eyes, yellow and red, lifted off Sprites/tlaloc.png and
+                              drawn over the sockets (Scripts/table_features.gd moves them)
                               so they can follow the ball
   Sprites/table/sling_left_lit.png, sling_right_lit.png  the slingshots lit up as they kick
                               (bumperleftlightup.png, bumperrightlightup.png)
@@ -1473,6 +1475,33 @@ def aztec_border():
     return img
 
 
+# The centre face, hand-drawn (Sprites/tlaloc.png): two 64x64 frames, mouth shut with his
+# eyes yellow, mouth open with them red. His eyes are lifted off it to be their own sprites
+# (they follow the ball, roll, blaze, get shot out: Scripts/table_features.gd)
+TLALOC_EYES = [(23, 23), (35, 23)]  # each eye's 6x6 box, top left, in the shut frame
+TLALOC_RED_UP = 1                   # the open frame's red eyes sit a pixel higher
+TLALOC_SOCKET = (48, 51, 57, 255)
+
+
+def tlaloc_face():
+    face = Image.open("Sprites/tlaloc.png").convert("RGBA")
+    sockets = face.copy()
+    eyes = Image.new("RGBA", (12, 6), T)
+    coloured = lambda p: p[3] and max(p[:3]) - min(p[:3]) > 40  # the eyes: the only colour in the grey stone
+    for f in range(2):
+        dy = -TLALOC_RED_UP if f == 1 else 0
+        for i, (x0, y0) in enumerate(TLALOC_EYES):
+            for y in range(6):
+                for x in range(6):
+                    at = (f * 64 + x0 + x, y0 + dy + y)
+                    p = face.getpixel(at)
+                    if coloured(p):
+                        if i == 0:
+                            eyes.putpixel((f * 6 + x, y), p)  # the left eye stands for both
+                        sockets.putpixel(at, TLALOC_SOCKET)
+    return sockets, eyes
+
+
 def spring_sheet():
     """The plunger, drawn round like a real one: a gold cap seen a little from above (its lit
     top face, then its side turning from a bright edge on the left into shadow on the right),
@@ -2130,10 +2159,8 @@ def main():
     leaf_bit().save("Sprites/table/leaf_bit.png")
     for name, out in (("spinningtower", "tower_drum"), ("spikes", "spikes"), ("torchbutton", "torch_button")):
         Image.open(SRC / ("%s.png" % name)).convert("RGBA").save("Sprites/table/%s.png" % out)
-    Image.open(SRC / "eyeless.png").convert("RGBA").save("Sprites/face_sockets.png")
-    eyes = Image.new("RGBA", (12, 6), T)
-    eyes.paste(Image.open(SRC / "yelloweye.png").convert("RGBA"), (0, 0))
-    eyes.paste(Image.open(SRC / "redeye.png").convert("RGBA"), (6, 0))
+    sockets, eyes = tlaloc_face()
+    sockets.save("Sprites/face_sockets.png")
     eyes.save("Sprites/table/face_eye.png")
     for side, name in (("left", "bumperleftlightup"), ("right", "bumperrightlightup")):
         lit = Image.open(SRC / ("%s.png" % name)).convert("RGBA")

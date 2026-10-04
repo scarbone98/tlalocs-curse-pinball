@@ -60,7 +60,7 @@ const SHRINE_EYES_ART := [Vector2(31.5, 31.5), Vector2(39.5, 31.5)]
 const SHRINE_LAMPS_ART := [Vector2(25, 55), Vector2(45, 55), Vector2(31, 58), Vector2(39, 58)]
 # The centre face's eyes (the hand-drawn yelloweye.png and redeye.png over eyeless.png)
 # follow the ball, a table-art pixel at most, from their sockets
-const FACE_EYES_ART := [Vector2(-6, -6), Vector2(7, -6)]
+const FACE_EYES_ART := [Vector2(-6, -6), Vector2(6, -6)]  # where the eyes sit in Sprites/tlaloc.png (tools/make_table.py)
 # The slingshots light up (bumperleftlightup.png, bumperrightlightup.png) as they kick:
 # where each lit sprite sits, in table-art pixels, and the kicker it belongs to
 const SLINGS := [
@@ -418,6 +418,7 @@ func _follow_with_eyes() -> void:
 		eye.position = home + look * MAP_SCALE
 		var sacrifice: bool = sacrifices != null and sacrifices.active  # blazing while a sacrifice sits in his mouth
 		eye.frame = 1 if GameManager.curse_active or _eyes_red_left > 0.0 or sacrifice else 0
+		eye.offset.y = -1.0 if eye.frame == 1 else 0.0  # (the red ones sit a pixel higher)
 
 ## Tlaloc's eyes a dart could hit (index -> where)
 func eye_targets() -> Dictionary:
