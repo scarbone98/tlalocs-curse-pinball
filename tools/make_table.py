@@ -375,6 +375,12 @@ def fire_button():
     return sheet
 
 
+# A small dart carved in the inlane wall's stone just above the dart trap's gold button,
+# lying along the stone, its flights behind and its point toward the button (art pixels:
+# its top-left corner)
+DART_RUNE = ["X.....X.", "XXXXXXXX", "X.....X."]
+DART_RUNE_AT = (60, 254)
+
 FRONT_WALLS_FROM = 330  # art rows: the walls along the table's foot, in front of the gutters
 
 
@@ -1559,6 +1565,7 @@ def main():
     jaguar_slots(base)
     jaguar_scratches(base, walls)
     paw_prints(base, walls)  # up to the jaguars' button
+    carve(base, DART_RUNE, *DART_RUNE_AT, "carve")  # over the dart trap's button
     front_walls(walls).save("Sprites/table/front_walls.png")
     beige_apron(base, walls)
     palm = {p[:3] for p in Image.open(SRC / "leaves.png").convert("RGBA").get_flattened_data() if p[3]}
