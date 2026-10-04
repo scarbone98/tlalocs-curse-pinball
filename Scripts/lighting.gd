@@ -3,15 +3,19 @@ extends Node2D
 ## darker still in Tlaloc's storm), lit by the things that burn and glow in it. Each torch
 ## throws a warm, flickering pool of light while it burns (none on embers), the
 ## golden temple glows, Tlaloc's whirl casts violet while his mouth is open, and a lit gold
-## button glows. A wide, dim sky light falls over the arena, and the drain glows red.
-## The pools are pixel art too: a few flat rings, in texels the size of the table's pixels.
+## button glows. A wide, dim sky light falls over the arena, lamps set in the floor glow
+## while they're lit, Tlaloc's eyes glow (red in his storm), and the drain glows red with
+## lava sparks spitting up out of it. The pools are pixel art too: two flat rings, in
+## texels the size of the table's pixels, and a flame's pool swells and shrinks as it flickers.
 
 const MOOD := Color(0.56, 0.54, 0.68)   # dusk over the table
 const STORM := Color(0.42, 0.45, 0.62)  # darker and bluer while the curse rains
 const TORCH_COLOUR := Color(1.0, 0.62, 0.3)
 const TORCH_SIZE := 1.3
-const TORCH_BLAZE := 1.15
+const TORCH_BLAZE := 0.7
+const FLICKER_RATES := Vector2(3.2, 6.9)  # the two slow waves a flame's light wavers on (radians/s)
 const FLICKER := 0.18            # how much a flame's light wavers
+const FLICKER_SIZE := 0.06       # ...and how much its pool swells and shrinks
 const FLAME_ABOVE := Vector2(0, -22)  # the flame sits above a torch's centre (Scripts/torches.gd)
 const TEMPLE_AT := Vector2(588, 170)
 # A wide, dim pool of sky light over the arena, the idol's tower and the skull
@@ -25,6 +29,12 @@ const GUTTER_COLOUR := Color(1.0, 0.18, 0.12)
 const GUTTER := 0.9
 const GUTTER_SIZE := 2.2
 const GUTTER_PULSE_SECONDS := 2.6
+const GUTTER_SWELL := 0.08  # the lava's pool swells and shrinks with its pulse
+const GUTTER_WIDTH := 130.0  # the sparks spit up across this much of the drain
+const LAMP_SIZE := 0.45
+const EYE_SIZE := 0.3
+const EYE_YELLOW := Color(1.0, 0.9, 0.3)
+const EYE_RED := Color(1.0, 0.15, 0.1)
 
 var features: Node2D  # TableFeatures
 
@@ -32,25 +42,97 @@ var _pools := {}  # size -> its pixel pool
 var _torch_lights: Array[PointLight2D] = []
 var _whirl_light: PointLight2D
 var _gutter_light: PointLight2D
+var _gutter_size := 1.0
 var _button_lights: Array = []  # [sprite, light]
+var _lamp_lights: Array = []  # [sprite, light, the first frame that counts as lit]
+var _eye_lights: Array[PointLight2D] = []
+var _torch_sizes: Array[float] = []
 var _clock := 0.0
 
+# Godot lights a canvas item with at most 16 lights, and the table's art is two big
+# pictures under all of them, so each is cut into tiles that only see the lights near them
+const TILE := Vector2(32, 53)  # art pixels: an 8 by 8 grid over the 256x424 table
+
+func _tile_map() -> void:
+	var map := features.get_node_or_null(^"../Map")
+	if map == null:
+		return
+	for layer: TextureRect in [map.get_node(^"base"), map.get_node(^"top")]:
+		var art := layer.texture
+		var size := Vector2(art.get_width(), art.get_height())
+		for ty in ceili(size.y / TILE.y):
+			for tx in ceili(size.x / TILE.x):
+				var tile := Sprite2D.new()
+				tile.texture = art
+				tile.centered = false
+				tile.region_enabled = true
+				tile.region_rect = Rect2(Vector2(tx, ty) * TILE, TILE).intersection(Rect2(Vector2.ZERO, size))
+				tile.scale = features.MAP_SCALE
+				tile.position = tile.region_rect.position * features.MAP_SCALE
+				tile.z_index = layer.z_index
+				tile.z_as_relative = layer.z_as_relative
+				map.add_child(tile)
+		layer.hide()
+
 func _ready() -> void:
+	_tile_map()
 	features._storm_tint.color = MOOD
 	for torch: AnimatedSprite2D in features._torches:
 		var light := _light(torch.position + FLAME_ABOVE, TORCH_COLOUR, TORCH_BLAZE, TORCH_SIZE)
 		_torch_lights.append(light)
+		_torch_sizes.append(light.texture_scale)
 	_light(TEMPLE_AT, Color(1.0, 0.8, 0.4), 0.55, 2.6)
 	_light(SKY_AT, SKY_COLOUR, SKY, SKY_SIZE)
 	_gutter_light = _light(GUTTER_AT, GUTTER_COLOUR, GUTTER, GUTTER_SIZE)
+	_gutter_size = _gutter_light.texture_scale
 	_whirl_light = _light(features.temple.AT, Color(0.85, 0.45, 1.0), 0.9, 1.4)
 	for sprite: AnimatedSprite2D in [features.idol_tower._button, features.journey._button_sprite]:
 		_button_lights.append([sprite, _light(sprite.position, Color(1.0, 0.85, 0.4), 0.7, 0.6)])
+	# the lamps set in the floor: the lanes', the bonus bars, the relics over Tlaloc, the spirit lane's
+	for lamp: AnimatedSprite2D in features._top_lamps + features._bottom_lamps + features._bars:
+		_lamp(lamp, Color(1.0, 0.85, 0.35), 1)
+	for lamp: AnimatedSprite2D in features.journey._relic_lamps:
+		_lamp(lamp, Color(1.0, 0.8, 0.3), 4)
+	for lamp: AnimatedSprite2D in features.spirit_lane._lamps:
+		_lamp(lamp, Color(0.4, 0.9, 1.0), 1)
+	for eye: Sprite2D in features._face_eyes:
+		_eye_lights.append(_light(eye.global_position, EYE_YELLOW, 0.8, EYE_SIZE))
+	_gutter_sparks()
+
+func _lamp(sprite: AnimatedSprite2D, colour: Color, lit_from: int) -> void:
+	_lamp_lights.append([sprite, _light(sprite.global_position, colour, 0.75, LAMP_SIZE), lit_from])
+
+# Lava down in the drain: sparks spit up out of it and wink out
+func _gutter_sparks() -> void:
+	var spark := Image.create(1, 1, false, Image.FORMAT_RGBA8)
+	spark.fill(Color.WHITE)
+	var sparks := CPUParticles2D.new()
+	sparks.texture = ImageTexture.create_from_image(spark)
+	sparks.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+	sparks.amount = 16
+	sparks.lifetime = 1.0
+	sparks.position = GUTTER_AT
+	sparks.emission_shape = CPUParticles2D.EMISSION_SHAPE_RECTANGLE
+	sparks.emission_rect_extents = Vector2(GUTTER_WIDTH * 0.5, 4)
+	sparks.direction = Vector2(0, -1)
+	sparks.spread = 25.0
+	sparks.initial_velocity_min = 60.0
+	sparks.initial_velocity_max = 150.0
+	sparks.gravity = Vector2(0, 140)
+	sparks.scale_amount_min = ART_PIXEL
+	sparks.scale_amount_max = ART_PIXEL
+	var heat := Gradient.new()
+	heat.offsets = PackedFloat32Array([0.0, 0.35, 0.7, 1.0])
+	heat.colors = PackedColorArray([Color(1.0, 0.95, 0.5), Color(1.0, 0.55, 0.1), Color(0.9, 0.15, 0.05), Color(0.6, 0.05, 0.0, 0.0)])
+	sparks.color_ramp = heat
+	sparks.z_index = 2
+	sparks.z_as_relative = false
+	features.add_child(sparks)
 
 # A light's pool, drawn in the table's own chunky pixels: a few flat rings, brightest in
 # the middle, one texel to an art pixel (so it's built to each light's size)
-const BAND_EDGES := [0.3, 0.55, 0.8, 1.0]
-const BAND_ALPHA := [1.0, 0.66, 0.38, 0.16]
+const BAND_EDGES := [0.5, 1.0]
+const BAND_ALPHA := [1.0, 0.42]
 const POOL_PIXELS := 128.0  # a light of size 1 lights a circle this many scene units across
 const ART_PIXEL := 2.9      # scene units to an art pixel (MAP_SCALE, about)
 const POOL_BLOCK := 3       # screen texels each art-pixel texel is drawn as
@@ -95,9 +177,20 @@ func _process(delta: float) -> void:
 		_torch_lights[i].visible = burning
 		if not burning:
 			continue
-		var waver := sin(_clock * 11.0 + i * 1.7) * 0.5 + sin(_clock * 23.0 + i * 3.1) * 0.5
+		var waver := sin(_clock * FLICKER_RATES.x + i * 1.7) * 0.5 + sin(_clock * FLICKER_RATES.y + i * 3.1) * 0.5
 		_torch_lights[i].energy = TORCH_BLAZE * (1.0 + FLICKER * waver)
+		_torch_lights[i].texture_scale = _torch_sizes[i] * (1.0 + FLICKER_SIZE * waver)
 	_whirl_light.visible = features.temple._whirl.visible
-	_gutter_light.energy = GUTTER * (0.8 + 0.2 * sin(_clock / GUTTER_PULSE_SECONDS * TAU))
+	var pulse := sin(_clock / GUTTER_PULSE_SECONDS * TAU)
+	_gutter_light.energy = GUTTER * (0.8 + 0.2 * pulse)
+	_gutter_light.texture_scale = _gutter_size * (1.0 + GUTTER_SWELL * pulse)
+	for pair: Array in _lamp_lights:
+		var lamp: AnimatedSprite2D = pair[0]
+		(pair[1] as PointLight2D).visible = lamp.is_visible_in_tree() and lamp.frame >= pair[2]
+	for i in _eye_lights.size():
+		var eye: Sprite2D = features._face_eyes[i]
+		_eye_lights[i].global_position = eye.global_position
+		_eye_lights[i].color = EYE_RED if eye.frame == 1 else EYE_YELLOW
+		_eye_lights[i].energy = 0.8 + 0.15 * sin(_clock * 3.0)
 	for pair: Array in _button_lights:
 		(pair[1] as PointLight2D).visible = (pair[0] as AnimatedSprite2D).visible

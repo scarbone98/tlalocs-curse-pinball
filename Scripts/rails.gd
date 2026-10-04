@@ -48,8 +48,11 @@ const MOUTH_SPREAD := 0.25            # radians either way
 const MOUTH_SPEED := Vector2(0.75, 1.0)  # of the speed it came down with
 # An emerald waits up the left rail; a ball riding past takes it, and another one turns
 # up a while later
-const GEM := preload("res://Sprites/table/rail_gem.png")  # tools/make_table.py: plain, glinting
-const GEM_ALONG := 0.35   # how far up the left rail it sits
+const GEM := preload("res://Sprites/table/rail_gem.png")  # tools/make_table.py: a cut emerald, plain, glinting
+const GEM_SHADOW := preload("res://Sprites/table/rail_gem_shadow.png")
+const GEM_ALONG := 0.6    # how far up the left rail it sits
+const GEM_HOVER := 4.0    # art pixels it floats over its shadow
+const GEM_BOB_SECONDS := 1.4
 const GEM_REACH := 26.0
 const GEM_POINTS := 5000
 const GEM_BEADS := 5
@@ -63,6 +66,7 @@ var _curves := {}  # path name -> Curve2D
 var _fork_offset := 0.0  # along the left rail: short of here the diverter can still switch a ball
 var _rides := {}  # ball -> Ride
 var _gem: AnimatedSprite2D
+var _gem_shadow: AnimatedSprite2D
 var _gem_left := 0.0  # until the next emerald turns up
 var _clock := 0.0
 
@@ -76,9 +80,12 @@ func _ready() -> void:
 	for path_name: String in Geometry.PATHS:
 		_curves[path_name] = _curve(Geometry.PATHS[path_name])
 	var left: Curve2D = _curves["left_lanes"]
-	_gem = features._sprite(GEM, 2, left.sample_baked(left.get_baked_length() * GEM_ALONG))
-	_gem.z_index = 3  # on the rail's art, under a ball riding past (z 4)
-	_gem.z_as_relative = false
+	var gem_at := left.sample_baked(left.get_baked_length() * GEM_ALONG)
+	_gem_shadow = features._sprite(GEM_SHADOW, 1, gem_at + Vector2(0, 5) * features.MAP_SCALE)
+	_gem = features._sprite(GEM, 2, gem_at)
+	for piece in [_gem_shadow, _gem]:
+		piece.z_index = 3  # on the rail's art, under a ball riding past (z 4)
+		piece.z_as_relative = false
 	# the left rail's two paths share their trunk up to the fork
 	var lanes: Array = Geometry.PATHS["left_lanes"]
 	var temple: Array = Geometry.PATHS["left_temple"]
@@ -214,6 +221,7 @@ func _take_gem() -> void:
 	if not _gem.visible:
 		return
 	_gem.hide()
+	_gem_shadow.hide()
 	_gem_left = GEM_RETURN_SECONDS
 	features._award(GEM_POINTS, _gem.position)
 	GameManager.add_beads(GEM_BEADS)
@@ -225,10 +233,12 @@ func _physics_process(delta: float) -> void:
 	to_temple = features.ramps.arrows["summon"] >= ARROWS_TO_TEMPLE
 	_clock += delta
 	_gem.frame = 1 if fposmod(_clock, 2.0) < 0.15 else 0  # a glint now and then
+	_gem.offset.y = -GEM_HOVER - (1.0 if fposmod(_clock / GEM_BOB_SECONDS, 1.0) < 0.5 else 0.0)  # hovering, bobbing
 	if _gem_left > 0.0:
 		_gem_left -= delta
 		if _gem_left <= 0.0:
 			_gem.show()
+			_gem_shadow.show()
 	for ball: RigidBody2D in _rides.keys():
 		if not is_instance_valid(ball) or ball.freeze or (ball.collision_mask & RAIL_LAYER) == 0:
 			_rides.erase(ball)

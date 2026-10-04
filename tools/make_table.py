@@ -44,7 +44,15 @@ and the playfield sprites cut from the hand-drawn sheets in tools/source_art/:
   Sprites/table/tower_drum.png, spikes.png, torch_button.png  as drawn (spinningtower.png,
                               spikes.png, torchbutton.png)
   Sprites/table/spring.png    the plunger's spring, at rest down to fully pulled
-  Sprites/table/rail_gem.png  the emerald up the left rail (plain, glinting)
+  Sprites/table/rail_gem.png, rail_gem_shadow.png  the emerald hovering up the left rail
+                              (plain, glinting) and its shadow
+  Sprites/table/idol_spin.png the golden idol turning on its tower (from idol.png)
+  Sprites/table/blood_heart.png  the beating heart for Tlaloc (8 Bit Evil Returns'
+                              heartbeat.png, redrawn at half size)
+  Sprites/table/spirit_lamp.png  the right lane's floor lamps (dark, lit)
+  Sprites/table/shard.png     a crystal sliver, for the tower breaking
+  Sprites/table/roulette_pictures.png, roulette_border.png, roulette_doors.png  the floor
+                              roulette: its pictures (cities, then prizes), border and doors
   Sprites/table/claw_swipe.png  a jaguar's claw marks as it swipes (striking, full, fading)
   Sprites/table/leaf_bit.png  a scrap of frond a shaken palm drops
   Sprites/table/temple_gems_lit.png  the temple ring's gems, lit
@@ -864,35 +872,184 @@ def spring_sheet():
     return sheet
 
 
-# ---------- the gem up the left rail ----------
+# ---------- the floor roulette ----------
 
-RAIL_GEM = [
-    "...ooo...",
-    "..oLLGo..",
-    ".oLLGGGo.",
-    "oLGGGGDDo",
-    "oGGGGDDDo",
-    ".oGGDDDo.",
-    "..oGDDo..",
-    "...oDo...",
-    "....o....",
+ROULETTE_PICTURE = (48, 30)    # each picture, redrawn smaller from Sprites/billboard.png's 64x40
+ROULETTE_FRAMES = list(range(0, 4)) + list(range(5, 10))  # the four cities, then the five prizes
+ROULETTE_BORDER = 3
+
+
+def roulette_art():
+    """The roulette set in the floor under Tlaloc: its pictures (the billboard's cities and
+    prizes, redrawn at 48x30 in each picture's own colours), a stone border trimmed in gold,
+    and the two carved stone doors that slide apart to show it."""
+    sheet = Image.open("Sprites/billboard.png").convert("RGBA")
+    pw, ph = ROULETTE_PICTURE
+    pictures = Image.new("RGBA", (pw * len(ROULETTE_FRAMES), ph), T)
+    for i, frame in enumerate(ROULETTE_FRAMES):
+        src = sheet.crop((frame * 64, 0, frame * 64 + 64, 40))
+        palette = list({p for p in src.get_flattened_data() if p[3]})
+        small = src.resize((pw, ph), Image.LANCZOS)
+        for y in range(ph):
+            for x in range(pw):
+                c = small.getpixel((x, y))
+                near = min(palette, key=lambda p: sum((p[k] - c[k]) ** 2 for k in range(3)))
+                pictures.putpixel((i * pw + x, y), near[:3] + (255,))
+    b = ROULETTE_BORDER
+    ink, stone_d, stone, stone_l = (20, 24, 36, 255), (70, 80, 96, 255), (104, 116, 130, 255), (150, 162, 172, 255)
+    gold, gold_d = (248, 208, 0, 255), (200, 138, 16, 255)
+    fw, fh = pw + b * 2, ph + b * 2
+    frame = Image.new("RGBA", (fw, fh), T)
+    for y in range(fh):
+        for x in range(fw):
+            edge = min(x, y, fw - 1 - x, fh - 1 - y)
+            if edge >= b:
+                continue
+            col = ink if edge == 0 else (gold if edge == b - 1 else (stone_l if y < fh // 2 else stone_d))
+            if edge == b - 1 and (x + y) % 6 == 0:
+                col = gold_d
+            frame.putpixel((x, y), col)
+    doors = Image.new("RGBA", (pw, ph), T)
+    half = pw // 2
+    for y in range(ph):
+        for x in range(pw):
+            col = stone if (x // 4 + y // 3) % 2 else (96, 108, 122, 255)
+            if x in (half - 1, half):
+                col = gold_d if x == half - 1 else ink  # the seam where they meet
+            if y in (0, ph - 1):
+                col = stone_d
+            doors.putpixel((x, y), col)
+    # a carved step-fret glyph on each door
+    for cx in (half // 2, half + half // 2):
+        for dx, dy in ((-3, -3), (-2, -3), (-1, -3), (0, -3), (1, -3), (1, -2), (1, -1), (-1, -1), (-1, 0), (-1, 1), (0, 1), (1, 1), (2, 1), (3, 1), (3, 2), (3, 3), (-3, -2), (-3, -1), (-3, 0), (-3, 1), (-3, 2), (-3, 3), (-2, 3), (-1, 3), (0, 3), (1, 3)):
+            doors.putpixel((cx + dx, ph // 2 + dy), stone_d)
+    return pictures, frame, doors
+
+
+# ---------- more table pieces ----------
+
+def idol_spin():
+    """The golden idol turning on its tower: face on, three-quarters, side on, three-quarters
+    the other way (redrawn narrower from idol.png's first frame, on the same pixel grid)."""
+    idol = Image.open("Sprites/table/idol.png").convert("RGBA")
+    size = idol.height
+    front = idol.crop((0, 0, size, size))
+    frames = []
+    for w in (size, 13, 6, 13):
+        f = Image.new("RGBA", (size, size), T)
+        x0 = (size - w) // 2
+        for x in range(w):
+            sx = int((x + 0.5) * size / w)
+            for y in range(size):
+                f.putpixel((x0 + x, y), front.getpixel((sx, y)))
+        frames.append(f)
+    frames[3] = frames[3].transpose(Image.FLIP_LEFT_RIGHT)
+    out = Image.new("RGBA", (size * 4, size), T)
+    for i, f in enumerate(frames):
+        out.paste(f, (i * size, 0))
+    return out
+
+
+def blood_heart():
+    """The beating heart from 8 Bit Evil Returns (heartbeat.png, 8 frames of 64x64), redrawn
+    at half size so it sits in Tlaloc's mouth on the table's pixel grid: each 2x2 block
+    becomes its most common colour, if most of it is heart."""
+    sheet = Image.open(SRC / "heartbeat.png").convert("RGBA")
+    n = sheet.width // sheet.height
+    fs = sheet.height
+    box = None
+    for i in range(n):
+        b = sheet.crop((i * fs, 0, (i + 1) * fs, fs)).getbbox()
+        if b:
+            box = b if box is None else (min(box[0], b[0]), min(box[1], b[1]), max(box[2], b[2]), max(box[3], b[3]))
+    x0, y0, x1, y1 = box
+    w, h = (x1 - x0 + 1) // 2, (y1 - y0 + 1) // 2
+    out = Image.new("RGBA", (w * n, h), T)
+    for i in range(n):
+        frame = sheet.crop((i * fs + x0, y0, i * fs + x0 + w * 2, y0 + h * 2))
+        for y in range(h):
+            for x in range(w):
+                block = [frame.getpixel((x * 2 + dx, y * 2 + dy)) for dx in (0, 1) for dy in (0, 1)]
+                solid = [p for p in block if p[3] > 128]
+                if len(solid) >= 2:
+                    out.putpixel((i * w + x, y), max(set(solid), key=solid.count))
+    return out
+
+
+EMERALD = [
+    "....ooooo....",
+    "...oLWWLGo...",
+    "..oLWLLGGGo..",
+    ".oLLLLGGGGDo.",
+    "oMMMMMMMMMMMo",
+    "oMGGGGGGDDDDo",
+    ".oMGGGGDDDDo.",
+    "..oMGGDDDDo..",
+    "...oMGDDDo...",
+    "....oMDDo....",
+    ".....oDo.....",
+    "......o......",
 ]
 
 
 def rail_gem():
-    """An emerald waiting up the left rail: plain, then with a glint."""
-    key = {"o": (20, 24, 36, 255), "L": (200, 255, 220, 255), "G": (40, 200, 120, 255), "D": (20, 120, 80, 255)}
-    out = Image.new("RGBA", (18, 9), T)
+    """A cut emerald hovering up the left rail: table and crown facets catching the light,
+    a dark pavilion, plain then glinting; and its shadow."""
+    key = {"o": (14, 40, 30, 255), "W": (240, 255, 245, 255), "L": (160, 250, 196, 255),
+           "G": (40, 200, 120, 255), "M": (90, 224, 150, 255), "D": (16, 112, 72, 255)}
+    w, h = len(EMERALD[0]), len(EMERALD)
+    out = Image.new("RGBA", (w * 2, h), T)
     for f in range(2):
-        for y, row in enumerate(RAIL_GEM):
+        for y, row in enumerate(EMERALD):
             for x, c in enumerate(row):
                 if c in key:
-                    out.putpixel((f * 9 + x, y), key[c])
+                    out.putpixel((f * w + x, y), key[c])
         if f == 1:
-            for x, y in ((3, 2), (2, 2), (4, 2), (3, 1), (3, 3)):
-                out.putpixel((9 + x, y), (255, 255, 255, 255))
+            for x, y in ((4, 1), (3, 1), (5, 1), (4, 0), (4, 2), (9, 5)):
+                out.putpixel((w + x, y), (255, 255, 255, 255))
+    shadow = Image.new("RGBA", (9, 3), T)
+    for x, y in [(x, 1) for x in range(9)] + [(x, 0) for x in range(2, 7)] + [(x, 2) for x in range(2, 7)]:
+        shadow.putpixel((x, y), (10, 12, 20, 110))
+    return out, shadow
+
+
+SPIRIT_LAMP = [
+    "..ooooo..",
+    ".oSSSSSo.",
+    "oSKKKKKSo",
+    "oSKKKKKSo",
+    "oSKKKKKSo",
+    ".oSSSSSo.",
+    "..ooooo..",
+]
+
+
+def spirit_lamp():
+    """A stone lamp set in the floor of the right lane: dark, then a spirit flame in it."""
+    ink, stone, dark = (20, 24, 36, 255), (112, 124, 136, 255), (40, 44, 56, 255)
+    blue, cyan, white = (30, 120, 170, 255), (90, 220, 255, 255), (230, 255, 255, 255)
+    w, h = len(SPIRIT_LAMP[0]), len(SPIRIT_LAMP)
+    out = Image.new("RGBA", (w * 2, h), T)
+    for f in range(2):
+        for y, row in enumerate(SPIRIT_LAMP):
+            for x, c in enumerate(row):
+                col = {"o": ink, "S": stone, "K": dark}.get(c)
+                if f == 1 and c == "K":
+                    col = white if (y == 3 and 3 <= x <= 5) else (cyan if 3 <= x <= 5 or y == 3 else blue)
+                if col:
+                    out.putpixel((f * w + x, y), col)
     return out
 
+
+def shard():
+    """A sliver of crystal, for the tower breaking up."""
+    img = Image.new("RGBA", (2, 3), T)
+    for (x, y), c in {(1, 0): (230, 252, 255), (0, 1): (130, 210, 245), (1, 1): (130, 210, 245), (0, 2): (60, 120, 180)}.items():
+        img.putpixel((x, y), c + (255,))
+    return img
+
+
+# ---------- the gem up the left rail ----------
 
 def write_table_geometry(palms, gems):
     def r(v):
@@ -976,7 +1133,17 @@ def main():
     skull_top.save("Sprites/table/skull_top.png")
     skull_jaw.save("Sprites/table/skull_jaw.png")
     spring_sheet().save("Sprites/table/spring.png")
-    rail_gem().save("Sprites/table/rail_gem.png")
+    gem, gem_shadow = rail_gem()
+    gem.save("Sprites/table/rail_gem.png")
+    gem_shadow.save("Sprites/table/rail_gem_shadow.png")
+    idol_spin().save("Sprites/table/idol_spin.png")
+    blood_heart().save("Sprites/table/blood_heart.png")
+    spirit_lamp().save("Sprites/table/spirit_lamp.png")
+    shard().save("Sprites/table/shard.png")
+    reel, reel_border, reel_doors = roulette_art()
+    reel.save("Sprites/table/roulette_pictures.png")
+    reel_border.save("Sprites/table/roulette_border.png")
+    reel_doors.save("Sprites/table/roulette_doors.png")
     claw_swipe().save("Sprites/table/claw_swipe.png")
     leaf_bit().save("Sprites/table/leaf_bit.png")
     for name, out in (("spinningtower", "tower_drum"), ("spikes", "spikes"), ("torchbutton", "torch_button")):

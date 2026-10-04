@@ -37,6 +37,8 @@ const Plunger := preload("res://Scripts/plunger.gd")
 const TableGeometry := preload("res://Scripts/table_geometry.gd")
 const FloorRoulette := preload("res://Scripts/floor_roulette.gd")
 const Lighting := preload("res://Scripts/lighting.gd")
+const HeartOffering := preload("res://Scripts/heart_offering.gd")
+const SpiritLane := preload("res://Scripts/spirit_lane.gd")
 const Effects := preload("res://Scripts/effects.gd")
 const TableLife := preload("res://Scripts/table_life.gd")
 const Music := preload("res://Scripts/music.gd")
@@ -110,6 +112,9 @@ var skull: Node2D
 var idol_tower: Node2D
 var spinner: Node2D
 var el_dorado: Node2D
+var roulette: Node2D  # Scripts/floor_roulette.gd sets itself here
+var heart: Node2D  # Scripts/heart_offering.gd
+var spirit_lane: Node2D  # Scripts/spirit_lane.gd
 
 var _face_hits := 0
 var _face_cooldown := 0.0
@@ -152,7 +157,7 @@ func _ready() -> void:
 	skull = CrystalSkull.new()
 	idol_tower = IdolTower.new()
 	spinner = Spinner.new()
-	for mode in [ramps, rails, kickback, spirit, journey, temple, spinner, Torches.new(), Temple.new(), idol_tower, skull, awakening, hatchling, Warriors.new(), Nudge.new(), Palms.new(), Plunger.new(), FloorRoulette.new(), Lighting.new()]:
+	for mode in [ramps, rails, kickback, spirit, journey, temple, spinner, Torches.new(), Temple.new(), idol_tower, skull, awakening, hatchling, Warriors.new(), Nudge.new(), Palms.new(), Plunger.new(), FloorRoulette.new(), HeartOffering.new(), SpiritLane.new(), Lighting.new()]:
 		mode.features = self
 		add_child(mode)
 	add_child(Effects.new())

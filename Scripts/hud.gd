@@ -4,10 +4,14 @@ class_name Hud
 # The table viewport is 720 wide, twice the 360 the shared theme was tuned for.
 const UI_SCALE := 2.0
 # The score and balls pills, sized to leave the pause button room between them. A long
-# score shrinks toward SCORE_FONT_MIN rather than running under the pause button.
-const TOP_FONT := 18
+# score shrinks toward SCORE_FONT_MIN rather than growing past SCORE_ROOM.
+# Everything sits in a compact column at the top left, over the stone face's corner, so
+# the golden temple (top right) stays in view
+const TOP_FONT := 12
+const HUD_LEFT := 8.0
+const BAR_LEFT := 46.0   # the score and balls start right of the pause button
+const SCORE_ROOM := 140.0  # widest the score pill grows before its font shrinks
 const SCORE_FONT_MIN := 11
-const TOP_GAP := 6.0
 # Launch power that drops the ball into a top lane (see ball.gd); marked on the meter
 const SKILL_SHOT_POWER := Vector2(0.70, 0.78)
 const MIN_LAUNCH_POWER := 0.5
@@ -71,10 +75,13 @@ func _ready() -> void:
 
 func _style_top_bar() -> void:
 	var bar: HBoxContainer = $HBoxContainer
-	bar.offset_left = 12 * UI_SCALE
-	bar.offset_right = -12 * UI_SCALE
-	bar.offset_top = 10 * UI_SCALE
-	bar.offset_bottom = 46 * UI_SCALE
+	bar.set_anchors_preset(Control.PRESET_TOP_LEFT)
+	bar.offset_left = BAR_LEFT * UI_SCALE
+	bar.offset_top = 8 * UI_SCALE
+	bar.offset_right = bar.offset_left
+	bar.offset_bottom = bar.offset_top
+	bar.grow_horizontal = Control.GROW_DIRECTION_END
+	bar.add_theme_constant_override("separation", int(4 * UI_SCALE))
 	bar.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	for label in [score_label, lives_label]:
 		label.label_settings = null
@@ -82,7 +89,7 @@ func _style_top_bar() -> void:
 		label.add_theme_font_size_override("font_size", TempleTheme.snap(int(TOP_FONT * UI_SCALE)))
 		label.add_theme_stylebox_override("normal", TempleTheme.pill_box(UI_SCALE))
 		label.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
-	lives_label.size_flags_horizontal = Control.SIZE_EXPAND | Control.SIZE_SHRINK_END
+
 
 func _build_toast() -> void:
 	_toast_label = Label.new()
@@ -172,11 +179,10 @@ func _on_launch_power_changed(power: float, charging: bool) -> void:
 func _build_objective() -> void:
 	_objective_label = Label.new()
 	_objective_label.theme_type_variation = "HintLabel"
-	_objective_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_objective_label.add_theme_font_size_override("font_size", TempleTheme.snap(int(8 * UI_SCALE)))
-	_objective_label.set_anchors_preset(Control.PRESET_CENTER_TOP)
-	_objective_label.grow_horizontal = Control.GROW_DIRECTION_BOTH
-	_objective_label.offset_top = 76 * UI_SCALE  # under the jade pill, so the two never overlap
+	_objective_label.set_anchors_preset(Control.PRESET_TOP_LEFT)
+	_objective_label.offset_left = HUD_LEFT * UI_SCALE
+	_objective_label.offset_top = 58 * UI_SCALE  # under the jade pill
 	_objective_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_objective_label.add_theme_stylebox_override("normal", TempleTheme.pill_box(UI_SCALE))
 	_objective_label.visible = false
@@ -186,12 +192,10 @@ func _build_objective() -> void:
 func _build_status() -> void:
 	_status_label = Label.new()
 	_status_label.theme_type_variation = "HintLabel"
-	_status_label.add_theme_font_size_override("font_size", TempleTheme.snap(int(10 * UI_SCALE)))
-	_status_label.set_anchors_preset(Control.PRESET_TOP_RIGHT)
-	_status_label.grow_horizontal = Control.GROW_DIRECTION_BEGIN
-	_status_label.offset_right = -12 * UI_SCALE
-	_status_label.offset_top = 48 * UI_SCALE
-	_status_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	_status_label.add_theme_font_size_override("font_size", TempleTheme.snap(int(8 * UI_SCALE)))
+	_status_label.set_anchors_preset(Control.PRESET_TOP_LEFT)
+	_status_label.offset_left = HUD_LEFT * UI_SCALE
+	_status_label.offset_top = 34 * UI_SCALE
 	_status_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_status_label.add_theme_stylebox_override("normal", TempleTheme.pill_box(UI_SCALE))
 	add_child(_status_label)
@@ -236,10 +240,11 @@ func _build_menu() -> void:
 	pause.text = "II"
 	pause.focus_mode = Control.FOCUS_NONE
 	pause.add_to_group("touch_block")
-	pause.add_theme_font_size_override("font_size", TempleTheme.snap(int(14 * UI_SCALE)))
-	pause.set_anchors_preset(Control.PRESET_CENTER_TOP)
-	pause.grow_horizontal = Control.GROW_DIRECTION_BOTH
-	pause.offset_top = 12 * UI_SCALE
+	pause.add_theme_font_size_override("font_size", TempleTheme.snap(int(10 * UI_SCALE)))
+	pause.set_anchors_preset(Control.PRESET_TOP_LEFT)
+	pause.offset_left = HUD_LEFT * UI_SCALE
+	pause.offset_top = 8 * UI_SCALE
+	pause.custom_minimum_size = Vector2(34, 0) * UI_SCALE
 	pause.pressed.connect(func(): _menu.open(true, _codex))
 	add_child(pause)
 	_menu = MainMenu.new()
@@ -339,8 +344,7 @@ func _render_score() -> void:
 func _fit_score() -> void:
 	if _pause == null:
 		return
-	var room: float = size.x * 0.5 - _pause.get_combined_minimum_size().x * 0.5 - TOP_GAP * UI_SCALE \
-		- $HBoxContainer.offset_left - score_label.get_theme_stylebox("normal").get_minimum_size().x
+	var room: float = SCORE_ROOM * UI_SCALE - score_label.get_theme_stylebox("normal").get_minimum_size().x
 	var font := score_label.get_theme_font("font")
 	var font_size := int(TOP_FONT * UI_SCALE)
 	while font_size > SCORE_FONT_MIN * UI_SCALE and font.get_string_size(score_label.text, HORIZONTAL_ALIGNMENT_LEFT, -1, font_size).x > room:
