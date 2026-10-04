@@ -8,9 +8,9 @@ extends Node2D
 
 const HEADS := preload("res://Sprites/table/totem_heads.png")
 const DOOR := preload("res://Sprites/table/totem_door.png")  # tools/make_table.py: shut, open
-const HEAD_SIZE := Vector2i(16, 19)  # one head, in art pixels
+const HEAD_SIZE := Vector2i(24, 19)  # one head, in art pixels (its wings and all)
 const FULL := 3
-const DOOR_ART := Vector2(20, 275)   # the trap door's middle, in table-art pixels: the totem's foot
+const DOOR_ART := Vector2(18, 297)   # the trap door's middle, in table-art pixels: the totem's foot
 const STEP_ART := 12.0               # each head sits this much higher than the one below
 const DROP := 260.0                  # scene units above its place a head drops from
 const DROP_SECONDS := 0.45

@@ -52,7 +52,7 @@ const Totem := preload("res://Scripts/totem.gd")
 # (tools/make_table.py: dark, lit): they light, flashing turn about, while a way's to be picked
 const ROAD_ARROWS := {
 	"left": [preload("res://Sprites/table/road_arrow_left.png"), Vector2(152, 836)],
-	"right": [preload("res://Sprites/table/road_arrow_right.png"), Vector2(478, 790)],
+	"right": [preload("res://Sprites/table/road_arrow_right.png"), Vector2(506, 736)],
 }
 const ROAD_FLASH := 3.0  # flashes a second
 const HIT_COOLDOWN := 1.0  # one rattle against a head counts once

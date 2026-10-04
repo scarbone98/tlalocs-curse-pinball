@@ -1091,9 +1091,9 @@ def temple_gems():
 
 # ---------- the plunger's spring ----------
 
-SPRING_W = 12
-SPRING_TALL = 18  # at rest (art pixels)
-SPRING_SHORT = 5  # pulled all the way down: squashed flat
+SPRING_W = 14
+SPRING_TALL = 36  # at rest (art pixels)
+SPRING_SHORT = 6  # pulled all the way down: squashed flat
 
 
 # The slingshots at rest: the lit art (bumperleftlightup.png, which the basemap has painted
@@ -1120,74 +1120,120 @@ def sling_unlit(lit):
 
 # ---------- the travel totem ----------
 
-TOTEM_W, TOTEM_H = 16, 19
+TOTEM_W, TOTEM_H = 24, 19  # each frame; the pole itself is 16 across, wings reach out either side
+TOTEM_POLE = 16
 TOTEM_RY = 3  # the half-height of its top face's ellipse
+
+# The carvings round each drum of the pole, a row at a time from just under its top face's
+# front edge, following it round (so they curve with the wood): . bare cedar, K black
+# formline, R red, G teal, W white, T teeth, Y yellow, N green
+TOTEM_CARVINGS = [
+    [  # the bear, at the foot
+        "................",
+        "..KKKK....KKKK..",
+        ".KWWKK....KKWWK.",
+        "..KKKK....KKKK..",
+        ".......KK.......",
+        "......KRRK......",
+        "..RR........RR..",
+        "...KKKKKKKKKK...",
+        "...KTKTKTKTKTK..",
+        "...KKKKKKKKKK...",
+        "................",
+        "GGGGGGGGGGGGGGGG",
+    ],
+    [  # the raven, its beak carved down its front
+        "GGGGGGGGGGGGGGGG",
+        "................",
+        "..KKK......KKK..",
+        ".KWWKK....KKWWK.",
+        "..KKK.KKKK.KKK..",
+        "......KRRK......",
+        "......KRRK......",
+        "......KKKK......",
+        ".......KK.......",
+        "...RR......RR...",
+        "................",
+        "RRRRRRRRRRRRRRRR",
+    ],
+    [  # Xatu, at the top: great staring eyes, a little hooked beak, its red and yellow bands
+        "................",
+        "..WWWW....WWWW..",
+        ".WWKKWW..WWKKWW.",
+        "..WWWW....WWWW..",
+        ".......YY.......",
+        "......YYYY......",
+        ".......YY.......",
+        "................",
+        "RRRRRRRRRRRRRRRR",
+        "YYYYYYYYYYYYYYYY",
+        "RRRRRRRRRRRRRRRR",
+        "................",
+    ],
+]
 
 
 def totem_heads():
-    """The totem a jaguar's hits build (Scripts/totem.gd): three carved stone heads, each a
-    drum of stone like the idol tower's (tower_drum.png), seen from a little above: its
-    oval top face, then its round side, lit from the left and going round into shadow, its
-    bottom edge curving with it. Carved into the side, curving round with it too: a band of
-    paint across the brow (jade, red, gold, bottom to top), deep eye sockets with a glint
-    of the paint, a broad nose and a wide mouth of teeth."""
-    ink = (16, 22, 36, 255)
-    side = [(214, 204, 182, 255), (182, 170, 146, 255), (148, 136, 114, 255), (112, 100, 84, 255), (78, 68, 58, 255), (54, 46, 42, 255)]
-    face_top = [(240, 234, 216, 255), (222, 214, 194, 255), (198, 188, 166, 255)]
-    paints = [
-        [(150, 246, 210, 255), (40, 196, 150, 255), (22, 140, 110, 255), (14, 86, 70, 255)],   # jade
-        [(255, 168, 136, 255), (220, 72, 44, 255), (164, 40, 28, 255), (98, 24, 20, 255)],     # red
-        [(255, 240, 150, 255), (244, 196, 24, 255), (190, 132, 12, 255), (120, 80, 8, 255)],   # gold
-    ]
-    socket, teeth = (28, 22, 26, 255), (240, 234, 216, 255)
-    w, h, ry = TOTEM_W, TOTEM_H, TOTEM_RY
-    top_c = ry           # the top face's middle row
-    bottom_c = h - 1 - ry  # ...and the bottom's, hidden but for its front edge
-    sheet = Image.new("RGBA", (w * 3, h), T)
+    """The totem pole a jaguar's hits build (Scripts/totem.gd), Pacific Northwest style:
+    three drums of carved red cedar, each a cylinder like the idol tower's drums, seen from
+    a little above, lit from the left and going round into shadow, bottom edge curving with
+    it; carved and painted in black formline, red and teal: a bear at the foot, a raven, and
+    on top Xatu, green, staring, its wings hanging down either side."""
+    ink = (20, 16, 18, 255)
+    cedar = [(222, 160, 104, 255), (196, 132, 80, 255), (166, 104, 60, 255), (132, 78, 44, 255), (98, 56, 34, 255), (70, 40, 26, 255)]
+    cedar_top = [(238, 186, 132, 255), (214, 158, 104, 255), (186, 128, 80, 255)]
+    green = [(150, 230, 120, 255), (108, 200, 92, 255), (76, 166, 72, 255), (54, 130, 58, 255), (38, 96, 46, 255), (26, 70, 36, 255)]
+    green_top = [(176, 240, 150, 255), (128, 212, 106, 255), (92, 176, 82, 255)]
+    paint = {"K": [(36, 30, 34, 255)] * 2, "R": [(226, 70, 52, 255), (150, 34, 28, 255)],
+             "G": [(70, 196, 176, 255), (32, 120, 112, 255)], "W": [(246, 242, 232, 255), (196, 190, 180, 255)],
+             "T": [(246, 242, 232, 255), (196, 190, 180, 255)], "Y": [(255, 220, 64, 255), (196, 150, 20, 255)]}
+    fw, h, pw, ry = TOTEM_W, TOTEM_H, TOTEM_POLE, TOTEM_RY
+    x_pole = (fw - pw) // 2
+    top_c, bottom_c = ry, h - 1 - ry
+    sheet = Image.new("RGBA", (fw * 3, h), T)
 
-    def lit(ramp, u):  # a cylinder lit from the upper left: brightest a third of the way in
-        k = abs(u + 0.35)
-        return ramp[min(len(ramp) - 1, int(k / 1.35 * len(ramp)))]
+    def lit(ramp, u):  # lit from the upper left: brightest a third of the way in
+        return ramp[min(len(ramp) - 1, int(abs(u + 0.35) / 1.35 * len(ramp)))]
 
     for f in range(3):
-        img = Image.new("RGBA", (w, h), T)
+        img = Image.new("RGBA", (fw, h), T)
         px = img.load()
-        paint = paints[f]
-        for x in range(w):
-            u = (x + 0.5 - w / 2) / (w / 2)
+        wood, wood_top = (green, green_top) if f == 2 else (cedar, cedar_top)
+        carving = TOTEM_CARVINGS[f]
+        if f == 2:
+            # Xatu's wings, folded down either side of the pole like a cloak, white-tipped
+            for side in (-1, 1):
+                for i in range(1, x_pole + 1):  # columns out from the pole's edge
+                    x = x_pole - i if side < 0 else x_pole + pw - 1 + i
+                    y0, y1 = top_c + 1 + i, h - 3 - i
+                    for y in range(y0, y1 + 1):
+                        edge = y in (y0, y1) or i == x_pole
+                        tip = y >= y1 - 2
+                        px[x, y] = ink if edge else ((246, 242, 232, 255) if tip else green[2 + (side > 0)])
+        for xx in range(pw):
+            x = x_pole + xx
+            u = (xx + 0.5 - pw / 2) / (pw / 2)
             arc = ry * math.sqrt(max(0.0, 1 - u * u))
-            y_top = int(round(top_c - arc))       # the top face's back edge
-            y_front = int(round(top_c + arc))     # ...its front edge, where the side starts
-            y_bottom = int(round(bottom_c + arc))  # the side's bottom edge
+            y_top = int(round(top_c - arc))
+            y_front = int(round(top_c + arc))
+            y_bottom = int(round(bottom_c + arc))
             for y in range(y_top, y_bottom + 1):
-                if y == y_top or y == y_bottom:
+                if y == y_top or y == y_bottom or xx in (0, pw - 1):
                     px[x, y] = ink
                 elif y < y_front:
-                    px[x, y] = face_top[0] if u < -0.2 and y <= top_c else (face_top[1] if u < 0.4 else face_top[2])
+                    px[x, y] = wood_top[0] if u < -0.2 and y <= top_c else (wood_top[1] if u < 0.4 else wood_top[2])
                 elif y == y_front:
-                    px[x, y] = lit(side[:3], u)  # the lip round the top
+                    px[x, y] = lit(wood[:3], u)
                 else:
-                    px[x, y] = lit(side, u)
-            # the carving, a row at a time down the side, curving round with it
-            k = lambda row: y_front + row
-            if abs(u) < 0.95:
-                px[x, k(1)] = lit(paint, u)  # the painted brow band
-                px[x, k(2)] = lit(paint[1:], u)
-            if abs(u) < 0.75 and x not in (7, 8):  # the eyes, either side of the nose
-                if 0.2 < abs(u) < 0.65:
-                    px[x, k(4)] = socket
-                    px[x, k(5)] = socket
-                    if (u < 0 and abs(u + 0.5) < 0.12) or (u > 0 and abs(u - 0.3) < 0.12):
-                        px[x, k(4)] = paint[0]  # a glint of paint in each
-            if x in (7, 8):  # the nose
-                px[x, k(5)] = lit(side, u - 0.4)
-                px[x, k(6)] = side[4] if x == 8 else side[3]
-            if abs(u) < 0.62:  # the mouth: a dark slot full of teeth
-                px[x, k(8)] = socket
-                px[x, k(9)] = teeth if x % 2 == 0 else socket
-                if y_bottom > k(10):
-                    px[x, k(10)] = side[4]
-        sheet.paste(img, (f * w, 0))
+                    px[x, y] = lit(wood, u)
+            for row, line in enumerate(carving):
+                y = y_front + 1 + row
+                key = line[xx]
+                if key == "." or y >= y_bottom or xx in (0, pw - 1):
+                    continue
+                light, dark = paint[key]
+                px[x, y] = light if u < 0.35 else dark
+        sheet.paste(img, (f * fw, 0))
     return sheet
 
 
@@ -1282,7 +1328,7 @@ def spring_sheet():
     shine, gold_l, gold, gold_d, gold_dd = (255, 252, 214, 255), (255, 232, 120, 255), (248, 200, 0, 255), (196, 132, 12, 255), (122, 76, 8, 255)
     steel = [(246, 250, 255, 255), (206, 216, 228, 255), (156, 170, 186, 255), (108, 122, 140, 255), (70, 80, 98, 255)]  # lit -> shade
     under, back, gap = (52, 60, 76, 255), (84, 94, 112, 255), (30, 34, 46, 255)
-    loops = 4.0
+    loops = 8.0
     frames = []
     w = SPRING_W
     c0, c1 = 3, w - 4  # the coil's inside, across (its ink edges either side)
@@ -1304,7 +1350,7 @@ def spring_sheet():
         # ...and its round side
         img.putpixel((1, top + 2), ink)
         img.putpixel((w - 2, top + 2), ink)
-        side = [gold_l, shine, gold_l, gold, gold, gold, gold_d, gold_dd]
+        side = [gold_l, shine, gold_l] + [gold] * (w - 9) + [gold_d, gold_dd]  # lit at the left, round into shadow
         for x in range(2, w - 2):
             img.putpixel((x, top + 2), side[x - 2])
         coil = tall - 3
