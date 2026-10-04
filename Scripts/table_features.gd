@@ -67,6 +67,7 @@ const SLINGS := [
 ]
 const SLING_LIT_SECONDS := 0.15
 const EYE_FOLLOW := 250.0  # scene units of distance for each art pixel the eyes turn
+const EYE_ROLL := 11.0     # radians a second his eyes roll round while he's swallowed the ball
 
 const TOP_LANE_POINTS := 250
 const TOP_LANES_COMPLETE_POINTS := 2000
@@ -346,7 +347,11 @@ func _follow_with_eyes() -> void:
 		var eye := _face_eyes[i]
 		var home: Vector2 = FACE_EYES_ART[i] * MAP_SCALE
 		var look := Vector2.ZERO
-		if is_instance_valid(target):
+		if temple and temple.swallowed:
+			# he's swallowed the ball: his eyes roll round and round, each its own way
+			var roll := Time.get_ticks_msec() / 1000.0 * EYE_ROLL * (1.0 if i == 0 else -1.0)
+			look = (Vector2(cos(roll), sin(roll)) * 1.4).round()
+		elif is_instance_valid(target):
 			var to := (target.global_position - (_face.global_position + home)) / EYE_FOLLOW
 			look = Vector2(clampf(roundf(to.x), -1.0, 1.0), clampf(roundf(to.y), -1.0, 1.0))
 		eye.position = home + look * MAP_SCALE

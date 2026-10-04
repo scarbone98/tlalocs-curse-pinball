@@ -63,6 +63,8 @@ var spins := 0
 var _whirl: AnimatedSprite2D
 var _was_open := false
 var _held: RigidBody2D
+var swallowed := false  # the held ball's gone down his throat (his eyes roll: Scripts/table_features.gd)
+var _after_reel := Callable()  # what to do once the floor roulette has landed, the ball still held
 var _rearm := 0.0
 var _clock := 0.0
 
@@ -95,7 +97,7 @@ func _physics_process(delta: float) -> void:
 	# his mouth opens, the whirl turning in it, while something waits (or he's holding the
 	# ball); while a sacrifice sits in it, it takes nothing else (Scripts/sacrifices.gd)
 	var heart_in: bool = features.sacrifices != null and features.sacrifices.active
-	var open: bool = not heart_in and (_held != null or _waiting())
+	var open: bool = not heart_in and not swallowed and (_held != null or _waiting())
 	_whirl.visible = open
 	var gaping := open or heart_in  # his mouth gapes round a sacrifice too
 	if gaping and features._face_sprite:
@@ -103,6 +105,10 @@ func _physics_process(delta: float) -> void:
 	elif _was_open and features._face_sprite and not GameManager.curse_active:
 		features._face_sprite.frame = MOUTH_SHUT  # nothing waiting any more: he shuts it
 	_was_open = gaping
+	if _after_reel.is_valid() and not features.roulette.busy():
+		var then := _after_reel
+		_after_reel = Callable()
+		then.call()
 	if _held or _rearm > 0.0 or not _waiting() or heart_in:
 		return
 	var balls := get_tree().get_nodes_in_group("ball")
@@ -147,28 +153,43 @@ func _catch(ball: RigidBody2D) -> void:
 			eject(ball))
 		return
 	if features.journey.traveling and features.journey.travel_steps > 0:
+		_swallow(ball)
 		get_tree().create_timer(HOLD_SECONDS).timeout.connect(func():
-			features.journey.arrive()
-			eject(ball))
+			features.journey.arrive()  # the cities spin on the floor while he holds it
+			_after_reel = eject.bind(ball))
 		return
 	# The roulette: the prize is picked now so the billboard's reel can spin while the ball is held
 	roulette_lit = false
 	var prize := _pick_prize()
 	var seconds := randf_range(SPIN_SECONDS.x, SPIN_SECONDS.y)
 	var picture: int = Billboard.PRIZE + Billboard.PRIZES.find(PRIZE_PICTURE[prize])
+	_swallow(ball)
 	PinballEvents.billboard_spin.emit(picture, seconds, PRIZE_CAPTIONS[prize])
-	get_tree().create_timer(seconds).timeout.connect(func():
+	_after_reel = func():  # once the floor's reel has come to rest
 		_award_prize(prize)
 		spins += 1
 		PinballEvents.roulette_spun.emit()
-		eject(ball))
+		eject(ball)
+
+# Gulp: once it's spiralled in, the ball goes down his throat and he shuts his mouth on it
+func _swallow(ball: RigidBody2D) -> void:
+	get_tree().create_timer(SPIRAL_SECONDS).timeout.connect(func():
+		if _held != ball:
+			return
+		swallowed = true
+		ball.anim.hide()
+		AudioSfx.play("tiki", 0.0, Vector2.ONE * 0.6))
 
 ## Sends a held ball back down toward the flippers (the bonus stage returns it here too)
 func eject(ball: RigidBody2D) -> void:
 	_held = null
+	swallowed = false
 	_rearm = REARM_SECONDS
 	ball.global_position = AT
 	ball.anim.modulate.a = 1.0
+	ball.anim.show()
+	if features._face_sprite:
+		features._face_sprite.frame = MOUTH_OPEN  # he spits it out
 	ball.freeze = false
 	ball.linear_velocity = Vector2(randf_range(-EJECT_SPREAD, EJECT_SPREAD), EJECT_SPEED)
 	AudioSfx.play("launch")

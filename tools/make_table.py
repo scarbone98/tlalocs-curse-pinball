@@ -29,6 +29,7 @@ and the playfield sprites cut from the hand-drawn sheets in tools/source_art/:
   paddle_left.png, paddle_right.png
   Sprites/table/torch.png     6 burning frames, then the same 6 as embers
   Sprites/table/blue_flipper.png  15 frames of the flipper plate turning, in blue
+  Sprites/table/red_flipper.png  ...and in its own red, for the right lane's spinner
   Sprites/table/wall_jaguar.png  the jaguar heads set in the side walls, facing into the
                               table from the left: watching, roaring, blinking
   Sprites/table/whirl.png     3 frames of the spirit whirl
@@ -1403,6 +1404,7 @@ def main():
         Image.open(SRC / name).convert("RGBA").save(name)
     torch_sheet().save("Sprites/table/torch.png")
     blue_flipper().save("Sprites/table/blue_flipper.png")
+    Image.open(SRC / "flipper.png").convert("RGBA").save("Sprites/table/red_flipper.png")  # as drawn
     jaguar_head().save("Sprites/table/wall_jaguar.png")
     Image.open(SRC / "magicWhirl.png").convert("RGBA").save("Sprites/table/whirl.png")
     Image.open(SRC / "warrior.png").convert("RGBA").save("Sprites/table/warrior.png")

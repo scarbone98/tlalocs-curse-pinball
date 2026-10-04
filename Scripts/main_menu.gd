@@ -17,7 +17,7 @@ const SCENE_SECONDS := 3.0
 const HOW_TO_PLAY := [
 	"Flippers: tap the left or right side of the screen, or Left / Right.",
 	"Launch: tap Launch (or Space). Bump the table with Shift / Up, or swipe.",
-	"Loop up the lane under the right rail to light its three spirit lamps: the crystal skull opens, and a shot into it calls a spirit. Hit the warriors to break its glyphs, then hit it 3 times to catch it.",
+	"Loop up the lane under the right rail, past the red spinner under the palm, to light its three spirit lamps: the crystal skull opens, and a shot into it calls a spirit. Hit the warriors to break its glyphs, then hit it 3 times to catch it.",
 	"A sacrifice waits on the golden temple: loop round inside the temple 3 times and it rises out of Tlaloc's mouth. Hit it 3 times to offer it (it stops his rain, too).",
 	"Left rail lights Awaken arrows: with 3, the crystal skull opens its jaws; feed it to awaken a spirit.",
 	"Hit the idol's spinning tower 3 times (top left) to sink it into its pit, then hit the golden idol to claim it.",

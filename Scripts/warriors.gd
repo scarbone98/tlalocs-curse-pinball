@@ -4,7 +4,8 @@ extends Node2D
 ## and then, and whenever a ball has been rattling about the arena for a moment, they set
 ## off marching round the ring together, turning as they go, and keep going for ten
 ## seconds, so a ball can't settle into one spot between them. Which way they go round,
-## clockwise or against it, is a toss-up each time. Every so often they're gone
+## clockwise or against it, is a toss-up each time; or instead they patrol, the three of
+## them together, up and down the arena or from side to side, and back to their places. Every so often they're gone
 ## altogether: the stone tablet in the middle of the arena slides open and one by one they
 ## hop down into the hole beneath it, and the arena stands empty a while before they hop
 ## back out to their places.
@@ -13,6 +14,9 @@ const CENTRE := Vector2(412, 445)     # the ring in the dirt (Sprites/layers/bas
 const RADIUS := 48.0
 const MARCH_SECONDS := 10.0
 const TURNS_PER_SECOND := 0.35
+enum { CIRCLE, UP_DOWN, LEFT_RIGHT }  # how they march
+const PATROL_RATE := 0.3  # patrols a second: a march's ten seconds is three of them, ending back home
+const PATROL_REACH := {UP_DOWN: Vector2(0, 30), LEFT_RIGHT: Vector2(26, 0)}  # how far either way (scene units)
 const MARCH_EVERY := Vector2(20.0, 35.0)
 const LINGER_SECONDS := 0.8           # a ball this long inside the arena sets them marching
 const AWAY_EVERY := Vector2(45.0, 80.0)
@@ -44,7 +48,9 @@ var _glance_wait: Array[float] = []
 var _glance_left: Array[float] = []
 var _angle := -PI / 2.0
 var _march_left := 0.0
-var _march_way := 1.0  # 1 clockwise, -1 the other way
+var _march_way := 1.0  # 1 clockwise, -1 the other way (and which way a patrol sets off)
+var _pattern := CIRCLE
+var _offset := Vector2.ZERO  # how far a patrol has taken them off their places
 var _away_wait := 60.0
 var _away_left := 0.0
 var _hole: AnimatedSprite2D
@@ -85,7 +91,7 @@ func _frames() -> SpriteFrames:
 func _place() -> void:
 	for i in _warriors.size():
 		var angle := _angle + TAU * i / _warriors.size()
-		_warriors[i].global_position = CENTRE + Vector2(cos(angle), sin(angle)) * RADIUS
+		_warriors[i].global_position = CENTRE + _offset + Vector2(cos(angle), sin(angle)) * RADIUS
 
 func _on_touch(body: Node, index: int) -> void:
 	if body.is_in_group("ball"):
@@ -101,10 +107,24 @@ func _physics_process(delta: float) -> void:
 				_sprites[i].frame = STANDING
 	if _march_left > 0.0:
 		_march_left -= delta
-		_angle += TAU * TURNS_PER_SECOND * delta * _march_way
+		var turn := 0
+		if _pattern == CIRCLE:
+			_angle += TAU * TURNS_PER_SECOND * delta * _march_way
+			turn = int(_clock * TURN_FPS) % TURN_FRAMES
+		else:
+			# out one way, back through their places, out the other, and home again
+			var phase := (MARCH_SECONDS - _march_left) * PATROL_RATE * TAU
+			_offset = PATROL_REACH[_pattern] * sin(phase) * _march_way
+			var heading := cos(phase) * _march_way  # which way they're going now
+			if _pattern == UP_DOWN:
+				turn = 0 if heading > 0.0 else 2  # facing down the table, or turned away up it
+			else:
+				turn = 1 if heading > 0.0 else 3  # turned to the side they're heading
+		if _march_left <= 0.0:
+			_offset = Vector2.ZERO
+			turn = 0
 		_place()
 		var up := int(_clock / STEP_EVERY) % 2 == 1 and _march_left > 0.0
-		var turn := int(_clock * TURN_FPS) % TURN_FRAMES if _march_left > 0.0 else 0
 		for i in _sprites.size():
 			_sprites[i].offset.y = -1.0 if up else 0.0  # they bob a pixel as they march
 			if _flash_left[i] <= 0.0:
@@ -182,6 +202,7 @@ func _set_here(here: bool) -> void:
 func _march() -> void:
 	_march_left = MARCH_SECONDS
 	_march_way = 1.0 if randf() < 0.5 else -1.0
+	_pattern = [CIRCLE, UP_DOWN, LEFT_RIGHT].pick_random()
 	_linger = 0.0
 	_rest_left = randf_range(MARCH_EVERY.x, MARCH_EVERY.y)
 	AudioSfx.play("roar", 0.0, Vector2.ONE * 0.7)
