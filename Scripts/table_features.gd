@@ -87,8 +87,8 @@ const CURSE_SECONDS := 20.0
 const CURSE_REST_SECONDS := 30.0  # once the rain passes Tlaloc sleeps, and face hits don't build
 # Ball upgrades, like Pokemon Pinball Ruby & Sapphire's Poke, Great, Ultra and Master
 # Balls: x1 to x4 on everything scored. Completing the top lanes moves up one; a minute
-# later it wears down one, and so on back to iron. A drain costs one step, not all.
-const BALL_TIERS := [["Iron", 1], ["Silver", 2], ["Emerald", 3], ["Gold", 4]]
+# later it wears down one, and so on back to silver. A drain costs one step, not all.
+const BALL_TIERS := [["Silver", 1], ["Iron", 2], ["Emerald", 3], ["Gold", 4]]
 const UPGRADE_SECONDS := 60.0
 const TOP_TIER_POINTS := 25000  # completing the lanes with the gold ball already out
 const MULTIBALL_DELAY := 1.4  # Tlaloc spits out the extra ball after the curse toast

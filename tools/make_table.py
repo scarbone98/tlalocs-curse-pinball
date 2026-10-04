@@ -24,8 +24,8 @@ It writes
 
 and the playfield sprites cut from the hand-drawn sheets in tools/source_art/:
 
-  Sprites/ball_spin.png       the ball's 16 roll frames, one row per ball upgrade (iron,
-                              silver, emerald and gold, all hand-drawn)
+  Sprites/ball_spin.png       the ball's 16 roll frames, one row per ball upgrade (silver,
+                              iron, emerald and gold, all hand-drawn)
   paddle_left.png, paddle_right.png
   Sprites/table/torch.png     6 burning frames, then the same 6 as embers
   Sprites/table/blue_flipper.png  15 frames of the flipper plate turning, carved in blue stone
@@ -695,9 +695,9 @@ def ramp_zone(blob):
 # ---------- sprites cut from the hand-drawn sheets ----------
 
 def ball_tiers():
-    """The four ball upgrades, all hand-drawn with the same 16 roll frames: iron (x1),
-    silver (x2, the original pinball_sprite.png), emerald (x3) and gold (x4)."""
-    rows = ["iron_ball.png", "pinball_sprite.png", "emerald_ball.png", "golden_ball.png"]
+    """The four ball upgrades, all hand-drawn with the same 16 roll frames: silver (x1, the
+    original pinball_sprite.png), iron (x2), emerald (x3) and gold (x4)."""
+    rows = ["pinball_sprite.png", "iron_ball.png", "emerald_ball.png", "golden_ball.png"]
     sheets = [Image.open(SRC / name).convert("RGBA") for name in rows]
     w, h = sheets[0].size
     out = Image.new("RGBA", (w, h * len(rows)), T)
