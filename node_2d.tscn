@@ -216,7 +216,7 @@ _data = {
 point_count = 26
 
 [sub_resource type="RectangleShape2D" id="RectangleShape2D_mjs1x"]
-size = Vector2(39, 100.75)
+size = Vector2(51.625, 68.09375)
 
 [sub_resource type="RectangleShape2D" id="RectangleShape2D_right_entry"]
 size = Vector2(53, 68.5)
@@ -349,7 +349,7 @@ metadata/_edit_lock_ = true
 polygon = PackedVector2Array(305, 262, 263, 283, 229, 324, 198, 397, 198, 450, 200, 502, 212, 551, 221, 566, 230, 562, 230, 541, 209, 440, 215, 412, 233, 403, 282, 406, 292, 427, 285, 513, 285, 524, 293, 533, 307, 535, 335, 534, 307, 478, 302, 432)
 
 [node name="CollisionPolygon2D10" type="CollisionPolygon2D" parent="layer_1_colliders" unique_id=1247322262]
-polygon = PackedVector2Array(189, 839, 173, 824, 151, 782, 116, 722, 92, 620, 172, 678, 222, 784, 188, 816)
+polygon = PackedVector2Array(189, 839, 173, 824, 151, 782, 116, 722, 92, 620, 161, 672, 219, 784, 188, 816)
 
 [node name="CollisionPolygon2D11" type="CollisionPolygon2D" parent="layer_1_colliders" unique_id=1259118001]
 polygon = PackedVector2Array(356, 261, 350, 268, 350, 318, 353, 334, 364, 335, 368, 319, 367, 265, 361, 260)
@@ -359,7 +359,7 @@ position = Vector2(-1, 0)
 polygon = PackedVector2Array(417, 269, 411, 276, 409, 326, 411, 335, 425, 335, 428, 324, 428, 273, 422, 268)
 
 [node name="CollisionPolygon2D13" type="CollisionPolygon2D" parent="layer_1_colliders" unique_id=1107982455]
-polygon = PackedVector2Array(161, 324, 128, 364, 111, 403, 101, 449, 96, 484, 90, 622, 103, 630, 105, 541, 160, 600, 167, 605, 144, 549, 132, 459)
+polygon = PackedVector2Array(161, 324, 128, 364, 111, 403, 101, 449, 96, 484, 90, 622, 103, 630, 105, 541, 158, 598, 169, 601, 144, 549, 132, 459)
 
 [node name="CollisionPolygon2D14" type="CollisionPolygon2D" parent="layer_1_colliders" unique_id=1986565174]
 polygon = PackedVector2Array(536, 740, 585, 611, 568, 597, 538, 598, 488, 695, 499, 662, 521, 618, 559, 517, 555, 467, 531, 462, 507, 467, 489, 539, 466, 585, 446, 628, 429, 628, 487, 509, 515, 420, 511, 355, 467, 328, 469, 292, 546, 356, 570, 414, 586, 509, 592, 598, 580, 660, 549, 742, 539, 753)
@@ -500,7 +500,7 @@ position = Vector2(319, 603)
 monitorable = false
 
 [node name="CollisionShape2D" type="CollisionShape2D" parent="RailEdits/left_entry" unique_id=1668569315]
-position = Vector2(-193, -5)
+position = Vector2(-190.8125, 7.953125)
 shape = SubResource("RectangleShape2D_mjs1x")
 
 [node name="right_entry" type="Area2D" parent="RailEdits" unique_id=840258431]
