@@ -45,4 +45,5 @@ signal mode_changed()                  # a mode started or ended (arrows only li
 signal nudged(direction: Vector2)      # the player bumped the table
 signal bonus_tally(lines: Array, multiplier: int) # end of ball: [[label, count, points each], ...], the HUD counts it up
 signal ball_struck(ball: RigidBody2D, at: Vector2, into: float) # the ball hit something solid at `at`, this hard into it (a press, not a graze)
+signal lava_rescue(ball: RigidBody2D)     # a ball saver's running as it hits the lava: Tlaloc snatches it back (Scripts/temple_hole.gd)
 signal view_changed(desktop: bool)        # the view switched between phone (tall) and desktop (zoomed in)

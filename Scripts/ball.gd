@@ -91,6 +91,7 @@ var rail_guide := Callable()
 var _impact_cooldown := 0.0
 var _falling_left := 0.0  # going under in the lava pit
 var in_lava := false
+var rescued := false  # being whirled up out of the lava by a ball saver (Scripts/temple_hole.gd)
 var _masked := true  # hidden behind the front walls (not while it rides a rail)  # it's in the lava (the spotlight stops following it)
 const BALL_MASK := preload("res://Scripts/ball_mask.gdshader")  # hidden behind the front walls, and under the lava
 const FRONT_WALLS := preload("res://Sprites/table/front_walls.png")  # tools/make_table.py
@@ -310,6 +311,13 @@ func _on_start_region_body_exited(body: Node) -> void:
 # smoke), before it counts as drained
 func _on_death_zone_body_entered(body: Node) -> void:
 	if body == self and not _pending_respawn and _falling_left <= 0.0:
+		# with a ball saver running, Tlaloc's smoke whirls it up out of the lava into his mouth
+		# instead (the last ball in play, on the main table; a multiball's others just go)
+		if GameManager.ball_save_left() > 0.0 and get_tree().get_nodes_in_group("ball").size() == 1 				and stage_origin == Vector2.ZERO and PinballEvents.lava_rescue.get_connections().size() > 0:
+			if not rescued:
+				rescued = true
+				PinballEvents.lava_rescue.emit(self)
+			return
 		var speed := linear_velocity.length()
 		collision_layer = 0
 		collision_mask = 0

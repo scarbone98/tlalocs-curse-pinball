@@ -12,6 +12,7 @@ extends Node2D
 ##    by itself on a prize. Each spin draws from a richer table than the last.
 ## With nothing waiting his mouth stays shut and the ball rolls over him.
 
+const SmokeTornado := preload("res://Scripts/smoke_tornado.gd")
 const WHIRL := preload("res://Sprites/table/whirl.png")  # the hand-drawn magicWhirl.png, turning over his open mouth
 
 const AT := Vector2(339, 838)  # Tlaloc's mouth, in the centre face (Sprites/face_sockets.png)
@@ -73,6 +74,7 @@ var _rearm := 0.0
 var _clock := 0.0
 
 func _ready() -> void:
+	PinballEvents.lava_rescue.connect(_rescue)
 	_whirl = features._sprite(WHIRL, 3, AT, 8.0)
 	_whirl.z_index = 1  # over the face
 	_whirl.z_as_relative = false
@@ -197,6 +199,52 @@ func _swallow(ball: RigidBody2D) -> void:
 			ball.global_position = AT
 			ball.anim.hide()
 			AudioSfx.play("tiki", 0.0, Vector2.ONE * 0.6)))
+
+const RESCUE_RISE_SECONDS := 1.0  # a saved ball rides the tornado up to his mouth this long
+
+# A ball saver's running as a ball hits the lava: a tornado of smoke twists up out of the
+# lava into his mouth, carrying the ball spiralling up it; it whirls round in his mouth,
+# and he spits it back out into play
+func _rescue(ball: RigidBody2D) -> void:
+	var layer := ball.collision_layer
+	var mask := ball.collision_mask
+	ball.collision_layer = 0
+	ball.collision_mask = 0
+	ball.freeze_mode = RigidBody2D.FREEZE_MODE_KINEMATIC
+	ball.set_deferred("freeze", true)
+	ball.linear_velocity = Vector2.ZERO
+	ball.rail_guide = Callable()
+	ball.z_index = 3  # between the tornado's far side and its near side
+	var tornado := SmokeTornado.new()
+	tornado.from = Vector2(clampf(ball.global_position.x, 300.0, 375.0), 1262.0)
+	tornado.to = AT + Vector2(0, 14)
+	tornado.seconds = RESCUE_RISE_SECONDS + 0.6
+	features.add_child(tornado)
+	PinballEvents.toast.emit("Ball saved!")
+	PinballEvents.effect.emit("lava", ball.global_position)
+	AudioSfx.play("shrine")
+	PinballEvents.rumble.emit(5.0)
+	var start := ball.global_position
+	var rise := create_tween().set_process_mode(Tween.TWEEN_PROCESS_PHYSICS)
+	rise.tween_method(func(t: float):
+		# caught up in it: round and round, higher and higher, tighter and tighter
+		var along := t * t * (3.0 - 2.0 * t)
+		var on := tornado.point(along, tornado.turn(along) + PI * 0.5) if is_instance_valid(tornado) else AT
+		var at := on.lerp(AT, smoothstep(0.85, 1.0, t))
+		ball.global_position = start.lerp(at, smoothstep(0.0, 0.12, t))
+		ball.set("_spin", MOUTH_SPIN_ROLL),
+		0.0, 1.0, RESCUE_RISE_SECONDS)
+	rise.tween_callback(func():
+		_held = ball  # his mouth opens on it, the whirl turning
+		_rearm = 0.0
+		AudioSfx.play("kickback")
+		_swallow(ball))
+	rise.tween_interval(SPIRAL_SECONDS + MOUTH_SPIN_SECONDS + 0.4)
+	rise.tween_callback(func():
+		eject(ball)
+		ball.collision_layer = layer
+		ball.collision_mask = mask
+		ball.set("rescued", false))
 
 ## Sends a held ball back down toward the flippers (the bonus stage returns it here too)
 func eject(ball: RigidBody2D) -> void:

@@ -35,9 +35,11 @@ var curse_active := false
 var show_title := true  # the title menu opens on load; Play Again goes straight back in
 var extra_ball_bought := false
 
-## Game speed. The physics match Pokemon Pinball 1:1 at its own 60Hz; Relaxed slows the
-## whole game evenly (time itself, so every proportion stays the same) for a floatier feel.
-const SPEEDS := [["1:1", 1.0], ["Relaxed", 0.8]]
+## Game speed. Normal slows the whole game evenly from Pokemon Pinball's own 1:1 (time
+## itself, so every proportion stays the same); it's the game, and the only speed the arcade
+## scores. Fast is the 1:1, for fun, unscored.
+const SPEEDS := [["Normal", 0.8], ["Fast (unscored)", 1.0]]
+const SCORED_SPEED := 0
 const SETTINGS_PATH := "user://settings.cfg"
 var speed_index := 0
 ## The view: phone (the whole tall table, as made for a phone held upright) or desktop (a
@@ -56,7 +58,7 @@ var _tally_pending := false
 func _ready():
 	var config := ConfigFile.new()
 	if config.load(SETTINGS_PATH) == OK:
-		speed_index = clampi(int(config.get_value("options", "speed", 0)), 0, SPEEDS.size() - 1)
+		speed_index = clampi(int(config.get_value("options", "speed_mode", 0)), 0, SPEEDS.size() - 1)
 		night = bool(config.get_value("options", "night", true))
 	# with no choice saved, a landscape screen (a desktop's) starts in the desktop view
 	desktop_view = bool(config.get_value("options", "desktop_view", _landscape_screen())) if config.has_section("options") \
@@ -209,7 +211,7 @@ func cycle_speed() -> void:
 	_apply_speed()
 	var config := ConfigFile.new()
 	config.load(SETTINGS_PATH)
-	config.set_value("options", "speed", speed_index)
+	config.set_value("options", "speed_mode", speed_index)
 	config.save(SETTINGS_PATH)
 
 func _landscape_screen() -> bool:
@@ -269,6 +271,8 @@ func restart() -> void:
 func _submit_arcade_score(final_score: int) -> void:
 	if not OS.has_feature("web"):
 		return
+	if speed_index != SCORED_SPEED:
+		final_score = 0  # the game's over, but Fast doesn't go on the arcade's board
 
 	var script := "window.parent && window.parent.postMessage({ type: 'PLAYER_DIED', score: %d }, '*');" % final_score
 	JavaScriptBridge.eval(script)
