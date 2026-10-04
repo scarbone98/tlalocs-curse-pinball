@@ -27,15 +27,16 @@ const MAX_DRAWN_SPIN := TAU * 3.0
 ##  - no friction or drag. Gravity weakens as the ball falls faster, so falls float:
 ##    12/256 px/frame^2 (726 here) while it's slow, 8/256 (484) once it falls faster
 ##    than 1.25 px/frame (322), and 4/256 (242) past 2.5 px/frame (645)
-##  - walls hand back about a quarter of the speed going into them (bounce 0.26)
+##  - walls hand back less than a fifth of the speed going into them (bounce 0.18), a
+##    touch deader than the GBA's 0.26 so the ball doesn't rattle about so much
 ##  - one limit on the ball's whole speed, not one per axis, higher down around the
-##    flippers so the flipper zone plays faster. The GBA's are 5.25 and 6.25 px/frame
-##    (1355 and 1613 here), raised about a fifth so the table's ramps, laid out for the
-##    Game Boy game's faster ball, still make as often as before.
+##    flippers so the flipper zone plays faster: about the GBA's 5.25 and 6.25 px/frame
+##    (1355 and 1613 here). The rails carry the ball along their tracks, so they don't
+##    need the extra speed the old wall ramps did.
 ##    The plunger lane is left out, so a launch always makes it round the orbit.
-@export var bounce: float = 0.26
-@export var max_speed: float = 1650.0
-@export var max_speed_low: float = 1900.0
+@export var bounce: float = 0.18
+@export var max_speed: float = 1400.0
+@export var max_speed_low: float = 1600.0
 const GRAVITY_BANDS := [[645.0, 242.0], [322.0, 484.0], [-INF, 726.0]]  # falling faster than -> gravity
 const PLUNGER_LANE_X := 655.0
 ## The side ramps are water channels (collision layer 2, switched on by the gates). Like

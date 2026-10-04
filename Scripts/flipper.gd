@@ -16,7 +16,7 @@ extends AnimatableBody2D
 ## Pokemon Pinball's kick grows straight from nothing at the pivot to 12.6 px/frame
 ## at the tip, which is past the ball's speed limit, so tip shots leave at full speed.
 @export var kick_base: float = 0.0
-@export var kick_gain: float = 3.3
+@export var kick_gain: float = 2.9
 @export var contact_margin: float = 6.0
 
 var _target: float

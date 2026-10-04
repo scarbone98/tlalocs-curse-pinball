@@ -8,8 +8,8 @@ extends Node2D
 ## two pieces, the ball between them: over the lower jaw, under the top, so a ball it
 ## takes goes into its mouth. It shuts its jaws on the ball and opens them again to spit
 ## it back out (shaking with it a moment first), and it bobs slowly up and down all the
-## while, floating. Now and then its teeth chatter; a ball that hits its teeth, or goes
-## into its mouth, knocks it back a little.
+## while, floating, glimmering with mysterious sparkles. A ball that hits its shut teeth
+## sets them chattering and knocks it back a little, as does one it takes.
 
 const TOP := preload("res://Sprites/table/skull_top.png")  # tools/make_table.py: jaws shut, open
 const JAW := preload("res://Sprites/table/skull_jaw.png")
@@ -26,7 +26,6 @@ enum { CALM, OPEN }  # Sprites/table/skull_top.png: jaws shut, jaws open
 const BOB_SECONDS := 2.4    # one slow bob, a pixel up and back
 const OPEN_TO_SPIT := 0.25  # it opens its jaws this long before the ball comes back out
 const SHAKE_SECONDS := 1.0  # it shakes this long, jaws shut, before it opens to spit
-const CHATTER_EVERY := Vector2(5.0, 10.0)
 const CHATTER_SECONDS := 0.5
 const CHATTER_FPS := 14.0
 const KNOCK := 2.0          # art pixels it's knocked back up by a hit
@@ -45,7 +44,6 @@ var _opening := false  # opening up to spit it out
 var _clock := 0.0
 var _shake_left := 0.0
 var _chatter_left := 0.0
-var _chatter_wait := 6.0
 var _knock_left := 0.0
 
 func _ready() -> void:
@@ -72,6 +70,33 @@ func _ready() -> void:
 	teeth.add_child(reach)
 	teeth.body_entered.connect(_on_teeth)
 	add_child(teeth)
+	_sparkles()
+
+# Mysterious sparkles winking in and out about the crystal
+func _sparkles() -> void:
+	var dot := Image.create(1, 1, false, Image.FORMAT_RGBA8)
+	dot.fill(Color.WHITE)
+	var sparkles := CPUParticles2D.new()
+	sparkles.texture = ImageTexture.create_from_image(dot)
+	sparkles.amount = 7
+	sparkles.lifetime = 1.4
+	sparkles.position = AT + Vector2(0, -8)
+	sparkles.emission_shape = CPUParticles2D.EMISSION_SHAPE_RECTANGLE
+	sparkles.emission_rect_extents = Vector2(48, 56)
+	sparkles.direction = Vector2(0, -1)
+	sparkles.spread = 30.0
+	sparkles.initial_velocity_min = 4.0
+	sparkles.initial_velocity_max = 14.0
+	sparkles.gravity = Vector2.ZERO
+	sparkles.scale_amount_min = 2.9  # one art pixel
+	sparkles.scale_amount_max = 2.9
+	var twinkle := Gradient.new()
+	twinkle.offsets = PackedFloat32Array([0.0, 0.3, 0.6, 1.0])
+	twinkle.colors = PackedColorArray([Color(0.7, 0.95, 1.0, 0.0), Color(1.0, 1.0, 1.0, 1.0), Color(0.55, 0.85, 1.0, 0.8), Color(0.75, 0.5, 1.0, 0.0)])
+	sparkles.color_ramp = twinkle
+	sparkles.z_index = 3
+	sparkles.z_as_relative = false
+	features.add_child(sparkles)
 
 func _physics_process(delta: float) -> void:
 	_rearm = maxf(_rearm - delta, 0.0)
@@ -85,12 +110,7 @@ func _physics_process(delta: float) -> void:
 		piece.offset = Vector2(shake, bob + lift)
 	var open := lit()
 	var jaws_open := _opening or (_held != null and not _chewing) or (_held == null and open)
-	# now and then, shut and idle, its teeth chatter
-	if _held == null and not open:
-		_chatter_wait -= delta
-		if _chatter_wait <= 0.0:
-			_chatter_wait = randf_range(CHATTER_EVERY.x, CHATTER_EVERY.y)
-			_chatter_left = CHATTER_SECONDS
+	# its teeth chatter a moment after a ball raps on them
 	_chatter_left = maxf(_chatter_left - delta, 0.0)
 	if _chatter_left > 0.0 and not jaws_open:
 		jaws_open = int(_clock * CHATTER_FPS) % 2 == 0
@@ -156,6 +176,7 @@ func _on_teeth(body: Node) -> void:
 		return
 	var ball := body as RigidBody2D
 	_knock_left = KNOCK_SECONDS
+	_chatter_left = CHATTER_SECONDS
 	var away := (ball.global_position - MOUTH).normalized()
 	ball.linear_velocity = ball.linear_velocity.bounce(away) * 0.5 + away * TEETH_KICK
 	AudioSfx.play("bumper", 0.0, Vector2.ONE * 1.2)

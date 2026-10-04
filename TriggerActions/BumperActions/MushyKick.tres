@@ -4,9 +4,9 @@
 
 [resource]
 script = ExtResource("1_jiplu")
-base_impulse = 970.0
+base_impulse = 820.0
 keep_fraction = 0.2
-gain = 1.25
+gain = 1.1
 max_impulse = 2200.0
 effect = "sparks"
 rumble = 3.0
