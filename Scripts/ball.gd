@@ -37,6 +37,8 @@ const MAX_DRAWN_SPIN := TAU * 3.0
 @export var bounce: float = 0.18
 @export var max_speed: float = 1400.0
 @export var max_speed_low: float = 1600.0
+const LAUNCH_TUNED_FROM_Y := 1158.7  # where the ball sat on the spring when the launch (and skill shot) was tuned
+const LAUNCH_CLIMB_GRAVITY := 726.0  # the gravity on a ball going up (GRAVITY_BANDS)
 const STRUCK_SPEED := 160.0  # going into a surface this fast is a hit (a button's press), not a graze or a roll
 const GRAVITY_BANDS := [[645.0, 242.0], [322.0, 484.0], [-INF, 726.0]]  # falling faster than -> gravity
 const PLUNGER_LANE_X := 655.0
@@ -267,7 +269,13 @@ func _current_power() -> float:
 func _launch(power: float = 1.0) -> void:
 	if not can_launch:
 		return
-	linear_velocity = Vector2(0.0, launch_speed * power)
+	# launched from higher up the lane (a taller spring) it goes as a launch from where the
+	# launches were tuned would be going by the time it got here: the skill shot stays put
+	var speed := absf(launch_speed * power)
+	var lift := LAUNCH_TUNED_FROM_Y - global_position.y
+	if lift > 0.0:
+		speed = sqrt(maxf(speed * speed - 2.0 * LAUNCH_CLIMB_GRAVITY * lift, 0.0))
+	linear_velocity = Vector2(0.0, -speed)
 	AudioSfx.play("launch")
 	PinballEvents.ball_launched.emit()
 

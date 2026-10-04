@@ -379,7 +379,7 @@ def fire_button():
 # A skull over crossed bones carved in the inlane wall's stone just above the dart trap's
 # gold button: poison (art pixels: its top-left corner)
 DART_RUNE = ["..XXX..", ".XXXXX.", ".X.X.X.", "..XXX..", "X.X.X.X", ".X...X.", "X.....X"]
-DART_RUNE_AT = (62, 256)  # just above the button, to its left
+DART_RUNE_AT = (65, 256)  # just above the button, to its left
 
 FRONT_WALLS_FROM = 330  # art rows: the walls along the table's foot, in front of the gutters
 

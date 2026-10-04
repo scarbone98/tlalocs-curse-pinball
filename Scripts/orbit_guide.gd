@@ -21,6 +21,10 @@ const ENGAGE_REACH := 10.0   # within this of a line...
 const ENGAGE_SPEED := 320.0  # ...going at least this fast along it...
 const ENGAGE_ALONG := 0.85   # ...and mostly along it (cosine), it's taken
 const RELEASE_SPEED := 160.0 # slower than this, it's let go to fall back
+const OVER_LANES_X := Vector2(300.0, 480.0)  # the top lanes, across the top (scene units)
+const LANES_RELEASE_SPEED := 320.0  # a launch this slow over them is let go to drop in
+const LANE_AIM := 2.5    # ...steered toward the middle of the lane it's over...
+const LANE_DROP := 80.0  # ...and dropping
 const END_MARGIN := 6.0      # it isn't taken right at an end
 const SETTLE_SECONDS := 0.1  # it slides onto the line this quickly
 const BALL_RADIUS := 19.0
@@ -46,6 +50,7 @@ class Ride:
 
 var features: Node2D  # TableFeatures
 var _lines: Array[Line] = []
+var _launch_curve: Curve2D
 var _curve: Curve2D  # the left orbit's (the debug view draws all of them: lines())
 var _rides := {}  # ball -> Ride
 var _steer_call: Callable
@@ -72,6 +77,8 @@ func _ready() -> void:
 		_lines.append(line)
 		if name == "orbit_guide":
 			_curve = curve
+		elif name == "launch_guide":
+			_launch_curve = curve
 	_steer_call = _steer
 
 # The launch line backwards, from the top down round the orbit, until it's come down to
@@ -174,8 +181,18 @@ func _steer(ball: RigidBody2D, state: PhysicsDirectBodyState2D) -> bool:
 	state.linear_velocity = tangent * ride.speed
 	state.angular_velocity = 0.0
 	ball.set("_spin", clampf(-ride.speed / BALL_RADIUS, -ball.MAX_DRAWN_SPIN, ball.MAX_DRAWN_SPIN))  # rolling along the wall
-	if off_end or absf(ride.speed) < RELEASE_SPEED:
+	# a launch losing its way over the top lanes drops into one (the skill shot), rather than
+	# being carried on past them
+	var over_lanes := ride.line.one_way and ride.line.curve == _launch_curve 		and xf.origin.x > OVER_LANES_X.x and xf.origin.x < OVER_LANES_X.y and absf(ride.speed) < LANES_RELEASE_SPEED
+	if off_end or over_lanes or absf(ride.speed) < RELEASE_SPEED:
 		_rides.erase(ball)
 		ball.rail_guide = Callable()  # the physics' own again, going as it was
+		if over_lanes:
+			# it drops into the lane it's over, not onto the posts between
+			var lane_x: float = features.TOP_LANES[0].x
+			for lane: Vector2 in features.TOP_LANES:
+				if absf(lane.x - xf.origin.x) < absf(lane_x - xf.origin.x):
+					lane_x = lane.x
+			state.linear_velocity = Vector2((lane_x - xf.origin.x) * LANE_AIM, LANE_DROP)
 		return false
 	return true
