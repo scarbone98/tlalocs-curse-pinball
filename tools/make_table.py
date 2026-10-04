@@ -1451,11 +1451,11 @@ def leaves():
 
 
 def aztec_border():
-    """A band of carved stone with a gold meander running along it, edged in gold: laid along
-    the top and bottom of the screen when a phone's held sideways (Scripts/hud.gd). One
-    repeat of it; it tiles across."""
-    ink, gold, gold_d = (20, 16, 24, 255), (248, 200, 40, 255), (176, 118, 16, 255)
-    stone, stone_d = (58, 48, 66, 255), (42, 34, 50, 255)
+    """A band of dark carved stone with a meander cut along it, in the table's own wall
+    stone so it sits quietly round the screen: laid along the top and bottom of the screen
+    when a phone's held sideways (Scripts/hud.gd). One repeat of it; it tiles across."""
+    ink, gold, gold_d = (16, 20, 30, 255), (92, 112, 124, 255), (62, 76, 90, 255)  # (the meander and lip: wall stone)
+    stone, stone_d = (36, 44, 58, 255), (30, 37, 50, 255)
     key = ["XXXXXXX.", "X.....X.", "X.XXX.X.", "X.X...X.", "X.XXXXX.", "X......."]
     w, h = len(key[0]), len(key) + 4
     img = Image.new("RGBA", (w, h), T)
