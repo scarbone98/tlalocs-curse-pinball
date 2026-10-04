@@ -1096,6 +1096,28 @@ SPRING_TALL = 18  # at rest (art pixels)
 SPRING_SHORT = 5  # pulled all the way down: squashed flat
 
 
+# The slingshots at rest: the lit art (bumperleftlightup.png, which the basemap has painted
+# in) with its glowing face and gold rim dimmed, laid over the basemap's lit ones; the lit
+# sprite flashes over it as one kicks. Its shadow on the floor stays as it is.
+SLING_DIM = {
+    (0x6c, 0xab, 0xc4): (0x4c, 0x80, 0xa2),  # the face
+    (0xf8, 0xf8, 0xf8): (0x9c, 0xc0, 0xd4),  # its shine
+    (0x77, 0xd1, 0xca): (0x5a, 0x9c, 0xaa),  # ...and its glint
+    (0xfc, 0xc3, 0x47): (0x56, 0x78, 0x9a),  # the rim: no gold (the gold is it lighting up)
+}
+
+
+def sling_unlit(lit):
+    out = lit.copy()
+    px = out.load()
+    for y in range(out.height):
+        for x in range(out.width):
+            p = px[x, y]
+            if p[3] and p[:3] in SLING_DIM:
+                px[x, y] = SLING_DIM[p[:3]] + (p[3],)
+    return out
+
+
 def spring_sheet():
     """The plunger, drawn round like a real one: a gold cap seen a little from above (its lit
     top face, then its side turning from a bright edge on the left into shadow on the right),
@@ -1733,7 +1755,9 @@ def main():
     eyes.paste(Image.open(SRC / "redeye.png").convert("RGBA"), (6, 0))
     eyes.save("Sprites/table/face_eye.png")
     for side, name in (("left", "bumperleftlightup"), ("right", "bumperrightlightup")):
-        Image.open(SRC / ("%s.png" % name)).convert("RGBA").save("Sprites/table/sling_%s_lit.png" % side)
+        lit = Image.open(SRC / ("%s.png" % name)).convert("RGBA")
+        lit.save("Sprites/table/sling_%s_lit.png" % side)
+        sling_unlit(lit).save("Sprites/table/sling_%s.png" % side)
     print("wrote the table and its sprites")
 
 

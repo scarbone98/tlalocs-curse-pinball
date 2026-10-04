@@ -18,6 +18,7 @@ const STONE_EYE := preload("res://Sprites/table/stone_eye.png")
 const RAIN_LAMP := preload("res://Sprites/table/rain_lamp.png")
 const FACE_EYE := preload("res://Sprites/table/face_eye.png")
 const SLING_LIT := [preload("res://Sprites/table/sling_left_lit.png"), preload("res://Sprites/table/sling_right_lit.png")]
+const SLING_UNLIT := [preload("res://Sprites/table/sling_left.png"), preload("res://Sprites/table/sling_right.png")]  # at rest, over the basemap's lit ones
 const RampShots := preload("res://Scripts/ramp_shots.gd")
 const Kickback := preload("res://Scripts/kickback.gd")
 const SpiritCapture := preload("res://Scripts/spirit_capture.gd")
@@ -371,6 +372,7 @@ func _build_storm() -> void:
 
 func _build_slings() -> void:
 	for i in SLINGS.size():
+		_sprite(SLING_UNLIT[i], 1, SLINGS[i][0] * MAP_SCALE)  # dim at rest; it lights only as it kicks
 		var lit: AnimatedSprite2D = _sprite(SLING_LIT[i], 1, SLINGS[i][0] * MAP_SCALE)
 		lit.hide()
 		var kicker := get_node_or_null(SLINGS[i][1]) as Area2D
