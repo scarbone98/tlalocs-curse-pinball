@@ -34,7 +34,10 @@ var _pass_cooldown := 0.0
 
 func _ready() -> void:
 	for at in PLATES:
-		_sprites.append(features._sprite(FLIPPER, FRAMES, at))
+		var plate: AnimatedSprite2D = features._sprite(FLIPPER, FRAMES, at)
+		plate.z_index = 2  # the ball (z 1) passes under the plates
+		plate.z_as_relative = false
+		_sprites.append(plate)
 		_rates.append(0.0)
 		_turned.append(0.0)
 		_scored.append(0)
