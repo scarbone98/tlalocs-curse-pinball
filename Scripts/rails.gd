@@ -18,10 +18,10 @@ extends Node2D
 const Geometry := preload("res://Scripts/rails_geometry.gd")
 
 const RAIL_LAYER := 2
-const ENTRIES := {  # opening -> the way up the rail from its mouth
-	"left_entry": Vector2(-0.52, -0.855),  # up the track from its mouth
-	"right_entry": Vector2(0.55, -0.84),
-}
+# The rail lines and lift boxes can be placed by hand in the editor: node_2d.tscn's RailEdits
+# holds a Path2D for each line (left_lanes, left_temple, right) and an Area2D for each mouth's
+# lift box (left_entry, right_entry). Without them, the traced lines (Scripts/rails_geometry.gd)
+# and the boxes below are used. Each mouth's way up is the start of its line.
 const ARROWS_TO_TEMPLE := 2
 # Where a ball heading up a rail is lifted on. Each mouth sits right beside another lane
 # (the blue flippers' lane right of the left one, the skull's lane left of the right
@@ -73,6 +73,8 @@ var _curves := {}  # path name -> Curve2D
 var _fork_offset := 0.0  # along the left rail: short of here the diverter can still switch a ball
 var _rides := {}  # ball -> Ride
 var _entry_areas := {}  # opening -> its Area2D
+var entry_rects := {}  # opening -> its lift box (scene rect), as placed
+var entry_dirs := {}   # opening -> the way up its rail from the mouth
 var _gem: AnimatedSprite2D
 var _gem_shadow: AnimatedSprite2D
 var _gem_sparkles: CPUParticles2D
@@ -86,8 +88,13 @@ class Ride:
 	var drift := Vector2.ZERO  # how far off the middle it was lifted on, settling away
 
 func _ready() -> void:
+	var edits := features.get_node_or_null(^"../RailEdits")
 	for path_name: String in Geometry.PATHS:
-		_curves[path_name] = _curve(Geometry.PATHS[path_name])
+		var placed := edits.get_node_or_null(path_name) as Path2D if edits else null
+		if placed and placed.curve and placed.curve.point_count > 1:
+			_curves[path_name] = _from_path(placed)  # as placed by hand in the editor
+		else:
+			_curves[path_name] = _curve(Geometry.PATHS[path_name])
 	var left: Curve2D = _curves["left_lanes"]
 	var gem_at := left.sample_baked(left.get_baked_length() * GEM_ALONG)
 	_gem_shadow = features._sprite(GEM_SHADOW, 1, gem_at + Vector2(0, 7) * features.MAP_SCALE)
@@ -98,15 +105,45 @@ func _ready() -> void:
 		piece.z_index = 3  # on the rail's art, under a ball riding past (z 4)
 		piece.z_as_relative = false
 	# the left rail's two paths share their trunk up to the fork
-	var lanes: Array = Geometry.PATHS["left_lanes"]
-	var temple: Array = Geometry.PATHS["left_temple"]
-	var shared := 0
-	while shared < mini(lanes.size(), temple.size()) and lanes[shared] == temple[shared]:
-		shared += 1
-	_fork_offset = (_curves["left_lanes"] as Curve2D).get_closest_offset(lanes[maxi(shared - 3, 0)])
-	for opening: String in ENTRIES:
-		var rect: Rect2 = ENTRY_AREAS[opening]
-		_entry_areas[opening] = _add_area(rect.get_center(), rect.size, _on_entry.bind(opening))
+	_fork_offset = _fork(_curves["left_lanes"], _curves["left_temple"])
+	for opening: String in ENTRY_ALIGN:
+		entry_dirs[opening] = _tangent(_curves["right" if opening == "right_entry" else "left_lanes"], 0.0)
+		var placed := edits.get_node_or_null(opening) as Area2D if edits else null
+		if placed:
+			placed.monitorable = false
+			placed.body_entered.connect(_on_entry.bind(opening))
+			_entry_areas[opening] = placed
+			entry_rects[opening] = _area_rect(placed)
+		else:
+			var rect: Rect2 = ENTRY_AREAS[opening]
+			entry_rects[opening] = rect
+			_entry_areas[opening] = _add_area(rect.get_center(), rect.size, _on_entry.bind(opening))
+
+# A line placed in the editor, as a curve in scene units
+func _from_path(node: Path2D) -> Curve2D:
+	var xf := node.global_transform
+	var curve := Curve2D.new()
+	curve.bake_interval = BAKE_INTERVAL
+	for i in node.curve.point_count:
+		curve.add_point(xf * node.curve.get_point_position(i), xf.basis_xform(node.curve.get_point_in(i)),
+			xf.basis_xform(node.curve.get_point_out(i)))
+	return curve
+
+# A lift box placed in the editor, as a scene rect
+func _area_rect(area: Area2D) -> Rect2:
+	var shape := area.get_child(0) as CollisionShape2D
+	var size: Vector2 = (shape.shape as RectangleShape2D).size * area.global_scale * shape.scale
+	return Rect2(area.global_position + shape.position - size / 2.0, size)
+
+# How far along the first line it runs together with the second, before they part
+func _fork(a: Curve2D, b: Curve2D) -> float:
+	var offset := 0.0
+	while offset < a.get_baked_length():
+		var at := a.sample_baked(offset)
+		if at.distance_to(b.get_closest_point(at)) > 3.0:
+			return maxf(offset - 12.0, 0.0)
+		offset += 4.0
+	return a.get_baked_length()
 
 # A smooth curve through the points: each one's handles point along the line from the
 # point before it to the one after (Catmull-Rom)
@@ -139,7 +176,7 @@ func _on_entry(body: Node, opening: String) -> void:
 		return
 	if _rides.has(ball) or (ball.collision_mask & RAIL_LAYER) != 0:
 		return
-	var up: Vector2 = ENTRIES[opening]
+	var up: Vector2 = entry_dirs[opening]
 	if ball.linear_velocity.normalized().dot(up) <= ENTRY_ALIGN[opening]:
 		return
 	var path := "right"

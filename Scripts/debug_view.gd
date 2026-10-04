@@ -145,12 +145,12 @@ func _draw_rails() -> void:
 		var mouth := curve.sample_baked(0.0)
 		_canvas.draw_circle(mouth, 4.0, TRACK)
 		_canvas.draw_string(ThemeDB.fallback_font, mouth + Vector2(6, -6), path_name, HORIZONTAL_ALIGNMENT_LEFT, -1, 12, TRACK)
-	for opening: String in Rails.ENTRIES:
-		var rect: Rect2 = Rails.ENTRY_AREAS[opening]
+	for opening: String in rails.entry_rects:
+		var rect: Rect2 = rails.entry_rects[opening]
 		_canvas.draw_rect(rect, Color(ENTRY, 0.18), true)
 		_canvas.draw_rect(rect, ENTRY, false, 2.0)
 		var centre := rect.get_center()
-		var up: Vector2 = Rails.ENTRIES[opening]
+		var up: Vector2 = rails.entry_dirs[opening]
 		var cone := acos(Rails.ENTRY_ALIGN[opening])
 		_canvas.draw_line(centre, centre + up * 60.0, ENTRY, 3.0)
 		_canvas.draw_line(centre, centre + up.rotated(cone) * 45.0, ENTRY, 1.0)
@@ -183,11 +183,11 @@ func _status() -> String:
 		elif features.orbit_guide and features.orbit_guide.carrying(b):
 			text += "  ON ORBIT GUIDE"
 		elif rails:
-			for opening: String in Rails.ENTRIES:
-				var rect: Rect2 = Rails.ENTRY_AREAS[opening]
+			for opening: String in rails.entry_rects:
+				var rect: Rect2 = rails.entry_rects[opening]
 				if rect.grow(14.0).has_point(b.global_position):
 					var path := "right" if opening == "right_entry" else ("left_temple" if rails.to_temple else "left_lanes")
-					var align := b.linear_velocity.normalized().dot(Rails.ENTRIES[opening])
+					var align := b.linear_velocity.normalized().dot(rails.entry_dirs[opening])
 					var off: float = rails._off_line(b.global_position, rails._curves[path])
 					text += "  in %s: aim %.2f (needs > %.2f)  off line %d (needs < %d)" % [opening, align, Rails.ENTRY_ALIGN[opening], off, Rails.ENTRY_LATERAL]
 		lines.append(text)

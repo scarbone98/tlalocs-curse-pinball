@@ -19,7 +19,7 @@ const JAW := preload("res://Sprites/table/skull_jaw.png")
 
 const AT := Vector2(526, 513)          # the skull sprite, at the lane's top (as in the layout mock-up)
 const MOUTH := Vector2(523, 543)       # its mouth, where it takes the ball
-const CATCH_RADIUS := 20.0
+const CATCH_RADIUS := 30.0  # a ball this near its mouth, coming up at it, is taken
 const HOLD_SECONDS := 1.0
 const SPIT_VELOCITY := Vector2(-170, 620)  # back down the lane
 const REARM_SECONDS := 1.2

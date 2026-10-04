@@ -33,8 +33,16 @@ func _ready() -> void:
 	features.orbit_guide = self
 	_curve = Curve2D.new()
 	_curve.bake_interval = BAKE_INTERVAL
-	for point: Vector2 in Geometry.PATH:
-		_curve.add_point(point)
+	# placed by hand in the editor (node_2d.tscn's RailEdits/orbit_guide), or the generated line
+	var placed := features.get_node_or_null(^"../RailEdits/orbit_guide") as Path2D
+	if placed and placed.curve and placed.curve.point_count > 1:
+		var xf := placed.global_transform
+		for i in placed.curve.point_count:
+			_curve.add_point(xf * placed.curve.get_point_position(i), xf.basis_xform(placed.curve.get_point_in(i)),
+				xf.basis_xform(placed.curve.get_point_out(i)))
+	else:
+		for point: Vector2 in Geometry.PATH:
+			_curve.add_point(point)
 	_steer_call = _steer
 
 ## True while it's carrying this ball round
