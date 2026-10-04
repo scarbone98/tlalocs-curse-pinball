@@ -44,7 +44,7 @@ func _ready() -> void:
 	features.sacrifices = self
 	_sprites["heart"] = _sprite(HEART, 8, BEAT_FPS)
 	_sprites["idol"] = _sprite(IDOL, 6, 0.0)
-	_sprites["emerald"] = _sprite(GEM, 2, 0.0)
+	_sprites["emerald"] = _sprite(GEM, 4, 6.0)  # light sweeping over its facets
 	_body = StaticBody2D.new()
 	_body.position = MOUTH
 	_shape = CollisionShape2D.new()

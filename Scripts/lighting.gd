@@ -114,6 +114,7 @@ func _ready() -> void:
 		_lamp(lamp, Color(1.0, 0.8, 0.3), 4)
 	for lamp: AnimatedSprite2D in features.spirit_lane._lamps:
 		_lamp(lamp, Color(0.4, 0.9, 1.0), 1)
+	_lamp(features.rails._gem, Color(0.3, 1.0, 0.55), 0)  # the rail emerald glows green while it's there
 	for frog: AnimatedSprite2D in features.kickback.frogs:
 		_lamp(frog, Color(0.4, 1.0, 0.6), 1)  # awake (or leaping): its jade glows
 	for eye: Sprite2D in features._face_eyes:

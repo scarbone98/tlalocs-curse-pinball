@@ -48,7 +48,9 @@ const MOUTH_SPREAD := 0.25            # radians either way
 const MOUTH_SPEED := Vector2(0.75, 1.0)  # of the speed it came down with
 # An emerald waits up the left rail; a ball riding past takes it, and another one turns
 # up a while later
-const GEM := preload("res://Sprites/table/rail_gem.png")  # tools/make_table.py: a cut emerald, plain, glinting
+const GEM := preload("res://Sprites/table/rail_gem.png")  # tools/make_table.py: a cut emerald, light sweeping over its facets
+const GEM_FRAMES := 4
+const GEM_FPS := 6.0
 const GEM_SHADOW := preload("res://Sprites/table/rail_gem_shadow.png")
 const GEM_ALONG := 0.6    # how far up the left rail it sits
 const GEM_HOVER := 4.0    # art pixels it floats over its shadow
@@ -67,6 +69,7 @@ var _rides := {}  # ball -> Ride
 var _entry_areas := {}  # opening -> its Area2D
 var _gem: AnimatedSprite2D
 var _gem_shadow: AnimatedSprite2D
+var _gem_sparkles: CPUParticles2D
 var _gem_left := 0.0  # until the next emerald turns up
 var _clock := 0.0
 
@@ -81,8 +84,10 @@ func _ready() -> void:
 		_curves[path_name] = _curve(Geometry.PATHS[path_name])
 	var left: Curve2D = _curves["left_lanes"]
 	var gem_at := left.sample_baked(left.get_baked_length() * GEM_ALONG)
-	_gem_shadow = features._sprite(GEM_SHADOW, 1, gem_at + Vector2(0, 5) * features.MAP_SCALE)
-	_gem = features._sprite(GEM, 2, gem_at)
+	_gem_shadow = features._sprite(GEM_SHADOW, 1, gem_at + Vector2(0, 7) * features.MAP_SCALE)
+	_gem = features._sprite(GEM, GEM_FRAMES, gem_at, GEM_FPS)
+	_gem.play()
+	_gem_sparkles = _sparkles(gem_at)
 	for piece in [_gem_shadow, _gem]:
 		piece.z_index = 3  # on the rail's art, under a ball riding past (z 4)
 		piece.z_as_relative = false
@@ -218,6 +223,33 @@ func _steer(ball: RigidBody2D, state: PhysicsDirectBodyState2D) -> bool:
 		return false
 	return true
 
+# Green and white glints twinkling round the emerald
+func _sparkles(at: Vector2) -> CPUParticles2D:
+	var dot := Image.create(1, 1, false, Image.FORMAT_RGBA8)
+	dot.fill(Color.WHITE)
+	var sparkles := CPUParticles2D.new()
+	sparkles.texture = ImageTexture.create_from_image(dot)
+	sparkles.amount = 6
+	sparkles.lifetime = 1.0
+	sparkles.position = at + Vector2(0, -12)
+	sparkles.emission_shape = CPUParticles2D.EMISSION_SHAPE_RECTANGLE
+	sparkles.emission_rect_extents = Vector2(26, 24)
+	sparkles.direction = Vector2(0, -1)
+	sparkles.spread = 40.0
+	sparkles.initial_velocity_min = 6.0
+	sparkles.initial_velocity_max = 18.0
+	sparkles.gravity = Vector2.ZERO
+	sparkles.scale_amount_min = 2.9
+	sparkles.scale_amount_max = 2.9
+	var twinkle := Gradient.new()
+	twinkle.offsets = PackedFloat32Array([0.0, 0.3, 0.7, 1.0])
+	twinkle.colors = PackedColorArray([Color(0.6, 1.0, 0.75, 0.0), Color(1, 1, 1, 1), Color(0.4, 1.0, 0.6, 0.8), Color(0.2, 0.9, 0.5, 0.0)])
+	sparkles.color_ramp = twinkle
+	sparkles.z_index = 4
+	sparkles.z_as_relative = false
+	features.add_child(sparkles)
+	return sparkles
+
 func _take_gem() -> void:
 	if not _gem.visible:
 		return
@@ -235,7 +267,7 @@ func _physics_process(delta: float) -> void:
 		for body in (_entry_areas[opening] as Area2D).get_overlapping_bodies():
 			_on_entry(body, opening)
 	_clock += delta
-	_gem.frame = 1 if fposmod(_clock, 2.0) < 0.15 else 0  # a glint now and then
+	_gem_sparkles.emitting = _gem.visible
 	_gem.offset.y = -GEM_HOVER - (1.0 if fposmod(_clock / GEM_BOB_SECONDS, 1.0) < 0.5 else 0.0)  # hovering, bobbing
 	if _gem_left > 0.0:
 		_gem_left -= delta

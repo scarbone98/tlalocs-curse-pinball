@@ -15,7 +15,8 @@ const DRUM := preload("res://Sprites/table/tower_drum.png")    # tools/make_tabl
 const IDOL := preload("res://Sprites/table/idol.png")          # tools/make_tiki_idol.py
 const IDOL_SPIN := preload("res://Sprites/table/idol_spin.png")  # tools/make_table.py: it turns on its tower
 const SHARD := preload("res://Sprites/table/shard.png")
-const IDOL_SPIN_FPS := 6.0
+const IDOL_SPIN_FPS := 8.0
+const IDOL_TURN_FRAMES := 8  # a full turn, in depth
 # Between the spikes and the tower's foot, where a ball can be when the spikes come back up
 const PIT := Rect2(214, 470, 76, 98)
 const SPIKES := preload("res://Sprites/table/spikes.png")
@@ -83,7 +84,7 @@ func _ready() -> void:
 	_idol = _sheet_sprite(IDOL, IDOL_FRAMES)
 	_idol.z_index = 3  # in front of the palm behind the tower (the palms are z 2)
 	_idol.z_as_relative = false
-	_turning = _sheet_sprite(IDOL_SPIN, 4)
+	_turning = _sheet_sprite(IDOL_SPIN, IDOL_TURN_FRAMES)
 	_turning.z_index = 3
 	_turning.z_as_relative = false
 	_shards = _shard_burst()
@@ -235,7 +236,7 @@ func _render_idol() -> void:
 	var spinning := not _claimed and _standing > 0 and _struck_left <= 0.0 and _rock_left <= 0.0
 	_turning.visible = spinning and _idol.visible
 	if spinning:
-		_turning.frame = int(_clock * IDOL_SPIN_FPS) % 4
+		_turning.frame = int(_clock * IDOL_SPIN_FPS) % IDOL_TURN_FRAMES
 	if _claimed:
 		return
 	_idol.self_modulate.a = 0.0 if _turning.visible else 1.0

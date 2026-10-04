@@ -986,25 +986,62 @@ def roulette_art():
 
 # ---------- more table pieces ----------
 
+IDOL_TURN_FRAMES = 8
+IDOL_DEPTH = 0.6  # how deep the idol is, front to back, as a share of its width
+
+
 def idol_spin():
-    """The golden idol turning on its tower: face on, three-quarters, side on, three-quarters
-    the other way (redrawn narrower from idol.png's first frame, on the same pixel grid)."""
+    """The golden idol turning round on its tower, in depth: each row of it is a slice
+    whose front shrinks as its side swings into view (shaded, as it turns from the light)
+    and then the back comes round, plain where the face was. Eight frames, a full turn,
+    on the table's pixel grid (built from idol.png's first frame)."""
+    import math
+
     idol = Image.open("Sprites/table/idol.png").convert("RGBA")
     size = idol.height
     front = idol.crop((0, 0, size, size))
-    frames = []
-    for w in (size, 13, 6, 13):
-        f = Image.new("RGBA", (size, size), T)
-        x0 = (size - w) // 2
-        for x in range(w):
-            sx = int((x + 0.5) * size / w)
-            for y in range(size):
-                f.putpixel((x0 + x, y), front.getpixel((sx, y)))
-        frames.append(f)
-    frames[3] = frames[3].transpose(Image.FLIP_LEFT_RIGHT)
-    out = Image.new("RGBA", (size * 4, size), T)
-    for i, f in enumerate(frames):
-        out.paste(f, (i * size, 0))
+    gold, dark = (248, 192, 0, 255), (176, 112, 0, 255)
+    face_rows = range(4, 8)
+    rows = []
+    for y in range(size):
+        xs = [x for x in range(size) if front.getpixel((x, y))[3]]
+        if not xs:
+            continue
+        l, r = min(xs), max(xs)
+        inner = [front.getpixel((x, y)) for x in range(l + 1, r)]
+        ink = front.getpixel((l, y))
+        # the back: the face's eyes, jewel and brow smoothed into plain gold, a seam down the middle
+        back = [gold if (y in face_rows and sum(p[:3]) not in (sum(gold[:3]), sum(dark[:3]))) else p for p in inner]
+        if back and y < 11:
+            back[len(back) // 2] = dark
+        rows.append((y, inner, back, ink))
+
+    def shade(p, k):
+        return (int(p[0] * k), int(p[1] * k), int(p[2] * k), 255)
+
+    out = Image.new("RGBA", (size * IDOL_TURN_FRAMES, size), T)
+    centre = size / 2
+    for f in range(IDOL_TURN_FRAMES):
+        angle = 2 * math.pi * f / IDOL_TURN_FRAMES
+        c, s_ = math.cos(angle), math.sin(angle)
+        for y, inner, back, ink in rows:
+            w = len(inner)
+            if w == 0:
+                continue
+            depth = max(1, round(w * IDOL_DEPTH))
+            fw = round(w * abs(c))
+            sw = round(depth * abs(s_))
+            tex = inner if c >= 0 else back[::-1]
+            face = [shade(tex[min(w - 1, int((i + 0.5) * w / fw))], 0.75 + 0.25 * abs(c)) for i in range(fw)] if fw else []
+            edge = tex[0] if s_ > 0 else tex[-1]
+            side = [shade(edge, 0.62)] * sw
+            body = side + face if s_ > 0 else face + side
+            total = len(body) + 2
+            x0 = int(round(centre - total / 2))
+            for i, p in enumerate([ink] + body + [ink]):
+                x = x0 + i
+                if 0 <= x < size:
+                    out.putpixel((f * size + x, y), p)
     return out
 
 
@@ -1034,39 +1071,62 @@ def blood_heart():
     return out
 
 
-EMERALD = [
-    "....ooooo....",
-    "...oLWWLGo...",
-    "..oLWLLGGGo..",
-    ".oLLLLGGGGDo.",
-    "oMMMMMMMMMMMo",
-    "oMGGGGGGDDDDo",
-    ".oMGGGGDDDDo.",
-    "..oMGGDDDDo..",
-    "...oMGDDDo...",
-    "....oMDDo....",
-    ".....oDo.....",
-    "......o......",
-]
+EMERALD_SIZE = 15
+EMERALD_FRAMES = 4
 
 
 def rail_gem():
-    """A cut emerald hovering up the left rail: table and crown facets catching the light,
-    a dark pavilion, plain then glinting; and its shadow."""
-    key = {"o": (14, 40, 30, 255), "W": (240, 255, 245, 255), "L": (160, 250, 196, 255),
-           "G": (40, 200, 120, 255), "M": (90, 224, 150, 255), "D": (16, 112, 72, 255)}
-    w, h = len(EMERALD[0]), len(EMERALD)
-    out = Image.new("RGBA", (w * 2, h), T)
-    for f in range(2):
-        for y, row in enumerate(EMERALD):
-            for x, c in enumerate(row):
-                if c in key:
-                    out.putpixel((f * w + x, y), key[c])
-        if f == 1:
-            for x, y in ((4, 1), (3, 1), (5, 1), (4, 0), (4, 2), (9, 5)):
-                out.putpixel((w + x, y), (255, 255, 255, 255))
-    shadow = Image.new("RGBA", (9, 3), T)
-    for x, y in [(x, 1) for x in range(9)] + [(x, 0) for x in range(2, 7)] + [(x, 2) for x in range(2, 7)]:
+    """A cut emerald hovering up the left rail, juicy: a flat table, a ring of crown facets
+    and a deep pavilion of facets narrowing to a point, light sweeping across them over
+    four frames (with a twinkle on the bright one); and its shadow."""
+    import math
+
+    n = EMERALD_SIZE
+    cx = (n - 1) / 2
+    girdle = 5
+    ink = (8, 40, 26, 255)
+    shades = [(10, 80, 50), (20, 125, 78), (36, 178, 104), (96, 230, 150), (190, 255, 214)]
+    out = Image.new("RGBA", (n * EMERALD_FRAMES, n), T)
+
+    def half_width(y):
+        if y < 1:
+            return -1
+        if y <= girdle:  # the crown flares out from the table to the girdle
+            return 3 + (y - 1) * 4 / (girdle - 1)
+        return (n - 1 - y) * 7 / (n - 1 - girdle)  # the pavilion narrows to its point
+
+    for f in range(EMERALD_FRAMES):
+        sweep = -cx + f * (n + 4) / EMERALD_FRAMES  # where the light is, across the gem
+        for y in range(n):
+            hw = half_width(y)
+            for x in range(n):
+                dx = x - cx
+                if hw < 0 or abs(dx) > hw + 0.4:
+                    continue
+                if abs(abs(dx) - hw) < 0.9 or y == 1:
+                    out.putpixel((f * n + x, y), ink)
+                    continue
+                if y <= girdle:
+                    facet = 2 if abs(dx) < 2.5 and y <= 2 else (3 if (int(dx + cx) // 3) % 2 else 2)
+                    if y == girdle:
+                        facet = 1
+                else:
+                    t = dx / max(hw, 1)
+                    facet = 1 + (int((t + 1) * 2.5) % 2)
+                    if abs(t) < 0.25:
+                        facet = 0
+                lit = math.exp(-((dx - sweep) ** 2) / 6.0)  # the sweep brightens what it crosses
+                k = min(4, facet + round(lit * 2))
+                out.putpixel((f * n + x, y), shades[k] + (255,))
+        # a twinkle where the light catches
+        tx = int(round(cx + sweep * 0.6))
+        if 2 <= tx <= n - 3:
+            for ddx, ddy in ((0, 0), (1, 0), (-1, 0), (0, 1), (0, -1)):
+                px, py = tx + ddx, 3 + ddy
+                if out.getpixel((f * n + px, py))[3]:
+                    out.putpixel((f * n + px, py), (255, 255, 255, 255))
+    shadow = Image.new("RGBA", (11, 3), T)
+    for x, y in [(x, 1) for x in range(11)] + [(x, 0) for x in range(2, 9)] + [(x, 2) for x in range(2, 9)]:
         shadow.putpixel((x, y), (10, 12, 20, 110))
     return out, shadow
 
