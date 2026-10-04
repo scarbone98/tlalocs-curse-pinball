@@ -4,7 +4,10 @@ extends Node2D
 ## a ball shot up the lane and spits it back out, but only with its jaws open. They open
 ## when it has something to give: a lit Awakening to start, or a spirit ready to rise once
 ## the ball has looped the right lane enough to light its lamps (Scripts/spirit_lane.gd):
-## then a ball it takes calls the spirit up. With its jaws shut it's solid, and the ball bounces off it. It's drawn in
+## then a ball it takes calls the spirit up. With nothing to give it still snaps its jaws
+## open at a ball coming up the lane at it, gulps it down, chews and spits it back out
+## (for the points, nothing more); only a ball dropping onto it from above raps its shut
+## teeth and bounces off. It's drawn in
 ## two pieces, the ball between them: over the lower jaw, under the top, so a ball it
 ## takes goes into its mouth. It shuts its jaws on the ball and opens them again to spit
 ## it back out (shaking with it a moment first), and it bobs slowly up and down all the
@@ -31,6 +34,7 @@ const CHATTER_FPS := 14.0
 const KNOCK := 2.0          # art pixels it's knocked back up by a hit
 const KNOCK_SECONDS := 0.15
 const TEETH_KICK := 450.0   # a ball off its shut teeth bounces away this fast
+const SNAP_REACH := 75.0    # unlit, it snaps its jaws open at a ball coming up at it from this near
 
 var features: Node2D  # TableFeatures, which owns the shared sprite and scoring helpers
 
@@ -45,6 +49,8 @@ var _clock := 0.0
 var _shake_left := 0.0
 var _chatter_left := 0.0
 var _knock_left := 0.0
+var _snapping := false  # unlit, jaws snapped open at a ball coming up the lane
+var _was_snapping := false
 
 func _ready() -> void:
 	_jaw = features._sprite(JAW, 1, AT)  # under the ball
@@ -109,6 +115,12 @@ func _physics_process(delta: float) -> void:
 	for piece in [_sprite, _jaw]:
 		piece.offset = Vector2(shake, bob + lift)
 	var open := lit()
+	# unlit, it snaps its jaws open at a ball coming up the lane at its mouth
+	_snapping = not open and _held == null and _rearm <= 0.0 and _ball_coming() != null
+	if _snapping and not _was_snapping:
+		AudioSfx.play("bumper", 0.0, Vector2.ONE * 0.6)
+	_was_snapping = _snapping
+	open = open or _snapping
 	var jaws_open := _opening or (_held != null and not _chewing) or (_held == null and open)
 	# its teeth chatter a moment after a ball raps on them
 	_chatter_left = maxf(_chatter_left - delta, 0.0)
@@ -128,6 +140,16 @@ func _physics_process(delta: float) -> void:
 				and ball.global_position.distance_to(MOUTH) < CATCH_RADIUS:
 			_eat(ball)
 			return
+
+# A ball heading up the lane at its mouth, close (or none)
+func _ball_coming() -> RigidBody2D:
+	for node in get_tree().get_nodes_in_group("ball"):
+		var ball := node as RigidBody2D
+		var to := ball.global_position - MOUTH
+		if not ball.freeze and ball.linear_velocity.y < 0.0 and to.y > -CATCH_RADIUS \
+				and to.length() < SNAP_REACH and features._is_ball_on_playfield(ball):
+			return ball
+	return null
 
 ## True when a shot into the skull would do something more than pay out: its jaws are open
 func lit() -> bool:
