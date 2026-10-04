@@ -16,6 +16,8 @@ var features: Node2D  # TableFeatures
 var _spring: Sprite2D
 var _shown := 0.0  # frames pulled down, as drawn
 var _cap: AnimatableBody2D
+var _cap_shape: CollisionShape2D
+var _passing := false  # the cap lets the ball through: snapping back up, or till the ball's clear of it
 var _art_pixel := 0.0  # one art pixel, in scene units down the table
 var _rest_y := 0.0
 var _frames := 1
@@ -41,6 +43,7 @@ func _ready() -> void:
 	line.b = Vector2(LANE_WIDTH * 0.5, 0)
 	shape.shape = line
 	_cap.add_child(shape)
+	_cap_shape = shape
 	add_child(_cap)
 	_rest_y = _cap.position.y
 	_fit_lane.call_deferred()
@@ -80,5 +83,19 @@ func _physics_process(delta: float) -> void:
 	var want := pulled * (_frames - 1)
 	# down as it's pulled; back up at once when it's let go
 	_shown = want if want >= _shown else move_toward(_shown, want, (_frames - 1) / SNAP_SECONDS * delta)
+	# snapping back up it passes through the ball rather than batting it on: the launch
+	# itself (Scripts/ball.gd) is all the kick it gets
+	# (and it stays so till the ball's clear above it, not shoving it on as they part)
+	var snapping := want < _shown
+	if snapping:
+		_passing = true
+	elif _passing:
+		_passing = false
+		for node in get_tree().get_nodes_in_group("ball"):
+			var ball := node as Node2D
+			if absf(ball.global_position.x - LANE_X) < LANE_WIDTH and ball.global_position.y > _rest_y - BALL_RADIUS - 2.0:
+				_passing = true
+	if _cap_shape.disabled != _passing:
+		_cap_shape.set_deferred("disabled", _passing)
 	_spring.frame = int(roundf(_shown))
 	_cap.position.y = _rest_y + _spring.frame * _art_pixel  # the cap the ball sits on goes with it
