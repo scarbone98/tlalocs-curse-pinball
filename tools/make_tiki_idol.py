@@ -1,95 +1,86 @@
-"""Draw the golden idol that waits at the top of the idol lane.
+"""Draw the golden idol that sits atop the spinning tower in the idol lane.
 
-  Sprites/table/idol.png   18x18 frames: gleaming, glinting, struck, rocking left,
-                           rocking right, and toppled on its side (Scripts/idol_puzzle.gd)
+  Sprites/table/idol.png   22x22 frames: gleaming, glinting, struck, rocking left,
+                           rocking right, and toppled on its side (Scripts/idol_tower.gd)
 
-It stands at the top of the U-shaped lane, upper left, where Cyndaquil's Egg Stand is on
-Pokemon Pinball Ruby's field, behind three stone blocks that have to be driven into the
-lane's wall before it can be claimed.
-
-Drawn at the table art's native resolution (256x424), front-facing, as its left half
-mirrored, in colours from the hand-drawn art (tools/source_art).
+A squat seated Aztec idol in gold, the kind you'd steal from a jungle temple: a feathered
+headdress with a jade jewel, a broad face with heavy brows, staring eyes and a downturned
+mouth, jade ear-spools, a jade pectoral on its chest, hands on its knees, sitting on a
+stepped stone base. Drawn at the table art's native resolution (256x424), front-facing,
+as its left half mirrored. tools/make_table.py turns it round in depth for idol_spin.png.
 Run from the repo root:  python3 tools/make_tiki_idol.py
 """
 from pathlib import Path
 
 from PIL import Image
 
-from pixel_art import Canvas, asymmetry, strip
-
 OUT_DIR = Path("Sprites/table")
 T = (0, 0, 0, 0)
+FRAME = 22  # each frame is square; the idol is 20x22 within it
+
+# Left half, 10 columns; column 9 sits against the centre line.
+#   o ink   L gold, lit   Y gold   D gold, shaded   S deep shadow   E jade   e jade, dark
+#   K stone   k stone, dark
+HALF = [
+    "......oooo",  # the headdress's crest of feathers
+    "....ooLoLL",
+    "...oLLYLYY",
+    "..oLYYYYEE",  # a jade jewel set in the middle of the band
+    ".oYYDYYYEe",
+    "oDYDDooooo",  # the band's lower edge: his heavy brow
+    "oDo.oDYYYY",
+    "oEeooYLLLY",  # ear-spools, the brow ridge catching the light
+    "oEEoYSSoYY",  # staring eyes
+    "oeEoYSSoDD",
+    ".ooo.YYYDD",  # the nose
+    "....oYYYDY",
+    "....oYSSSS",  # a downturned mouth
+    ".....oYYYY",
+    "...ooYYYEe",  # a jade pectoral on his chest
+    "..oYYDYEEE",
+    ".oYYDoYYEe",
+    ".oYDoDDYYY",  # his arms down to his hands, resting on his knees
+    ".oLLLLDYYY",
+    "okkkkkkkkk",  # the stepped stone base
+    "oKkKkKkKkK",
+    "oooooooooo",
+]
+
+COLOURS = {
+    "o": (32, 16, 8), "L": (248, 232, 112), "Y": (248, 192, 0), "D": (176, 112, 0),
+    "S": (96, 52, 0), "E": (40, 200, 120), "e": (20, 120, 76),
+    "K": (130, 136, 146), "k": (86, 92, 104),
+}
 
 
-def c(value):
-    value = value.lstrip("#")
-    return tuple(int(value[i:i + 2], 16) for i in (0, 2, 4)) + (255,)
+def idol(kind="still"):
+    w, h = len(HALF[0]) * 2, len(HALF)
+    img = Image.new("RGBA", (FRAME, FRAME), T)
+    x0, y0 = (FRAME - w) // 2, FRAME - h
+    for y, row in enumerate(HALF):
+        for x, key in enumerate(row):
+            if key not in COLOURS:
+                continue
+            col = COLOURS[key]
+            if kind == "hit" and key in "LYDS":
+                col = tuple(min(255, int(v + (255 - v) * 0.6)) for v in col)  # washed bright as it's struck
+            for px in (x0 + x, x0 + w - 1 - x):
+                img.putpixel((px, y0 + y), col + (255,))
+    if kind == "glint":  # a star of light off the headdress
+        for dx, dy in ((0, 0), (1, 0), (-1, 0), (0, 1), (0, -1)):
+            img.putpixel((x0 + 5 + dx, y0 + 2 + dy), (255, 255, 255, 255))
+    return img
 
 
-INK = c("#201008")
-WOOD_DD = c("#402000")
-WOOD_D = c("#74460a")
-WOOD = c("#a96d14")
-WOOD_L = c("#d78d20")
-WOOD_H = c("#ea9923")
-LEAF_D = c("#186070")
-LEAF = c("#089890")
-LEAF_L = c("#20d8a0")
-PAINT = c("#bd3410")
-WHITE = c("#f8f0f0")
-EYE = c("#f8d000")
-EYE_HOT = c("#fff890")
-MOUTH = c("#5a1008")
-GOLD_DD = c("#7a4a00")
-GOLD_D = c("#b07000")
-GOLD = c("#f8c000")
-GOLD_L = c("#f8e870")
-GOLD_H = c("#fffbd6")
-JADE = c("#20b870")
-
-
-# ---------- the golden idol ----------
-
-IW, IH = 18, 18
-
-
-def idol(state="idle"):
-    k = Canvas(IW, IH)
-    shine = GOLD_H if state == "hit" else GOLD_L
-    body = GOLD_L if state == "hit" else GOLD
-    # stepped headdress
-    k.rect(4, 1, 8, 2, GOLD_D)
-    k.rect(5, 0, 8, 0, GOLD)
-    k.rect(3, 3, 8, 3, GOLD_D)
-    # round head with big almond eyes and a jade jewel on the brow
-    k.ellipse(9.0, 7.0, 5.0, 4.0, body)
-    k.rect(6, 4, 8, 5, shine)
-    k.set(8, 4, JADE)
-    k.rect(5, 6, 7, 7, GOLD_DD)               # eyes
-    k.set(6, 6, INK if state != "hit" else GOLD_H)
-    k.rect(7, 9, 8, 9, GOLD_D)                # mouth
-    # squat body, hugging its knees
-    k.ellipse(9.0, 13.5, 6.0, 3.6, GOLD_D)
-    k.rect(4, 11, 8, 13, body)
-    k.rect(5, 12, 8, 12, shine)                # arms
-    k.rect(3, 14, 8, 15, GOLD_D)               # knees
-    k.rect(4, 16, 8, 17, GOLD_DD)              # base
-    k.mirror()
-    if state == "glint":
-        for x, y in ((12, 4), (13, 3), (13, 5), (14, 4)):
-            k.set(x, y, GOLD_H)
-    k.outline(INK)
-    return k.image()
-
-
-def rock(upright, direction):
-    """Rocking on its base: rows shear a pixel per few rows toward one side."""
+def rock(upright, way):
+    """Rocking on its base: everything above the base leans a pixel one way."""
     out = Image.new("RGBA", upright.size, T)
-    for y in range(upright.height):
-        shift = direction * ((IH - 1 - y) // 6)
-        for x in range(upright.width):
+    base_top = FRAME - 3
+    for y in range(FRAME):
+        shift = way if y < base_top - 6 else 0
+        for x in range(FRAME):
             p = upright.getpixel((x, y))
-            if p[3] and 0 <= x + shift < IW:
+            if p[3] and 0 <= x + shift < FRAME:
                 out.putpixel((x + shift, y), p)
     return out
 
@@ -97,18 +88,19 @@ def rock(upright, direction):
 def toppled(upright):
     """Fallen on its side, head to the right, lying at the bottom of the frame."""
     side = upright.rotate(-90, expand=True)
-    bbox = side.getbbox()
-    side = side.crop(bbox)
-    out = Image.new("RGBA", (IW, IH), T)
-    out.paste(side, ((IW - side.width) // 2, IH - side.height))
+    side = side.crop(side.getbbox())
+    out = Image.new("RGBA", (FRAME, FRAME), T)
+    out.paste(side, ((FRAME - side.width) // 2, FRAME - side.height))
     return out
 
 
 def main():
     still = idol()
     frames = [still, idol("glint"), idol("hit"), rock(still, -1), rock(still, 1), toppled(still)]
-    assert asymmetry(still) == 0, "the idol must mirror exactly"
-    strip(frames).save(OUT_DIR / "idol.png")
+    sheet = Image.new("RGBA", (FRAME * len(frames), FRAME), T)
+    for i, f in enumerate(frames):
+        sheet.paste(f, (i * FRAME, 0))
+    sheet.save(OUT_DIR / "idol.png")
     print("wrote", OUT_DIR / "idol.png")
 
 

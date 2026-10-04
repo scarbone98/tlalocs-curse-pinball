@@ -4,7 +4,7 @@ extends Node2D
 ## Each city has a feat; doing it there earns that city's gold relic and moves the
 ## journey on to the next city still missing its relic. Two jaguars (the hand-drawn
 ## jaguar) lurk in slots in the side walls with only their snouts showing. Hitting the
-## golden button on the tip of the left inlane wall brings them out for a while, as
+## gold button at the foot of the crystal skull's lane brings them out for a while, as
 ## Chikorita wakes the Linoone on Pokemon Pinball Ruby's field; while they're out,
 ## filling both heads' three pips before they fade starts Travel mode, like Ruby &
 ## Sapphire's. For a minute (with a ball saver) shoot the left
@@ -27,9 +27,9 @@ const HEAD_SIZE := Vector2(20, 24)  # one frame of Sprites/table/wall_jaguar.png
 const PEEK := 5.0
 const OUT := 17.0
 const EMERGE_PER_SECOND := 40.0  # art pixels a second as a head slides out or back
-# The golden button on the left inlane wall's tip that wakes them (scene units)
-const BUTTON_AT := Vector2(207, 815)
-const BUTTON_RADIUS := 36.0  # it's set into the wall's tip, so it reaches out past the face
+# The gold button that wakes them, at the foot of the skull's lane (scene units)
+const BUTTON_AT := Vector2(441.6, 640)  # the gold button at the foot of the skull's lane
+const BUTTON_RADIUS := 18.0
 const OUT_SECONDS := 10.0  # not long, so they aren't forever in the way of shots up the rails
 const BUTTON_POINTS := 1000
 const LURK_POINTS := 100  # a hit on a head still in its slot
@@ -111,7 +111,7 @@ func _ready() -> void:
 	button.add_child(button_shape)
 	button.body_entered.connect(_on_button)
 	add_child(button)
-	_button_sprite = features.gold_button("jaguar_button")
+	_button_sprite = features.gold_button("skull_button")
 	for side in 2:
 		var claw: AnimatedSprite2D = features._sprite(CLAW, 3, Vector2.ZERO, 16.0)
 		claw.flip_h = side == 1

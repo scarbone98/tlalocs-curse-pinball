@@ -53,6 +53,8 @@ and the playfield sprites cut from the hand-drawn sheets in tools/source_art/:
   Sprites/table/shard.png     a crystal sliver, for the tower breaking
   Sprites/table/temple_interior.png  the inside of the golden temple, seen through its windows
   Sprites/table/arena_hole.png  the stone tablet in the warriors' arena (shut, open)
+  Sprites/table/lava_glow.png, lava_embers.png  the lava pit (lava.png): its glow, and its
+                              embers and edge in 4 frames
   Sprites/table/roulette_pictures.png, roulette_border.png, roulette_doors.png  the floor
                               roulette: its pictures (cities, then prizes), border and doors
   Sprites/table/claw_swipe.png  a jaguar's claw marks as it swipes (striking, full, fading)
@@ -689,7 +691,8 @@ def claw_swipe():
 # frames to draw over them when they're hit, like the torches' stone buttons
 GOLD_BUTTONS = {
     "spike_button": (110, 179, 117, 185),   # beside the idol pit's spikes
-    "jaguar_button": (70, 266, 79, 274),    # on the left inlane wall's tip
+    "frog_button": (70, 266, 79, 274),      # on the left inlane wall's tip: wakes the frogs
+    "skull_button": (154, 209, 160, 215),   # at the foot of the skull's lane: brings the jaguars out
 }
 PRESS_SHADOW = (112, 72, 8, 255)
 BUTTON_GLOW = (255, 248, 168)  # lit, its gold blends halfway to this
@@ -874,6 +877,52 @@ def spring_sheet():
     return sheet
 
 
+# ---------- the lava pit ----------
+
+LAVA_FRAMES = 4
+
+
+def lava_layers():
+    """The lava in the drain, from the hand-drawn lava.png (the lava reference layer, at
+    the table's size): its translucent glow over the drain and its edges on its own (the
+    game breathes it), and its solid pixels, the embers and the lava's edge along the
+    bottom, in frames: embers flicker and drift up a pixel, the edge shimmers."""
+    import random
+
+    lava = Image.open(SRC / "lava.png").convert("RGBA")
+    w, h = lava.size
+    glow = Image.new("RGBA", (w, h), T)
+    solid = []
+    for y in range(h):
+        for x in range(w):
+            p = lava.getpixel((x, y))
+            if not p[3]:
+                continue
+            if p[3] < 255:
+                glow.putpixel((x, y), p)
+            else:
+                solid.append((x, y, p))
+    rng = random.Random(7)
+    bright = (255, 150, 60, 255)
+    box = lava.getbbox()
+    frames = Image.new("RGBA", ((box[2] - box[0]) * LAVA_FRAMES, box[3] - box[1]), T)
+    fw = box[2] - box[0]
+    for f in range(LAVA_FRAMES):
+        for x, y, p in solid:
+            edge = y >= h - 3  # the lava's edge along the bottom
+            if edge:
+                col = bright if (x + f) % 4 == 0 else p
+                frames.putpixel((f * fw + x - box[0], y - box[1]), col)
+                continue
+            phase = (rng.random() + f / LAVA_FRAMES) % 1.0  # each ember on its own beat
+            if phase < 0.2:
+                continue  # flickered out
+            ny = y - (1 if phase > 0.6 else 0)
+            frames.putpixel((f * fw + x - box[0], ny - box[1]), bright if phase > 0.85 else p)
+        rng = random.Random(7)  # the same embers, frame to frame
+    return glow, frames, box
+
+
 # ---------- the warriors' hole in the arena ----------
 
 HOLE_SIZE = (24, 16)
@@ -1001,7 +1050,7 @@ def idol_spin():
     size = idol.height
     front = idol.crop((0, 0, size, size))
     gold, dark = (248, 192, 0, 255), (176, 112, 0, 255)
-    face_rows = range(4, 8)
+    face_rows = range(3, 18)  # the jewel, the face and the pectoral (tools/make_tiki_idol.py)
     rows = []
     for y in range(size):
         xs = [x for x in range(size) if front.getpixel((x, y))[3]]
@@ -1011,8 +1060,11 @@ def idol_spin():
         inner = [front.getpixel((x, y)) for x in range(l + 1, r)]
         ink = front.getpixel((l, y))
         # the back: the face's eyes, jewel and brow smoothed into plain gold, a seam down the middle
-        back = [gold if (y in face_rows and sum(p[:3]) not in (sum(gold[:3]), sum(dark[:3]))) else p for p in inner]
-        if back and y < 11:
+        # the back of his head and body: plain gold, shaded at the sides
+        back = list(inner)
+        if y in face_rows:
+            back = [dark if i in (0, len(inner) - 1) else gold for i in range(len(inner))]
+        if back and y < 18:
             back[len(back) // 2] = dark
         rows.append((y, inner, back, ink))
 
@@ -1260,6 +1312,10 @@ def main():
     shard().save("Sprites/table/shard.png")
     temple_interior().save("Sprites/table/temple_interior.png")
     arena_hole().save("Sprites/table/arena_hole.png")
+    lava_glow, lava_frames, lava_box = lava_layers()
+    lava_glow.save("Sprites/table/lava_glow.png")
+    lava_frames.save("Sprites/table/lava_embers.png")
+    print("lava embers box", lava_box)
     reel, reel_border, reel_doors = roulette_art()
     reel.save("Sprites/table/roulette_pictures.png")
     reel_border.save("Sprites/table/roulette_border.png")

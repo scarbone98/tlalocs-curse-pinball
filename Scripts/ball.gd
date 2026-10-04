@@ -88,6 +88,8 @@ var _spin := 0.0   # radians per second, clockwise
 ## Set by Scripts/rails.gd while the ball rides a rail: carries it along the track
 var rail_guide := Callable()
 var _impact_cooldown := 0.0
+var _falling_left := 0.0  # falling away into the lava pit
+const FALL_SECONDS := 0.9
 var _turn := 0.0   # how far the sprite has turned
 static var _ramp_art: Image
 static var _tier_frames := {}  # tier -> SpriteFrames for that row of the spin sheet
@@ -144,6 +146,10 @@ func _physics_process(delta: float) -> void:
 		# held by the temple or the kickback
 		_moved_v = Vector2.ZERO
 	_impact_cooldown = maxf(_impact_cooldown - delta, 0.0)
+	if _falling_left > 0.0:
+		_falling_left -= delta
+		if _falling_left <= 0.0:
+			_drained()
 	_watch_for_stuck(delta)
 	_watch_ramp_exit(delta)
 
@@ -280,18 +286,25 @@ func _on_start_region_body_exited(body: Node) -> void:
 		_charging = false
 		PinballEvents.launch_available.emit(false)
 
+# Into the lava pit: it falls away out of sight (passing through everything) before
+# it counts as drained
 func _on_death_zone_body_entered(body: Node) -> void:
-	if body == self and not _pending_respawn:
-		if get_tree().get_nodes_in_group("ball").size() > 1:
-			# Multiball: a ball that drains while others are still up just leaves play
-			remove_from_group("ball")
-			queue_free()
-			return
-		PinballEvents.ball_drained.emit()
-		_pending_respawn = true
-		_cooldown_frames = 3
+	if body == self and not _pending_respawn and _falling_left <= 0.0:
+		_falling_left = FALL_SECONDS
 		collision_layer = 0
 		collision_mask = 0
+
+func _drained() -> void:
+	if get_tree().get_nodes_in_group("ball").size() > 1:
+		# Multiball: a ball that drains while others are still up just leaves play
+		remove_from_group("ball")
+		queue_free()
+		return
+	PinballEvents.ball_drained.emit()
+	_pending_respawn = true
+	_cooldown_frames = 3
+	collision_layer = 0
+	collision_mask = 0
 
 func _integrate_forces(state: PhysicsDirectBodyState2D) -> void:
 	if _pending_respawn:

@@ -1,12 +1,12 @@
 extends Node2D
-## Tlaloc's sacrifice. Between his curses it waits on the round disc in the middle of the
-## golden temple: the beating heart (8 Bit Evil Returns' heartbeat,
-## Sprites/table/blood_heart.png), and on later curses a golden idol or an emerald instead,
-## turn and turn about. When his curse breaks (Scripts/table_features.gd) it flies down into
-## his open mouth: hit it three times to offer it up, each hit knocking the ball well away,
-## and the rain stops at once, with points and a ball saver for the trouble. If the curse
-## passes first, it flies back up to the temple. While it sits in his mouth, his mouth
-## takes nothing else.
+## Tlaloc's sacrifice. It waits on the round disc in the middle of the golden temple: the
+## beating heart (8 Bit Evil Returns' heartbeat, Sprites/table/blood_heart.png), and on
+## later turns a golden idol or an emerald instead, turn and turn about. Three laps round
+## inside the temple (Scripts/temple.gd) call it down: it fades from the temple and rises
+## up out of Tlaloc's mouth. Hit it three times to offer it up, each hit knocking the ball
+## well away, for points and a ball saver (and if his curse is raining, it stops at once).
+## Left unoffered too long, it sinks back down his throat and returns to the temple.
+## While it sits in his mouth, his mouth takes nothing else.
 
 const HEART := preload("res://Sprites/table/blood_heart.png")  # tools/make_table.py: 8 frames beating
 const IDOL := preload("res://Sprites/table/idol.png")          # tools/make_tiki_idol.py
@@ -19,6 +19,9 @@ const HITS := 3
 const HIT_COOLDOWN := 0.6
 const KNOCK := 950.0     # how hard a hit on it sends the ball away
 const FLY_SECONDS := 0.7
+const LAPS_TO_CALL := 3.0   # laps round the temple, all told, that call the sacrifice down
+const RISE := 18.0          # scene units it rises up out of his mouth
+const WAIT_SECONDS := 40.0  # unoffered this long, it goes back to the temple
 const BEAT_FPS := 10.0
 const RETURNS := 8.0     # after one's offered, the next appears on the temple this much later
 const OFFERED_POINTS := 30000
@@ -38,6 +41,8 @@ var _cooldown := 0.0
 var _flash_left := 0.0
 var _returns_left := 0.0
 var _clock := 0.0
+var _laps := 0.0
+var _wait_left := 0.0
 var _burst: CPUParticles2D
 
 func _ready() -> void:
@@ -66,11 +71,7 @@ func _ready() -> void:
 	add_child(sensor)
 	_burst = _make_burst()
 	_show_waiting()
-	PinballEvents.curse_changed.connect(func(cursed: bool):
-		if cursed:
-			_descend()
-		elif active:
-			_ascend())
+
 
 func _sprite(texture: Texture2D, frames: int, fps: float) -> AnimatedSprite2D:
 	var sprite: AnimatedSprite2D = features._sprite(texture, frames, TEMPLE_CIRCLE, fps)
@@ -81,6 +82,19 @@ func _sprite(texture: Texture2D, frames: int, fps: float) -> AnimatedSprite2D:
 
 func _kind() -> String:
 	return ORDER[_turn % ORDER.size()]
+
+## The sacrifice in sight: on the temple, or in his mouth (for the spotlight on it)
+func current() -> AnimatedSprite2D:
+	return _sprites[_kind()]
+
+## Laps the ball made round inside the temple; enough of them call the sacrifice down
+func add_laps(laps: float) -> void:
+	if active:
+		return
+	_laps += laps
+	if _laps >= LAPS_TO_CALL:
+		_laps = 0.0
+		_descend()
 
 func _make_burst() -> CPUParticles2D:
 	var drop := Image.create(1, 1, false, Image.FORMAT_RGBA8)
@@ -113,7 +127,7 @@ func _show_waiting() -> void:
 	sprite.modulate.a = 0.0
 	create_tween().tween_property(sprite, "modulate:a", 1.0, 1.0)
 
-# The curse breaks: down it flies, into his mouth
+# Called down: it fades from the temple and rises up out of his mouth
 func _descend() -> void:
 	var sprite: AnimatedSprite2D = _sprites[_kind()]
 	if not sprite.visible:
@@ -121,21 +135,30 @@ func _descend() -> void:
 	active = true
 	_hits = 0
 	_returns_left = 0.0
-	sprite.modulate.a = 1.0
-	var fly := create_tween()
-	fly.tween_property(sprite, "position", MOUTH, FLY_SECONDS).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN_OUT)
-	fly.tween_callback(func():
+	_wait_left = WAIT_SECONDS
+	var move := create_tween()
+	move.tween_property(sprite, "modulate:a", 0.0, FLY_SECONDS * 0.5)
+	move.tween_callback(func():
+		sprite.position = MOUTH + Vector2(0, RISE))
+	move.tween_property(sprite, "position", MOUTH, FLY_SECONDS).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	move.parallel().tween_property(sprite, "modulate:a", 1.0, FLY_SECONDS * 0.6)
+	move.tween_callback(func():
 		if active:
 			_shape.set_deferred("disabled", false))
 	AudioSfx.play("shrine", 0.0, Vector2.ONE * 0.7)
 
-# The curse passed by itself: unoffered, it flies back up to the temple
+# Unoffered too long: it sinks back down his throat and returns to the temple
 func _ascend() -> void:
 	active = false
 	_shape.set_deferred("disabled", true)
 	var sprite: AnimatedSprite2D = _sprites[_kind()]
 	sprite.speed_scale = 1.0
-	create_tween().tween_property(sprite, "position", TEMPLE_CIRCLE, FLY_SECONDS)
+	var move := create_tween()
+	move.tween_property(sprite, "position", MOUTH + Vector2(0, RISE), FLY_SECONDS * 0.6)
+	move.parallel().tween_property(sprite, "modulate:a", 0.0, FLY_SECONDS * 0.6)
+	move.tween_callback(func():
+		sprite.position = TEMPLE_CIRCLE)
+	move.tween_property(sprite, "modulate:a", 1.0, FLY_SECONDS)
 
 func _on_hit(body: Node) -> void:
 	if not active or _cooldown > 0.0 or not features._is_ball_on_playfield(body):
@@ -181,12 +204,17 @@ func _offer() -> void:
 	sprite.speed_scale = 1.0
 	_turn += 1
 	_returns_left = RETURNS
-	features._curse_timer.stop()
-	features._end_curse()
+	if GameManager.curse_active:  # and Tlaloc's rain stops
+		features._curse_timer.stop()
+		features._end_curse()
 
 func _physics_process(delta: float) -> void:
 	_clock += delta
 	_cooldown = maxf(_cooldown - delta, 0.0)
+	if active and _wait_left > 0.0:
+		_wait_left -= delta
+		if _wait_left <= 0.0:
+			_ascend()
 	if _returns_left > 0.0:
 		_returns_left -= delta
 		if _returns_left <= 0.0:

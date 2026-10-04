@@ -113,6 +113,7 @@ func _swallow(ball: RigidBody2D) -> void:
 		var angle := from_angle - t * TAU * laps
 		ball.global_position = LOOP_CENTRE + Vector2(cos(angle), sin(angle)) * LOOP_RADIUS
 	if made_it:
+		features.sacrifices.add_laps(laps)  # enough laps call the sacrifice down
 		# round and round, slowing as it goes
 		loop.tween_method(at, 0.0, 1.0, seconds).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
 		loop.tween_callback(_offering)
