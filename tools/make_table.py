@@ -1134,96 +1134,145 @@ def sling_unlit(lit):
 
 # ---------- the travel totem ----------
 
-TOTEM_W, TOTEM_H = 24, 19  # each frame; the pole itself is 16 across, wings reach out either side
-TOTEM_POLE = 16
-TOTEM_RY = 3  # the half-height of its top face's ellipse
+TOTEM_W, TOTEM_H = 26, 22  # each frame: the pole, and what stands out from it (ears, beak, wings)
+TOTEM_POLE = 16            # the pole's width
+TOTEM_RY = 3               # the half-height of each drum's top face
+TOTEM_TOP = 3              # rows above the drum's top face, for what rises off it (the bear's ears)
 
-# The carvings round each drum of the pole, a row at a time from just under its top face's
-# front edge, following it round (so they curve with the wood): . bare cedar, K black
-# formline, R red, G teal, W white, T teeth, Y yellow, N green
+# The carving round each drum, as if unrolled flat: a row at a time from just under its top
+# face's front edge, each row following it round so the carving curves with the wood.
+# . bare wood, K black formline, R red, G teal, W white, Y yellow, N green, O beak
 TOTEM_CARVINGS = [
     [  # the bear, at the foot
-        "................",
-        "..KKKK....KKKK..",
-        ".KWWKK....KKWWK.",
-        "..KKKK....KKKK..",
-        ".......KK.......",
-        "......KRRK......",
-        "..RR........RR..",
-        "...KKKKKKKKKK...",
-        "...KTKTKTKTKTK..",
-        "...KKKKKKKKKK...",
-        "................",
-        "GGGGGGGGGGGGGGGG",
+        "..RRRR....RRRR..",
+        ".RKKKKR..RKKKKR.",
+        ".KWWKKKK.KKKWWK.",  # formline eyes: a white lid over a black pupil
+        ".KWKKKK..KKKKWK.",
+        "..KKKK.GG.KKKK..",
+        "......GKKG......",  # his snout, teal, black nostrils
+        ".RR...GGGG...RR.",  # red cheeks
+        "..KKKKKKKKKKKK..",
+        "..KWKWKWKWKWKWK.",  # bared teeth
+        "...KRRRRRRRRK...",
+        "....KKKKKKKK....",
+        "GGGGGGGGGGGGGGGG",  # a teal band round its foot
+        "KKKKKKKKKKKKKKKK",
     ],
-    [  # the raven, its beak carved down its front
-        "GGGGGGGGGGGGGGGG",
-        "................",
-        "..KKK......KKK..",
+    [  # the raven: eyes either side of a long beak carved out from its face
+        "KKKKKKKKKKKKKKKK",
+        "..RRR......RRR..",
+        ".KKKKK....KKKKK.",
         ".KWWKK....KKWWK.",
-        "..KKK.KKKK.KKK..",
-        "......KRRK......",
-        "......KRRK......",
-        "......KKKK......",
-        ".......KK.......",
-        "...RR......RR...",
+        ".KKKK......KKKK.",
+        "..GG........GG..",
+        ".GKKG......GKKG.",  # its wings, folded at its sides
+        ".GKKG......GKKG.",
+        ".GGGG......GGGG.",
         "................",
-        "RRRRRRRRRRRRRRRR",
+        "..RRRRRRRRRRRR..",
+        "..KKKKKKKKKKKK..",
+        "................",
     ],
-    [  # Xatu, at the top: great staring eyes, a little hooked beak, its red and yellow bands
-        "................",
-        "..WWWW....WWWW..",
-        ".WWKKWW..WWKKWW.",
-        "..WWWW....WWWW..",
-        ".......YY.......",
-        "......YYYY......",
-        ".......YY.......",
+    [  # Xatu, at the top: great staring eyes, its little hooked beak, red and yellow bands
+        ".WWWWW....WWWWW.",
+        "WWWKKWW..WWKKWWW",
+        "WWKKKKW..WKKKKWW",
+        "WWKKKWW..WWKKKWW",
+        ".WWWWW.OO.WWWWW.",
+        ".......OOO......",
+        ".......OO.......",
         "................",
         "RRRRRRRRRRRRRRRR",
         "YYYYYYYYYYYYYYYY",
+        "KKKKKKKKKKKKKKKK",
+        "YYYYYYYYYYYYYYYY",
         "RRRRRRRRRRRRRRRR",
-        "................",
     ],
 ]
 
 
+def _ramp(rgb, steps=5):
+    """A pixel-art shading ramp for one colour: lighter steps warmer and yellower, darker
+    ones cooler and toward purple, light to dark"""
+    h, l, s_ = colorsys.rgb_to_hls(*[c / 255 for c in rgb])
+    out = []
+    for i in range(steps):
+        k = i / (steps - 1)  # 0 lightest .. 1 darkest
+        dl = 0.22 - 0.5 * k
+        hue = h + (0.03 if dl > 0 else -0.04) * abs(dl) * 2.5  # light toward yellow, shadow toward blue
+        r, g, b_ = colorsys.hls_to_rgb(hue % 1.0, min(0.94, max(0.06, l + dl)), min(1.0, s_ * (1.05 - 0.15 * k)))
+        out.append((int(r * 255), int(g * 255), int(b_ * 255), 255))
+    return out
+
+
 def totem_heads():
     """The totem pole a jaguar's hits build (Scripts/totem.gd), Pacific Northwest style:
-    three drums of carved red cedar, each a cylinder like the idol tower's drums, seen from
-    a little above, lit from the left and going round into shadow, bottom edge curving with
-    it; carved and painted in black formline, red and teal: a bear at the foot, a raven, and
-    on top Xatu, green, staring, its wings hanging down either side."""
-    ink = (20, 16, 18, 255)
-    cedar = [(222, 160, 104, 255), (196, 132, 80, 255), (166, 104, 60, 255), (132, 78, 44, 255), (98, 56, 34, 255), (70, 40, 26, 255)]
-    cedar_top = [(238, 186, 132, 255), (214, 158, 104, 255), (186, 128, 80, 255)]
-    green = [(150, 230, 120, 255), (108, 200, 92, 255), (76, 166, 72, 255), (54, 130, 58, 255), (38, 96, 46, 255), (26, 70, 36, 255)]
-    green_top = [(176, 240, 150, 255), (128, 212, 106, 255), (92, 176, 82, 255)]
-    paint = {"K": [(36, 30, 34, 255)] * 2, "R": [(226, 70, 52, 255), (150, 34, 28, 255)],
-             "G": [(70, 196, 176, 255), (32, 120, 112, 255)], "W": [(246, 242, 232, 255), (196, 190, 180, 255)],
-             "T": [(246, 242, 232, 255), (196, 190, 180, 255)], "Y": [(255, 220, 64, 255), (196, 150, 20, 255)]}
-    fw, h, pw, ry = TOTEM_W, TOTEM_H, TOTEM_POLE, TOTEM_RY
+    three drums of carved red cedar, each a cylinder seen a little from above like the
+    idol tower's drums. Every colour has its own shading ramp (warmer in the light, cooler
+    in the shade), lit from the upper left round the cylinder, a rim of reflected light
+    down its far edge, a shadow under the lip of the top face. Carved and painted in black
+    formline, red and teal: a bear at the foot, its ears standing up off the top; a raven,
+    its beak jutting out over its chest and casting a shadow; and on top Xatu, green,
+    staring, wings spread wide either side like a thunderbird's."""
+    ink = (24, 16, 20, 255)
+    base = {".": (176, 104, 58), "K": (40, 32, 38), "R": (214, 58, 44), "G": (52, 170, 156),
+            "W": (240, 232, 214), "Y": (246, 196, 40), "N": (86, 184, 82), "O": (238, 170, 40)}
+    ramps = {k: _ramp(v) for k, v in base.items()}
+    green_wood = _ramp((86, 184, 82))
+    fw, h, pw, ry, top_pad = TOTEM_W, TOTEM_H, TOTEM_POLE, TOTEM_RY, TOTEM_TOP
     x_pole = (fw - pw) // 2
-    top_c, bottom_c = ry, h - 1 - ry
+    top_c = top_pad + ry
+    bottom_c = h - 1 - ry
     sheet = Image.new("RGBA", (fw * 3, h), T)
 
-    def lit(ramp, u):  # lit from the upper left: brightest a third of the way in
-        return ramp[min(len(ramp) - 1, int(abs(u + 0.35) / 1.35 * len(ramp)))]
+    def light(u):  # lit from the upper left, round the cylinder: 0 lit .. 4 deep shade
+        n = (u, math.sqrt(max(0.0, 1 - u * u)))
+        lam = max(0.0, n[0] * -0.55 + n[1] * 0.83)
+        step = 4 - int(round(lam * 4.2))
+        if u > 0.82:
+            step = max(step - 1, 1)  # a rim of light bounced back off its far edge
+        return max(0, min(4, step))
 
     for f in range(3):
         img = Image.new("RGBA", (fw, h), T)
         px = img.load()
-        wood, wood_top = (green, green_top) if f == 2 else (cedar, cedar_top)
+        wood = green_wood if f == 2 else ramps["."]
         carving = TOTEM_CARVINGS[f]
-        if f == 2:
-            # Xatu's wings, folded down either side of the pole like a cloak, white-tipped
+
+        if f == 2:  # Xatu's wings, spread wide either side like a thunderbird's: white, in layers of
+            # feathers, banded red and tipped black, the far wing in shade
+            feather = _ramp((240, 234, 222))
             for side in (-1, 1):
-                for i in range(1, x_pole + 1):  # columns out from the pole's edge
+                for i in range(1, x_pole + 1):
                     x = x_pole - i if side < 0 else x_pole + pw - 1 + i
-                    y0, y1 = top_c + 1 + i, h - 3 - i
+                    y0 = top_c - 1 + i // 2
+                    y1 = top_c + 11 - (i + 1) // 2
+                    shade = 1 if side < 0 else 2
                     for y in range(y0, y1 + 1):
-                        edge = y in (y0, y1) or i == x_pole
-                        tip = y >= y1 - 2
-                        px[x, y] = ink if edge else ((246, 242, 232, 255) if tip else green[2 + (side > 0)])
+                        if y == y0 or y == y1 or i == x_pole:
+                            px[x, y] = ink
+                        elif y >= y1 - 1:
+                            px[x, y] = ramps["K"][1]  # black tips
+                        elif y >= y1 - 3:
+                            px[x, y] = ramps["R"][shade]  # a red band
+                        elif (y - y0 + i) % 3 == 0:
+                            px[x, y] = feather[shade + 1]  # the edge of each feather over the next
+                        else:
+                            px[x, y] = feather[shade - 1 if y < y0 + 2 else shade]
+
+        if f == 0:  # the bear's round ears, standing up off its top face, red inside
+            for ex in (x_pole + 1, x_pole + pw - 5):
+                ear = [".oo.", "oRco", "occo"]
+                for dy, row in enumerate(ear):
+                    for dx, ch in enumerate(row):
+                        y = top_c - ry - 2 + dy
+                        if ch == "o":
+                            px[ex + dx, y] = ink
+                        elif ch == "R":
+                            px[ex + dx, y] = ramps["R"][1]
+                        elif ch == "c":
+                            px[ex + dx, y] = wood[1 if dx < 2 else 2]
+
         for xx in range(pw):
             x = x_pole + xx
             u = (xx + 0.5 - pw / 2) / (pw / 2)
@@ -1231,22 +1280,42 @@ def totem_heads():
             y_top = int(round(top_c - arc))
             y_front = int(round(top_c + arc))
             y_bottom = int(round(bottom_c + arc))
+            step = light(u)
             for y in range(y_top, y_bottom + 1):
                 if y == y_top or y == y_bottom or xx in (0, pw - 1):
                     px[x, y] = ink
-                elif y < y_front:
-                    px[x, y] = wood_top[0] if u < -0.2 and y <= top_c else (wood_top[1] if u < 0.4 else wood_top[2])
+                elif y < y_front:  # the top face, catching the light from above
+                    px[x, y] = wood[0] if u < 0.25 and y < top_c else wood[1 if u < 0.6 else 2]
                 elif y == y_front:
-                    px[x, y] = lit(wood[:3], u)
+                    px[x, y] = wood[max(0, step - 1)]  # its lip, catching the light
+                elif y == y_front + 1:
+                    px[x, y] = wood[min(4, step + 1)]  # the shadow under the lip
                 else:
-                    px[x, y] = lit(wood, u)
+                    px[x, y] = wood[step]
             for row, line in enumerate(carving):
                 y = y_front + 1 + row
                 key = line[xx]
                 if key == "." or y >= y_bottom or xx in (0, pw - 1):
                     continue
-                light, dark = paint[key]
-                px[x, y] = light if u < 0.35 else dark
+                if key == "K":
+                    px[x, y] = ramps["K"][min(4, 1 + step // 2)]
+                elif key == "W":
+                    px[x, y] = ramps["W"][min(2, step // 2)]  # white paint stays bright, just greying into the shade
+                else:
+                    px[x, y] = ramps[key][min(4, step + (1 if row == 0 else 0))]
+
+        if f == 1:  # the raven's beak, jutting out from between its eyes, down over its chest
+            beak = _ramp((40, 32, 38))
+            cx = x_pole + pw // 2
+            y0 = top_c + ry + 3
+            for k, half in enumerate((1, 1, 2, 2, 2, 1, 1, 0)):
+                y = y0 + k
+                for x in range(cx - half - 1, cx + half + 1):
+                    edge = x in (cx - half - 1, cx + half)
+                    px[x, y] = ink if edge else (beak[0] if x < cx else beak[2])
+                if k < 6:
+                    px[cx + half + 1, y + 1] = ramps["."][4]  # its shadow, cast down on the chest
+            px[cx - 1, y0 + 1] = ramps["R"][0]  # a red nostril line along it
         sheet.paste(img, (f * fw, 0))
     return sheet
 
