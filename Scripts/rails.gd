@@ -27,8 +27,8 @@ const ARROWS_TO_TEMPLE := 2
 # (the blue flippers' lane right of the left one, the skull's lane left of the right
 # one), so only a ball heading along the rail is taken: within this much of its line
 const ENTRY_AREAS := {
-	"left_entry": Rect2(130, 612, 60, 58),   # over its mouth as drawn, between the wires' ends
-	"right_entry": Rect2(487, 682, 70, 80),  # over its mouth as drawn, and the approach below it
+	"left_entry": Rect2(128, 596, 52, 46),   # right in its mouth, between the wires' ends
+	"right_entry": Rect2(500, 650, 60, 55),  # right in its mouth, as drawn
 }
 const ENTRY_ALIGN := {"left_entry": 0.94, "right_entry": 0.94}  # cosines: about 20 degrees
 # ...and only on the rail's own line: the lanes running up under the rails, beside their

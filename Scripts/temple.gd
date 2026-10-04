@@ -26,6 +26,7 @@ const SPEED_PER_LAP := 450.0
 const MAX_LAPS := 3.0
 const LAPS_TO_MAKE_IT := 1.0
 const LAP_SECONDS := 0.55
+const ENTER_SWEEP := 1.6  # radians of its first lap over which it glides from where it came in onto the ring
 const ROLL_BACK_SPEED := 260.0
 const SPIT_FROM := Vector2(440, 100)   # just back down the pipe, on the rail's upper branch
 const SPIT_VELOCITY := Vector2(-760, 30)
@@ -109,16 +110,30 @@ func _swallow(ball: RigidBody2D) -> void:
 	var made_it := laps >= LAPS_TO_MAKE_IT
 	var seconds := LAP_SECONDS * laps
 	var loop := create_tween().set_process_mode(Tween.TWEEN_PROCESS_PHYSICS)
+	var entry := ball.global_position
+	# on the ring at this angle, gliding onto it from where it came in over the first stretch
+	var on_ring := func(angle: float, travelled: float) -> Vector2:
+		var ring := LOOP_CENTRE + Vector2(cos(angle), sin(angle)) * LOOP_RADIUS
+		return entry.lerp(ring, smoothstep(0.0, ENTER_SWEEP, travelled))
 	var at := func(t: float):
-		var angle := from_angle - t * TAU * laps
-		ball.global_position = LOOP_CENTRE + Vector2(cos(angle), sin(angle)) * LOOP_RADIUS
+		ball.global_position = on_ring.call(from_angle - t * TAU * laps, t * TAU * laps)
 	if made_it:
 		features.sacrifices.add_laps(laps)  # enough laps call the sacrifice down
-		# round and round, slowing as it goes
-		loop.tween_method(at, 0.0, 1.0, seconds).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+		# round and round, coming round the last time just where the ring meets the pipe,
+		# and straight on out down it without a stop
+		var pipe_angle := _ring_angle(SPIT_FROM)
+		var to_pipe := fposmod(from_angle - pipe_angle, TAU)
+		var sweep := to_pipe + TAU * maxf(roundf((TAU * laps - to_pipe) / TAU), 0.0)
+		var ring_seconds := LAP_SECONDS * sweep / TAU
+		var round_and_out := func(t: float):
+			ball.global_position = on_ring.call(from_angle - t * sweep, t * sweep)
+		loop.tween_method(round_and_out, 0.0, 1.0, ring_seconds)  # at an even pace, racing round
 		loop.tween_callback(_offering)
-		loop.tween_interval(0.3)
+		var exit := LOOP_CENTRE + Vector2(cos(pipe_angle), sin(pipe_angle)) * LOOP_RADIUS
+		var exit_speed := TAU * (LOOP_RADIUS.x + LOOP_RADIUS.y) / 2.0 / LAP_SECONDS  # going as it went round
+		loop.tween_property(ball, "global_position", SPIT_FROM, exit.distance_to(SPIT_FROM) / exit_speed)
 		loop.tween_callback(_spit.bind(ball))
+		seconds = ring_seconds
 		AudioSfx.play("shrine")
 		PinballEvents.rumble.emit(4.0)
 		features._flash_shrine(seconds + 0.3)
@@ -127,6 +142,11 @@ func _swallow(ball: RigidBody2D) -> void:
 		loop.tween_method(at, 0.0, 1.0, seconds).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
 		loop.tween_method(at, 1.0, 0.0, seconds).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN)
 		loop.tween_callback(_roll_back.bind(ball, came_up))
+
+# Where round the ring (its angle) a point outside it lies
+func _ring_angle(point: Vector2) -> float:
+	var rel := (point - LOOP_CENTRE) / LOOP_RADIUS
+	return atan2(rel.y, rel.x)
 
 # Out of the temple the way it came in, rolling back down that rail
 func _roll_back(ball: RigidBody2D, path: String) -> void:
@@ -151,7 +171,7 @@ func _offering() -> void:
 func _spit(ball: RigidBody2D) -> void:
 	_held = null
 	_rearm = REARM_SECONDS
-	ball.global_position = SPIT_FROM
+	ball.global_position = SPIT_FROM  # (it's just come down the pipe to here)
 	ball.freeze = false
 	ball.linear_velocity = SPIT_VELOCITY.rotated(randf_range(-0.1, 0.1)) * randf_range(0.8, 1.15)  # never quite the same twice
 	features.rails.lift(ball, "left_temple")  # back down the pipe and all the way down the left rail

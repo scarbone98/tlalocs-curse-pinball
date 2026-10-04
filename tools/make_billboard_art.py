@@ -253,7 +253,8 @@ def main():
     cities = [tenochtitlan(), teotihuacan(), chichen_itza(), palenque()]
     relics = frames_of("Sprites/table/relics.png", 8)[4:]
     ball_sheet = Image.open("Sprites/ball_spin.png").convert("RGBA")
-    balls = [ball_sheet.crop((0, t * 20, 20, (t + 1) * 20)) for t in range(4)]
+    size = ball_sheet.height // 4  # one row (and its first frame) per ball upgrade
+    balls = [ball_sheet.crop((0, t * size, size, (t + 1) * size)) for t in range(4)]
     prizes = [
         coin_pile(1),                                                      # offering
         coin_pile(2),                                                      # treasure

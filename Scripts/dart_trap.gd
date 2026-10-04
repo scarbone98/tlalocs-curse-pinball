@@ -14,7 +14,7 @@ const FALLING := preload("res://Sprites/table/dart_falling.png")  # tools/make_t
 const STUCK := preload("res://Sprites/table/dart_stuck.png")      # still, quivering
 const SHADOW := preload("res://Sprites/table/dart_shadow.png")
 const BUTTON_AT := Vector2(207, 815)     # the gold button on the left inlane wall's tip
-const BUTTON_RADIUS := 26.0              # it's set into the wall's tip, so it reaches out a little past the face
+const BUTTON_REACH := 22.0               # a knock into the wall this near it presses it
 const BUTTON_POINTS := 500
 const PRESSED_SECONDS := 0.35
 const DARTS := 7
@@ -59,16 +59,10 @@ var _darts: Array[Dictionary] = []  # each standing (or falling) dart: spot, spr
 func _ready() -> void:
 	features.dart_trap = self
 	button_sprite = features.gold_button("dart_button")
-	var button := Area2D.new()
-	button.position = BUTTON_AT
-	button.monitorable = false
-	var shape := CollisionShape2D.new()
-	var circle := CircleShape2D.new()
-	circle.radius = BUTTON_RADIUS
-	shape.shape = circle
-	button.add_child(shape)
-	button.body_entered.connect(_on_button)
-	add_child(button)
+	# pressed only by a ball knocked into it, not one grazing past or rolling over it
+	PinballEvents.ball_struck.connect(func(ball: RigidBody2D, at: Vector2, _into: float):
+		if at.distance_to(BUTTON_AT) < BUTTON_REACH:
+			_on_button(ball))
 
 func ready_to_fire() -> bool:
 	return _reload_left <= 0.0 and _to_drop == 0 and _darts.is_empty()

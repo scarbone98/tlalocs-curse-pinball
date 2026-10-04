@@ -106,7 +106,7 @@ func _physics_process(delta: float) -> void:
 	var gaping := open or heart_in  # his mouth gapes round a sacrifice too
 	if gaping and features._face_sprite:
 		features._face_sprite.frame = MOUTH_OPEN
-	elif _was_open and features._face_sprite and not GameManager.curse_active:
+	elif _was_open and features._face_sprite:
 		features._face_sprite.frame = MOUTH_SHUT  # nothing waiting any more: he shuts it
 	_was_open = gaping
 	if _after_reel.is_valid() and not features.roulette.busy():
@@ -115,22 +115,23 @@ func _physics_process(delta: float) -> void:
 		then.call()
 	if _held or _rearm > 0.0 or not _waiting() or heart_in:
 		return
-	var balls := get_tree().get_nodes_in_group("ball")
-	if balls.size() != 1:
-		return  # multiball rolls straight over it
-	var ball := balls[0] as RigidBody2D
-	if ball.freeze or not features._is_ball_on_playfield(ball):
-		return
-	var to_mouth := AT - ball.global_position
-	var near := to_mouth.length()
-	if near < CATCH_RADIUS:
-		_catch(ball)
-	elif near < PULL_RADIUS:
-		# the whirl draws it in, and takes the edge off its speed as it spirals toward the mouth
-		var strength := 1.0 - near / PULL_RADIUS
-		ball.linear_velocity += to_mouth.normalized() * PULL * strength * delta
-		ball.linear_velocity += to_mouth.normalized().orthogonal() * SWIRL * strength * delta
-		ball.linear_velocity *= 1.0 - 0.8 * strength * delta
+	# with more than one ball in play (his curse's multiball, say) he takes whichever comes
+	# to him; the others play on while he holds it
+	for node in get_tree().get_nodes_in_group("ball"):
+		var ball := node as RigidBody2D
+		if ball.freeze or not features._is_ball_on_playfield(ball):
+			continue
+		var to_mouth := AT - ball.global_position
+		var near := to_mouth.length()
+		if near < CATCH_RADIUS:
+			_catch(ball)
+			return
+		elif near < PULL_RADIUS:
+			# the whirl draws it in, and takes the edge off its speed as it spirals toward the mouth
+			var strength := 1.0 - near / PULL_RADIUS
+			ball.linear_velocity += to_mouth.normalized() * PULL * strength * delta
+			ball.linear_velocity += to_mouth.normalized().orthogonal() * SWIRL * strength * delta
+			ball.linear_velocity *= 1.0 - 0.8 * strength * delta
 
 func _catch(ball: RigidBody2D) -> void:
 	_held = ball

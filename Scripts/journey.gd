@@ -29,7 +29,7 @@ const OUT := 17.0
 const EMERGE_PER_SECOND := 40.0  # art pixels a second as a head slides out or back
 # The gold button that wakes them, at the foot of the skull's lane (scene units)
 const BUTTON_AT := Vector2(441.6, 640)  # the gold button at the foot of the skull's lane
-const BUTTON_RADIUS := 18.0
+const BUTTON_REACH := 20.0  # a knock into the wall this near it presses it
 const OUT_SECONDS := 10.0  # not long, so they aren't forever in the way of shots up the rails
 # Now and then they come out by themselves for a while: usually just one, sometimes both
 const PROWL_EVERY := Vector2(25.0, 50.0)
@@ -110,16 +110,10 @@ var _clock := 0.0
 func _ready() -> void:
 	_build_serpent(0, LEFT_WEDGE, Vector2.RIGHT)
 	_build_serpent(1, RIGHT_WEDGE, Vector2.LEFT)
-	var button := Area2D.new()
-	button.position = BUTTON_AT
-	button.monitorable = false
-	var button_shape := CollisionShape2D.new()
-	var circle := CircleShape2D.new()
-	circle.radius = BUTTON_RADIUS
-	button_shape.shape = circle
-	button.add_child(button_shape)
-	button.body_entered.connect(_on_button)
-	add_child(button)
+	# pressed only by a ball knocked into it, not one passing it on the way up the lane
+	PinballEvents.ball_struck.connect(func(ball: RigidBody2D, at: Vector2, _into: float):
+		if at.distance_to(BUTTON_AT) < BUTTON_REACH:
+			_on_button(ball))
 	_button_sprite = features.gold_button("skull_button")
 	for side in 2:
 		var claw: AnimatedSprite2D = features._sprite(CLAW, 3, Vector2.ZERO, 16.0)

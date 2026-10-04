@@ -44,3 +44,4 @@ signal hatched()                       # a hatchling spirit was caught
 signal mode_changed()                  # a mode started or ended (arrows only light outside modes)
 signal nudged(direction: Vector2)      # the player bumped the table
 signal bonus_tally(lines: Array, multiplier: int) # end of ball: [[label, count, points each], ...], the HUD counts it up
+signal ball_struck(ball: RigidBody2D, at: Vector2, into: float) # the ball hit something solid at `at`, this hard into it (a press, not a graze)

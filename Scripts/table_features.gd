@@ -113,6 +113,8 @@ var journey: Node2D
 var dart_trap: Node2D  # Scripts/dart_trap.gd
 var warriors: Node2D   # Scripts/warriors.gd
 var torch_lane: Node2D  # Scripts/torches.gd
+var _lane_gate: StaticBody2D
+var _looping := {}  # ball -> it's being let on through the lane gate
 var orbit_guide: Node2D  # Scripts/orbit_guide.gd
 var temple: Node2D
 var awakening: Node2D
@@ -253,9 +255,13 @@ func _build_bonus_bars() -> void:
 # The launch lane runs up the right side and round the top-right orbit into the top of
 # the table. Without a gate a ball in play could run the orbit backwards and drop all
 # the way back into the launch lane, so, like Pokemon Pinball's, a one-way gate where
-# the orbit meets the table lets launched balls out but turns balls in play away.
+# the orbit meets the table lets launched balls out but turns balls in play away - all
+# but one looping round fast (up the torch lane and over the top), which it lets on round
+# the orbit and down the launch lane to the plunger, to be launched again.
 const LANE_GATE_X := 480.0
 const LANE_GATE_SPAN := Vector2(215, 305)  # across the orbit, ends buried in its walls
+const LOOP_THROUGH_SPEED := 600.0  # a ball heading right through the gate this fast is looping: it's let on
+const LOOP_THROUGH_REACH := Vector2(140, 60)  # how far before the gate (x) and either side of its middle (y) it's let on
 
 func _build_lane_gate() -> void:
 	var gate := StaticBody2D.new()
@@ -271,6 +277,29 @@ func _build_lane_gate() -> void:
 	shape.position = Vector2(LANE_GATE_X, (LANE_GATE_SPAN.x + LANE_GATE_SPAN.y) / 2.0)
 	gate.add_child(shape)
 	add_child(gate)
+	_lane_gate = gate
+
+# A ball coming fast along the top heading right, looping, goes on through the lane gate
+func _let_loops_through() -> void:
+	if _lane_gate == null:
+		return
+	var middle_y := (LANE_GATE_SPAN.x + LANE_GATE_SPAN.y) / 2.0
+	for ball: RigidBody2D in _looping.keys():
+		var gone := not is_instance_valid(ball)
+		if gone or ball.global_position.x > LANE_GATE_X + 40.0 or ball.global_position.x < LANE_GATE_X - LOOP_THROUGH_REACH.x - 20.0:
+			if not gone:
+				ball.remove_collision_exception_with(_lane_gate)
+			_looping.erase(ball)
+	for node in get_tree().get_nodes_in_group("ball"):
+		var ball := node as RigidBody2D
+		if _looping.has(ball):
+			continue
+		var at := ball.global_position
+		var near := at.x > LANE_GATE_X - LOOP_THROUGH_REACH.x and at.x < LANE_GATE_X \
+			and absf(at.y - middle_y) < LOOP_THROUGH_REACH.y
+		if near and ball.linear_velocity.x > LOOP_THROUGH_SPEED:
+			_looping[ball] = true
+			ball.add_collision_exception_with(_lane_gate)
 
 func _build_shrine() -> void:
 	_shrine_mask = _sprite(STONE_EYE, 4, SHRINE_EYES_ART[0] * MAP_SCALE)
@@ -419,6 +448,7 @@ func _is_ball_on_playfield(body: Node) -> bool:
 	return ball != null and ball.is_in_group("ball") and (ball.collision_mask & 2) == 0
 
 func _physics_process(delta: float) -> void:
+	_let_loops_through()
 	# Timers run on game time so they stay correct on slow frames
 	_skill_shot_left = maxf(_skill_shot_left - delta, 0.0)
 	_face_cooldown = maxf(_face_cooldown - delta, 0.0)
@@ -553,8 +583,8 @@ func _start_curse() -> void:
 	create_tween().tween_property(_storm_tint, "color", Lighting.storm(), 0.8)
 	for torch in _torches:
 		torch.speed_scale = 2.0
-	if _face_sprite:
-		_face_sprite.frame = 1
+	# (his mouth is the temple hole's to open, only when it has something to swallow: his
+	# eyes blaze red for the curse - Scripts/temple_hole.gd)
 	_strike_lightning()
 	_curse_timer.start(CURSE_SECONDS)
 	get_tree().create_timer(MULTIBALL_DELAY).timeout.connect(_release_extra_ball)
@@ -585,8 +615,6 @@ func _end_curse() -> void:
 	create_tween().tween_property(_storm_tint, "color", Lighting.mood(), 1.2)
 	for torch in _torches:
 		torch.speed_scale = 1.0
-	if _face_sprite:
-		_face_sprite.frame = 0
 
 func _strike_lightning() -> void:
 	if not GameManager.curse_active:
@@ -652,14 +680,7 @@ func _celebrate(lamps: Array[AnimatedSprite2D], restore: Callable) -> void:
 	tween.tween_callback(restore)
 
 func _flash_face_eyes() -> void:
-	if _face_sprite == null:
-		return
-	_face_sprite.frame = 1
-	_eyes_red_left = 0.45
-	if not GameManager.curse_active:
-		get_tree().create_timer(0.45).timeout.connect(func():
-			if not GameManager.curse_active:
-				_face_sprite.frame = 0)
+	_eyes_red_left = 0.45  # (just his eyes: his mouth only opens to swallow something)
 
 # ---------- score popups ----------
 

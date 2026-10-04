@@ -37,6 +37,7 @@ const MAX_DRAWN_SPIN := TAU * 3.0
 @export var bounce: float = 0.18
 @export var max_speed: float = 1400.0
 @export var max_speed_low: float = 1600.0
+const STRUCK_SPEED := 160.0  # going into a surface this fast is a hit (a button's press), not a graze or a roll
 const GRAVITY_BANDS := [[645.0, 242.0], [322.0, 484.0], [-INF, 726.0]]  # falling faster than -> gravity
 const PLUNGER_LANE_X := 655.0
 ## The side ramps are water channels (collision layer 2, switched on by the gates). Like
@@ -403,6 +404,8 @@ func _update_spin(state: PhysicsDirectBodyState2D, v: Vector2) -> void:
 	_spin = clampf(normal.cross(v) / _drawn_radius(), -MAX_DRAWN_SPIN, MAX_DRAWN_SPIN)
 	# how fast it was going into the surface it just met
 	var into := -_moved_v.dot(normal)
+	if into > STRUCK_SPEED:
+		PinballEvents.ball_struck.emit(self, global_position - normal * 19.0, into)  # a real knock into it
 	if into > IMPACT_SPEED and _impact_cooldown <= 0.0:
 		_impact_cooldown = IMPACT_COOLDOWN
 		_on_impact.call_deferred(global_position - normal * 19.0, (into - IMPACT_SPEED) * IMPACT_RUMBLE_PER_SPEED + 1.0)

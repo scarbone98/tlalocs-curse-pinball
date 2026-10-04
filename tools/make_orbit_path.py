@@ -4,38 +4,56 @@ A fast ball running along the left orbit's outer wall - round over the top from 
 launch side and down the left lane, or up the lane (the torch lane) and round the other
 way - is carried along this line, a ball's radius in from the wall, rather than left to
 the physics: a ball skidding round a tight curve of straight wall pieces hitches as it
-taps from one to the next. Drawn from the same sweep and arc the wall's collider in
-node_2d.tscn follows. Run from the repo root:  python3 tools/make_orbit_path.py
+taps from one to the next. Read from the wall colliders in node_2d.tscn, so re-run this
+after editing them. Run from the repo root:  python3 tools/make_orbit_path.py
 """
 import math
+import re
 
 BALL = 19.5      # the ball's radius, and a hair: the line keeps it just off the wall
 OUT = "Scripts/orbit_geometry.gd"
+SCENE = "node_2d.tscn"
+TOP_FROM = (336.0, 410.0)  # how far along the top run (scene x) the line starts
 
 
-def cr(p0, p1, p2, p3, t):
-    return tuple(0.5 * ((2 * p1[i]) + (-p0[i] + p2[i]) * t + (2 * p0[i] - 5 * p1[i] + 4 * p2[i] - p3[i]) * t * t
-                        + (-p0[i] + 3 * p1[i] - 3 * p2[i] + p3[i]) * t ** 3) for i in range(2))
+def polygon(scene, name):
+    """A layer_1_colliders polygon from the scene, in scene units."""
+    m = re.search(r'\[node name="%s" type="CollisionPolygon2D" parent="layer_1_colliders"[^\]]*\]\n((?:[^\[]*?))'
+                  r'polygon = PackedVector2Array\(([^)]*)\)' % name, scene)
+    pos = re.search(r'position = Vector2\(([-\d.]+), ([-\d.]+)\)', m.group(1))
+    ox, oy = (float(pos.group(1)), float(pos.group(2))) if pos else (0.0, 0.0)
+    v = [float(x) for x in m.group(2).split(',')]
+    return [(v[i] + ox, v[i + 1] + oy) for i in range(0, len(v), 2)]
 
 
 def wall():
-    """The orbit's outer wall, as the colliders have it (scene units), from the top run across
-    from the launch side, round, and down the left lane."""
-    chain = [(410.0, 205.0), (370.0, 200.8)]  # the launch orbit's wall coming across the top
-    ctrl = [(336, 196), (300, 193), (268, 199), (236, 208), (206, 220), (178, 233), (152, 247), (127, 262), (104, 278)]
-    phi0 = math.radians(38)
-    ext = [chain[-1]] + ctrl + [(104 - 30 * math.cos(phi0), 278 + 30 * math.sin(phi0))]
-    for k in range(1, len(ext) - 2):
-        for j in range(8):
-            chain.append(cr(ext[k - 1], ext[k], ext[k + 1], ext[k + 2], j / 8))
-    radius = 191.0  # the even arc down into the lane
-    for deg in range(38, 87, 2):
-        phi = math.radians(deg)
-        chain.append((104 - radius * (math.sin(phi) - math.sin(phi0)), 278 + radius * (math.cos(phi0) - math.cos(phi))))
-    # down the lane, and on past where its wall meets the one below (CollisionPolygon2D7's edge
-    # from (44, 706) to (87, 802)) at an angle, so the ball isn't knocked there either
-    chain += [(31.5, 470), (32, 560), (32, 611), (40.8, 671), (46, 703), (55, 724), (70, 758), (87, 802), (96, 822)]
-    return chain
+    """The orbit's outer wall as the colliders in node_2d.tscn have it (scene units): the
+    launch orbit's wall coming across the top, the left wall round and down the left lane,
+    and on along the wall below it past the lane's foot. Read from the scene, so it follows
+    any edit made to the colliders: re-run this after changing them."""
+    scene = open(SCENE, encoding="utf8").read()
+    right = polygon(scene, "CollisionPolygon2D2")
+    left = polygon(scene, "CollisionPolygon2D")
+    below = polygon(scene, "CollisionPolygon2D7")
+    # the launch wall's top run, from where it meets the left wall rightward (taken right to left)
+    top = [q for q in right if 180 < q[1] < 215 and TOP_FROM[0] < q[0] <= TOP_FROM[1]]
+    top.sort(key=lambda q: -q[0])
+    # the left wall, from the junction at the top round and down to the lane's foot
+    start = min((q for q in left if 185 < q[1] < 200), key=lambda q: q[0] if q[0] > 300 else 1e9)
+    i0 = left.index(start)
+    # down the lane to where the wall below takes over (its top corner), then on along that
+    # wall's edge toward the inlane, rather than turning the left wall's own sharp foot
+    corner = min(below, key=lambda q: q[1] if q[0] > 30 else 1e9)
+    nxt = below[(below.index(corner) - 1) % len(below)]
+    i1 = max(i for i, q in enumerate(left) if q[1] < corner[1] - 4 and q[0] > 30 and i > i0)
+    chain = top + left[i0:i1 + 1] + [corner]
+    for t in (0.35, 0.7, 1.0):
+        chain.append((corner[0] + (nxt[0] - corner[0]) * t, corner[1] + (nxt[1] - corner[1]) * t))
+    dedup = [chain[0]]
+    for q in chain[1:]:
+        if math.dist(q, dedup[-1]) > 0.5:
+            dedup.append(q)
+    return dedup
 
 
 def chaikin(chain, rounds):
