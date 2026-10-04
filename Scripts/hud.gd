@@ -13,18 +13,18 @@ const BAR_LEFT := 46.0   # the score and balls start right of the pause button
 const SCORE_ROOM := 140.0  # widest the score pill grows before its font shrinks
 const SCORE_FONT_MIN := 11
 # Launch power that drops the ball into a top lane (see ball.gd); marked on the meter
-const SKILL_SHOT_POWER := Vector2(0.70, 0.78)
+const SKILL_SHOT_POWER := Vector2(0.815, 0.85)  # (measured: launches here drop into a top lane)
 const MIN_LAUNCH_POWER := 0.5
+const METER_LAMPS := 12
 
 @onready var score_label: Label       = $HBoxContainer/ScoreLabel
 @onready var lives_label: Label       = $HBoxContainer/LivesLabel
 
 var _tween: Tween
 var _toast_label: Label
-var _launch_button: Button
+var _lamps: Array = []  # the power meter's lamps: [style, where along it, in the sweet spot]
 var _launch_box: VBoxContainer
 var _power_meter: Control
-var _power_fill: ColorRect
 var _menu: MainMenu
 var _objective_label: Label
 var _billboard: Billboard
@@ -118,57 +118,58 @@ func _build_launch_button() -> void:
 	_power_meter = _build_power_meter()
 	_launch_box.add_child(_power_meter)
 
-	_launch_button = Button.new()
-	_launch_button.text = "Launch"
-	_launch_button.add_to_group("touch_block")
-	_launch_button.focus_mode = Control.FOCUS_NONE
-	_launch_button.add_theme_font_size_override("font_size", TempleTheme.snap(int(18 * UI_SCALE)))
-	_launch_button.button_down.connect(func(): PinballEvents.launch_pressed.emit())
-	_launch_button.button_up.connect(func(): PinballEvents.launch_released.emit())
-	_launch_box.add_child(_launch_button)
-
+# The plunger's pull, as a row of stone lamps in a stone frame: they light one after
+# another, ember red, as it's drawn back; the ones in the sweet spot (a launch that drops
+# straight into a top lane) sit in gold-rimmed sockets and burn gold
 func _build_power_meter() -> Control:
-	var meter := Panel.new()
-	meter.custom_minimum_size = Vector2(0, 22 * UI_SCALE)
+	var meter := PanelContainer.new()
 	meter.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	meter.modulate.a = 0.0
-	meter.add_theme_stylebox_override("panel", TempleTheme.pill_box(UI_SCALE))
-
-	var inset := 3 * UI_SCALE
-	_power_fill = ColorRect.new()
-	_power_fill.color = TempleTheme.TERRACOTTA
-	_power_fill.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	_power_fill.anchor_bottom = 1.0
-	_power_fill.offset_left = inset
-	_power_fill.offset_top = inset
-	_power_fill.offset_bottom = -inset
-	meter.add_child(_power_fill)
-
-	# Sweet-spot marker is an outline drawn over the fill so it stays visible while charging
-	var band := Panel.new()
-	var band_box := StyleBoxFlat.new()
-	band_box.draw_center = false
-	band_box.border_color = TempleTheme.GOLD
-	band_box.set_border_width_all(int(2 * UI_SCALE))
-	band_box.set_corner_radius_all(int(3 * UI_SCALE))
-	band.add_theme_stylebox_override("panel", band_box)
-	band.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	band.anchor_left = _power_to_meter(SKILL_SHOT_POWER.x)
-	band.anchor_right = _power_to_meter(SKILL_SHOT_POWER.y)
-	band.anchor_bottom = 1.0
-	band.offset_top = inset * 0.5
-	band.offset_bottom = -inset * 0.5
-	meter.add_child(band)
+	meter.add_theme_stylebox_override("panel", TempleTheme.panel_box(UI_SCALE))
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", int(2 * UI_SCALE))
+	row.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	meter.add_child(row)
+	_lamps.clear()
+	for i in METER_LAMPS:
+		var at := float(i + 0.5) / METER_LAMPS
+		var socket := Panel.new()
+		socket.custom_minimum_size = Vector2(9, 14) * UI_SCALE
+		socket.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		var box := StyleBoxFlat.new()
+		box.bg_color = TempleTheme.STONE
+		box.set_corner_radius_all(int(2 * UI_SCALE))
+		# its stretch of the pull overlaps the sweet spot
+		var sweet := _meter_to_power(float(i + 1) / METER_LAMPS) >= SKILL_SHOT_POWER.x 			and _meter_to_power(float(i) / METER_LAMPS) <= SKILL_SHOT_POWER.y
+		if sweet:
+			box.border_color = TempleTheme.GOLD  # a gold-rimmed socket: the sweet spot
+			box.set_border_width_all(int(1 * UI_SCALE))
+		socket.add_theme_stylebox_override("panel", box)
+		row.add_child(socket)
+		_lamps.append([box, at, sweet])
 	return meter
+
+func _meter_to_power(at: float) -> float:
+	return lerpf(MIN_LAUNCH_POWER, 1.0, at)
+
+func _in_sweet_spot(power: float) -> bool:
+	return power >= SKILL_SHOT_POWER.x and power <= SKILL_SHOT_POWER.y
 
 func _power_to_meter(power: float) -> float:
 	return clampf((power - MIN_LAUNCH_POWER) / (1.0 - MIN_LAUNCH_POWER), 0.0, 1.0)
 
 func _on_launch_power_changed(power: float, charging: bool) -> void:
 	_power_meter.modulate.a = 1.0 if charging else 0.0
-	_power_fill.anchor_right = _power_to_meter(power)
-	var in_sweet_spot := power >= SKILL_SHOT_POWER.x and power <= SKILL_SHOT_POWER.y
-	_power_fill.color = TempleTheme.GOLD if in_sweet_spot else TempleTheme.TERRACOTTA
+	var reached := _power_to_meter(power)
+	for lamp: Array in _lamps:
+		var box: StyleBoxFlat = lamp[0]
+		var lit: bool = lamp[1] <= reached
+		if not lit:
+			box.bg_color = TempleTheme.STONE  # an unlit lamp, plain stone
+		elif lamp[2]:
+			box.bg_color = TempleTheme.GOLD
+		else:
+			box.bg_color = TempleTheme.TERRACOTTA
 
 # The journey's current goal, in the hint's spot once the controls hint has gone
 func _build_objective() -> void:

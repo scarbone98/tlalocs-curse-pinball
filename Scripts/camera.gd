@@ -34,6 +34,8 @@ const PLUNGER_SHIFT := 48.0
 ## while the ball's inside it).
 const RIGHT_X := 720.0     # as far right as the limits allow
 const PHONE_ZOOM := 1.12
+const DESKTOP_FOLLOW := 2.2   # how much faster the desktop view catches up
+const DESKTOP_DRAG := 0.45    # ...and how much smaller the band the ball roams before it moves
 const DESKTOP_WIDTH := 655.0  # scene units across the desktop view shows: the playfield, short of the launch tube
 const REST_LEFT_EDGE := 0.0  # at rest the view's left edge: the table's own, border and all
 const SHRINE := Rect2(439, 42, 281, 290)  # inside the golden temple
@@ -47,8 +49,6 @@ var _look := Vector2.ZERO
 var _jolt := Vector2.ZERO
 
 func _ready() -> void:
-	_set_view(GameManager.desktop_view)
-	PinballEvents.view_changed.connect(_set_view)
 	drag_vertical_enabled = true
 	drag_horizontal_enabled = false
 	drag_top_margin = DRAG_TOP
@@ -58,6 +58,8 @@ func _ready() -> void:
 	position_smoothing_enabled = true
 	position_smoothing_speed = FOLLOW_SPEED
 	PinballEvents.rumble.connect(func(strength: float): _shake = maxf(_shake, strength))
+	_set_view(GameManager.desktop_view)  # (after the defaults above, which it adjusts)
+	PinballEvents.view_changed.connect(_set_view)
 	PinballEvents.nudged.connect(func(direction: Vector2): _jolt = -direction * NUDGE_JOLT)
 
 func _process(dt):
@@ -86,6 +88,10 @@ func _process(dt):
 func _set_view(desktop: bool) -> void:
 	var z := PHONE_ZOOM if not desktop else 720.0 / DESKTOP_WIDTH
 	zoom = Vector2(z, z)
+	# zoomed in, less of the table's in view: it starts following sooner and catches up faster
+	position_smoothing_speed = FOLLOW_SPEED * (DESKTOP_FOLLOW if desktop else 1.0)
+	drag_top_margin = DRAG_TOP * (DESKTOP_DRAG if desktop else 1.0)
+	drag_bottom_margin = DRAG_BOTTOM * (DESKTOP_DRAG if desktop else 1.0)
 
 func _view_x(target: Node2D) -> float:
 	var at := target.global_position

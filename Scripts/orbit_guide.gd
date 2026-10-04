@@ -22,6 +22,7 @@ const RELEASE_SPEED := 160.0 # slower than this, it's let go to fall back
 const END_MARGIN := 6.0      # it isn't taken right at an end
 const SETTLE_SECONDS := 0.1  # it slides onto the line this quickly
 const BALL_RADIUS := 19.0
+const LOST_REACH := 60.0     # a ball this far off the line it's riding has been moved off it
 const BAKE_INTERVAL := 2.0
 const LINES := {"orbit_guide": false, "launch_guide": true}  # name -> one way only (from its start)
 
@@ -125,6 +126,10 @@ func _steer(ball: RigidBody2D, state: PhysicsDirectBodyState2D) -> bool:
 		return false
 	var curve := ride.line.curve
 	var dt := state.step
+	if state.transform.origin.distance_to(curve.sample_baked(ride.offset)) > LOST_REACH:
+		_rides.erase(ball)  # it's been moved right off the line (respawned, caught): let it go
+		ball.rail_guide = Callable()
+		return false
 	var tangent := _tangent(curve, ride.offset)
 	var v := tangent * ride.speed
 	ride.speed += ball._gravity(v.y) * tangent.y * dt  # the table's own gravity, along the line

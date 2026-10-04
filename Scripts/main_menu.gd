@@ -36,6 +36,7 @@ var _picture_atlas: AtlasTexture
 var _clock := 0.0
 var _scene_index := 0
 var _buttons: VBoxContainer
+var _column: VBoxContainer
 var _how_to: PanelContainer
 var _codex: CodexScreen
 
@@ -70,9 +71,27 @@ func _unhandled_input(event: InputEvent) -> void:
 	elif _paused_game:
 		close()
 
+# Shrinks the menu's column to fit a screen shorter than it (the desktop view), centred on
+# it; checked every frame it's open, so it settles whatever order things load and lay out in
+func _fit_column() -> void:
+	if _column == null:
+		return
+	var view_h := get_viewport_rect().size.y
+	var tall := maxf(_column.get_combined_minimum_size().y, _column.size.y)
+	var k := minf(1.0, view_h * 0.96 / maxf(tall, 1.0))
+	_column.scale = Vector2(k, k)
+	if k >= 1.0:
+		_column.pivot_offset = _column.size / 2.0
+		return
+	# shrink it about the point that lands its middle in the middle of the screen (taller than
+	# the screen, its container pins its top to the top)
+	var top := _column.position.y
+	_column.pivot_offset = Vector2(_column.size.x / 2.0, (view_h / 2.0 - top - k * tall / 2.0) / (1.0 - k))
+
 func _process(delta: float) -> void:
 	if not visible:
 		return
+	_fit_column()
 	_clock += delta
 	# Tlaloc's eyes smoulder, and the frame moves on through the journey
 	_mask_atlas.region = Rect2(Vector2(1 if int(_clock * 2.0) % 2 == 0 else 3, 0) * MASK_SIZE, MASK_SIZE)
@@ -96,23 +115,7 @@ func _build() -> void:
 	column.alignment = BoxContainer.ALIGNMENT_CENTER
 	column.add_theme_constant_override("separation", 18)
 	center.add_child(column)
-	# in the shorter desktop view it shrinks to fit, about its middle
-	var fit := func():
-		var view_h := get_viewport_rect().size.y
-		var k := minf(1.0, view_h * 0.97 / maxf(column.size.y, 1.0))
-		column.scale = Vector2(k, k)
-		if k >= 1.0:
-			column.pivot_offset = column.size / 2.0
-			return
-		# taller than the screen, the container pins its top to the screen's top: shrink it
-		# about the point that lands its middle in the middle of the screen
-		var top := column.position.y
-		var y := (view_h / 2.0 - k * (top + column.size.y / 2.0)) / (1.0 - k) - top
-		column.pivot_offset = Vector2(column.size.x / 2.0, y)
-	column.resized.connect(fit)
-	get_viewport().size_changed.connect(fit)
-	PinballEvents.view_changed.connect(func(_desktop: bool): fit.call_deferred())
-	fit.call_deferred()
+	_column = column  # in the shorter desktop view it shrinks to fit (_fit_column, every frame)
 
 	_mask_atlas = AtlasTexture.new()
 	_mask_atlas.atlas = MASK

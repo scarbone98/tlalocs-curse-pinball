@@ -1097,33 +1097,46 @@ SPRING_SHORT = 4  # pulled all the way down
 
 
 def spring_sheet():
-    """The plunger: a gold cap on a steel coil, one frame for each pixel it's pulled down,
-    from at rest to fully pulled, each standing on the frame's bottom edge."""
-    ink, gold, gold_d = (20, 24, 36, 255), (248, 208, 0, 255), (200, 138, 16, 255)
-    light, mid, dark = (214, 224, 232, 255), (142, 158, 172, 255), (74, 86, 102, 255)
+    """The plunger: a domed gold cap on a steel coil, one frame for each pixel it's pulled
+    down, from at rest to fully pulled, each standing on the frame's bottom edge. The coil's
+    wire slants round a dark rod, lit from the left like a cylinder, its back turns darker
+    through the gaps; its loops close up as it's pulled down."""
+    ink = (20, 24, 36, 255)
+    gold_l, gold, gold_d, gold_dd = (255, 240, 150, 255), (248, 208, 0, 255), (200, 138, 16, 255), (120, 78, 8, 255)
+    steel = [(232, 238, 244, 255), (186, 198, 210, 255), (132, 146, 160, 255), (84, 96, 112, 255)]  # lit -> shade
+    back, rod = (54, 62, 76, 255), (34, 40, 52, 255)
     frames = []
+    w = SPRING_W
     for tall in range(SPRING_TALL, SPRING_SHORT - 1, -1):
-        img = Image.new("RGBA", (SPRING_W, SPRING_TALL), T)
+        img = Image.new("RGBA", (w, SPRING_TALL), T)
         top = SPRING_TALL - tall
-        for x in range(1, SPRING_W - 1):  # the cap
+        # the cap: a rounded dome, a highlight on its crown, its rim in shadow underneath
+        for x in range(2, w - 2):
             img.putpixel((x, top), ink)
-            img.putpixel((x, top + 1), gold if x < SPRING_W - 3 else gold_d)
-            img.putpixel((x, top + 2), ink)
-        img.putpixel((0, top + 1), ink)
-        img.putpixel((SPRING_W - 1, top + 1), ink)
+        img.putpixel((1, top + 1), ink)
+        img.putpixel((w - 2, top + 1), ink)
+        for x in range(2, w - 2):
+            img.putpixel((x, top + 1), gold_l if 3 <= x <= 5 else (gold if x < w - 4 else gold_d))
+        img.putpixel((0, top + 2), ink)
+        img.putpixel((w - 1, top + 2), ink)
+        for x in range(1, w - 1):
+            img.putpixel((x, top + 2), gold_d if x < w - 3 else gold_dd)
         coil = tall - 3
-        loops = 4
         for r in range(coil):
             y = top + 3 + r
-            front = (r * loops / max(coil, 1)) % 1.0 < 0.5
-            if front:
-                img.putpixel((2, y), ink)
-                img.putpixel((SPRING_W - 3, y), ink)
-                for x in range(3, SPRING_W - 3):
-                    img.putpixel((x, y), light if x < 6 else mid)
-            else:
-                for x in range(3, SPRING_W - 3):
-                    img.putpixel((x, y), dark)
+            for x in range(2, w - 2):
+                # a turn of wire every other row, its right half a row lower, so each loop
+                # runs down across the front at a slant
+                wire = (r + (1 if x >= w // 2 else 0)) % 2 == 0
+                if wire:
+                    col = steel[min(3, (x - 2) * 4 // (w - 4))]  # lit from the left, like a cylinder
+                elif 5 <= x <= w - 6:
+                    col = rod  # the rod, through the gap
+                else:
+                    col = back  # the coil's far side
+                img.putpixel((x, y), col)
+            img.putpixel((1, y), ink)
+            img.putpixel((w - 2, y), ink)
         frames.append(img)
     sheet = Image.new("RGBA", (SPRING_W * len(frames), SPRING_TALL), T)
     for i, f in enumerate(frames):
