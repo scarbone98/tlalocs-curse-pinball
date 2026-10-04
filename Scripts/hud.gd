@@ -3,6 +3,7 @@ class_name Hud
 
 # The table viewport is 720 wide, twice the 360 the shared theme was tuned for.
 const UI_SCALE := 2.0
+const DESKTOP_SCALE := 0.62  # the HUD in the desktop view, which is barely half a phone's height
 # The score and balls pills, sized to leave the pause button room between them. A long
 # score shrinks toward SCORE_FONT_MIN rather than growing past SCORE_ROOM.
 # Everything sits in a compact column at the top left, over the stone face's corner, so
@@ -64,9 +65,25 @@ func _ready() -> void:
 	PinballEvents.objective_changed.connect(_on_objective_changed)
 	PinballEvents.ball_saver_changed.connect(_on_saver_changed)
 	resized.connect(_fit_score)
+	# the desktop view's window is much shorter than a phone's: the HUD's drawn smaller there
+	PinballEvents.view_changed.connect(_fit_view)
+	get_viewport().size_changed.connect(func(): _fit_view(GameManager.desktop_view))
+	_fit_view.call_deferred(GameManager.desktop_view)
 
 	_render_score()
 	_render_lives()
+
+# Phone view: the HUD fills the screen at its own size. Desktop view: it's drawn at
+# DESKTOP_SCALE over an area that much bigger, so everything keeps its place, just smaller
+func _fit_view(desktop: bool) -> void:
+	if desktop:
+		set_anchors_preset(Control.PRESET_TOP_LEFT)
+		position = Vector2.ZERO
+		scale = Vector2.ONE * DESKTOP_SCALE
+		size = get_viewport_rect().size / DESKTOP_SCALE
+	else:
+		scale = Vector2.ONE
+		set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 
 func _style_top_bar() -> void:
 	var bar: HBoxContainer = $HBoxContainer
