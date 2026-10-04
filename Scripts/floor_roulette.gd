@@ -35,7 +35,8 @@ var _spin_step := 0.0
 var _spin_index := 0
 var _hide_left := 0.0
 var _starting := false  # the doors changing over to the reel before a spin
-var _pieces: Array[Sprite2D] = []  # the reel, the doors and the frame: all sink together
+var _pieces: Array[Sprite2D] = []  # the reel and the doors: the surface that sinks (the frame round it doesn't)
+var _gap: Sprite2D  # the shadow along the top of the window as the surface sinks
 var _on_it := 0  # balls rolling over it
 var _sunk := false
 
@@ -47,7 +48,15 @@ func _ready() -> void:
 		var door := _piece(DOORS)
 		door.region_enabled = true
 		_doors.append(door)
-	_piece(BORDER)
+	var shade := Image.create(int(PICTURE.x), int(SINK), false, Image.FORMAT_RGBA8)
+	shade.fill(Color(0.08, 0.06, 0.1, 0.85))
+	_gap = Sprite2D.new()
+	_gap.texture = ImageTexture.create_from_image(shade)
+	_gap.scale = features.MAP_SCALE
+	_gap.position = AT + Vector2(0, -PICTURE.y / 2.0 + SINK / 2.0) * features.MAP_SCALE
+	_gap.hide()
+	features.add_child(_gap)
+	_piece(BORDER)  # over the surface's edges, staying put as it sinks
 	_render_doors()
 	_open_on_city.call_deferred()
 	# it gives a little under a ball rolling over it, like a button (and does nothing)
@@ -75,7 +84,8 @@ func _piece(texture: Texture2D) -> Sprite2D:
 	sprite.scale = features.MAP_SCALE
 	sprite.position = AT
 	features.add_child(sprite)
-	_pieces.append(sprite)
+	if texture != BORDER:
+		_pieces.append(sprite)
 	return sprite
 
 # The city the journey's at: what it shows between spins
@@ -129,8 +139,9 @@ func _process(delta: float) -> void:
 	if sunk != _sunk:
 		_sunk = sunk
 		for piece in _pieces:
-			piece.offset.y = SINK if sunk else 0.0  # a pixel down, and a touch darker
-			piece.self_modulate = Color(0.85, 0.85, 0.85) if sunk else Color.WHITE
+			piece.offset.y = SINK if sunk else 0.0  # the surface a pixel down in its frame, a touch darker
+			piece.self_modulate = Color(0.88, 0.88, 0.88) if sunk else Color.WHITE
+		_gap.visible = sunk
 	if _spin_left > 0.0:
 		_spin_left -= delta
 		# fast at first, then slower, like a slot machine coming to rest
