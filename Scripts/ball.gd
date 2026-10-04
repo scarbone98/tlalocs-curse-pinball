@@ -175,7 +175,7 @@ func _physics_process(delta: float) -> void:
 	_watch_for_stuck(delta)
 	_watch_ramp_exit(delta)
 
-## Shows the ball as silver, iron, emerald or gold (one row each of the spin sheet)
+## Shows the ball as iron, silver, emerald or gold (one row each of the spin sheet)
 func set_tier(tier: int) -> void:
 	if anim == null:
 		return
