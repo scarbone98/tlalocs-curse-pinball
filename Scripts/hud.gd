@@ -15,14 +15,14 @@ const SCORE_FONT_MIN := 11
 # Launch power that drops the ball into a top lane (see ball.gd); marked on the meter
 const SKILL_SHOT_POWER := Vector2(0.815, 0.85)  # (measured: launches here drop into a top lane)
 const MIN_LAUNCH_POWER := 0.5
-const METER_LAMPS := 12
+const METER_LAMPS := 20
 
 @onready var score_label: Label       = $HBoxContainer/ScoreLabel
 @onready var lives_label: Label       = $HBoxContainer/LivesLabel
 
 var _tween: Tween
 var _toast_label: Label
-var _lamps: Array = []  # the power meter's lamps: [style, where along it, in the sweet spot]
+var _lamps: Array = []  # the power meter's lamps: [its TextureRect, where along it, in the sweet spot]
 var _launch_box: VBoxContainer
 var _power_meter: Control
 var _menu: MainMenu
@@ -118,7 +118,7 @@ func _build_launch_button() -> void:
 	_power_meter = _build_power_meter()
 	_launch_box.add_child(_power_meter)
 
-# The plunger's pull, as a row of stone lamps in a stone frame: they light one after
+# The plunger's pull, as a row of little pixel lamps in a stone frame: they light one after
 # another, ember red, as it's drawn back; the ones in the sweet spot (a launch that drops
 # straight into a top lane) sit in gold-rimmed sockets and burn gold
 func _build_power_meter() -> Control:
@@ -127,27 +127,73 @@ func _build_power_meter() -> Control:
 	meter.modulate.a = 0.0
 	meter.add_theme_stylebox_override("panel", TempleTheme.panel_box(UI_SCALE))
 	var row := HBoxContainer.new()
-	row.add_theme_constant_override("separation", int(2 * UI_SCALE))
+	row.add_theme_constant_override("separation", TempleTheme.FRAME_SCALE)  # one pixel between
 	row.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	meter.add_child(row)
 	_lamps.clear()
 	for i in METER_LAMPS:
 		var at := float(i + 0.5) / METER_LAMPS
-		var socket := Panel.new()
-		socket.custom_minimum_size = Vector2(9, 14) * UI_SCALE
-		socket.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		var box := StyleBoxFlat.new()
-		box.bg_color = TempleTheme.STONE
-		box.set_corner_radius_all(int(2 * UI_SCALE))
 		# its stretch of the pull overlaps the sweet spot
 		var sweet := _meter_to_power(float(i + 1) / METER_LAMPS) >= SKILL_SHOT_POWER.x 			and _meter_to_power(float(i) / METER_LAMPS) <= SKILL_SHOT_POWER.y
-		if sweet:
-			box.border_color = TempleTheme.GOLD  # a gold-rimmed socket: the sweet spot
-			box.set_border_width_all(int(1 * UI_SCALE))
-		socket.add_theme_stylebox_override("panel", box)
-		row.add_child(socket)
-		_lamps.append([box, at, sweet])
+		var lamp := TextureRect.new()
+		lamp.texture = _lamp_art(sweet, LAMP_OFF)
+		lamp.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+		lamp.stretch_mode = TextureRect.STRETCH_SCALE
+		lamp.custom_minimum_size = Vector2(LAMP_ART) * TempleTheme.FRAME_SCALE
+		lamp.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		row.add_child(lamp)
+		_lamps.append([lamp, at, sweet])
 	return meter
+
+const LAMP_ART := Vector2i(4, 6)  # each lamp, in pixels (drawn 3x, like the frames)
+enum { LAMP_OFF, LAMP_EMBER, LAMP_GOLD }
+var _lamp_textures := {}
+
+# A lamp in its socket, pixel by pixel: a rim (gold in the sweet spot) with clipped corners,
+# a glint top left, its glass shaded darker bottom right
+func _lamp_art(sweet: bool, state: int) -> Texture2D:
+	var key := Vector2i(int(sweet), state)
+	if _lamp_textures.has(key):
+		return _lamp_textures[key]
+	var glint: Color
+	var glass: Color
+	var shade: Color
+	match state:
+		LAMP_EMBER:
+			glint = Color("#ffb060")
+			glass = TempleTheme.TERRACOTTA
+			shade = Color("#802814")
+		LAMP_GOLD:
+			glint = Color("#fff6b8")
+			glass = TempleTheme.GOLD
+			shade = TempleTheme.GOLD_DARK
+		_:
+			glint = TempleTheme.STONE
+			glass = TempleTheme.STONE_DARK
+			shade = TempleTheme.INK
+	var rim := TempleTheme.GOLD_DARK if sweet else TempleTheme.INK
+	var image := Image.create(LAMP_ART.x, LAMP_ART.y, false, Image.FORMAT_RGBA8)
+	var w := LAMP_ART.x
+	var h := LAMP_ART.y
+	for y in h:
+		for x in w:
+			var edge := x == 0 or y == 0 or x == w - 1 or y == h - 1
+			var corner := (x == 0 or x == w - 1) and (y == 0 or y == h - 1)
+			var col := Color(0, 0, 0, 0)
+			if corner:
+				pass
+			elif edge:
+				col = rim
+			elif x == 1 and y == 1:
+				col = glint
+			elif x == w - 2 and y >= h - 3:
+				col = shade
+			else:
+				col = glass
+			image.set_pixel(x, y, col)
+	var texture := ImageTexture.create_from_image(image)
+	_lamp_textures[key] = texture
+	return texture
 
 func _meter_to_power(at: float) -> float:
 	return lerpf(MIN_LAUNCH_POWER, 1.0, at)
@@ -162,14 +208,9 @@ func _on_launch_power_changed(power: float, charging: bool) -> void:
 	_power_meter.modulate.a = 1.0 if charging else 0.0
 	var reached := _power_to_meter(power)
 	for lamp: Array in _lamps:
-		var box: StyleBoxFlat = lamp[0]
 		var lit: bool = lamp[1] <= reached
-		if not lit:
-			box.bg_color = TempleTheme.STONE  # an unlit lamp, plain stone
-		elif lamp[2]:
-			box.bg_color = TempleTheme.GOLD
-		else:
-			box.bg_color = TempleTheme.TERRACOTTA
+		var state := LAMP_OFF if not lit else (LAMP_GOLD if lamp[2] else LAMP_EMBER)
+		(lamp[0] as TextureRect).texture = _lamp_art(lamp[2], state)
 
 # The journey's current goal, in the hint's spot once the controls hint has gone
 func _build_objective() -> void:
