@@ -257,9 +257,14 @@ func _build_bonus_bars() -> void:
 # the way back into the launch lane, so, like Pokemon Pinball's, a one-way gate where
 # the orbit meets the table lets launched balls out but turns balls in play away - all
 # but one looping round fast (up the torch lane and over the top), which it lets on round
-# the orbit and down the launch lane to the plunger, to be launched again.
+# the orbit. A one-way flap across the top of the launch tube then turns that one down the
+# right lane (the spirit lane, beside the tube) instead: nothing gets back into the tube.
 const LANE_GATE_X := 480.0
 const LANE_GATE_SPAN := Vector2(215, 305)  # across the orbit, ends buried in its walls
+# The flap: from the tube's outer wall down to the tip of its inner wall (scene units).
+# Launched balls come up through it; one coming round the orbit is steered off it, down
+# into the right lane
+const TUBE_FLAP := [Vector2(667, 391), Vector2(612, 416)]
 const LOOP_THROUGH_SPEED := 600.0  # a ball heading right through the gate this fast is looping: it's let on
 const LOOP_THROUGH_REACH := Vector2(140, 60)  # how far before the gate (x) and either side of its middle (y) it's let on
 
@@ -278,6 +283,23 @@ func _build_lane_gate() -> void:
 	gate.add_child(shape)
 	add_child(gate)
 	_lane_gate = gate
+	# the flap across the top of the launch tube
+	var flap := StaticBody2D.new()
+	var flap_shape := CollisionShape2D.new()
+	var flap_line := SegmentShape2D.new()
+	var a: Vector2 = TUBE_FLAP[1]
+	var b: Vector2 = TUBE_FLAP[0]
+	var across := (b - a).length()
+	flap_line.a = Vector2(-across / 2.0, 0)
+	flap_line.b = Vector2(across / 2.0, 0)
+	flap_shape.shape = flap_line
+	flap_shape.one_way_collision = true
+	# along it from its low end to its high end, its local +y (the way it stops balls) points
+	# down into the tube: balls coming up out of it pass
+	flap_shape.rotation = (b - a).angle()
+	flap_shape.position = (a + b) / 2.0
+	flap.add_child(flap_shape)
+	add_child(flap)
 
 # A ball coming fast along the top heading right, looping, goes on through the lane gate
 func _let_loops_through() -> void:
