@@ -91,6 +91,8 @@ func _ready() -> void:
 			torch.scale = features.MAP_SCALE
 			torch.play(&"ember")
 			torch.frame = randi() % 6
+			torch.z_index = 2  # standing up off the floor: over a ball rolling past (z 1)
+			torch.z_as_relative = false
 			features.add_child(torch)
 			features._torches.append(torch)  # the curse makes them flicker faster
 			both.append(torch)
@@ -102,6 +104,8 @@ func _ready() -> void:
 		torch.scale = features.MAP_SCALE
 		torch.play(&"blaze")
 		torch.frame = randi() % 6
+		torch.z_index = 2
+		torch.z_as_relative = false
 		features.add_child(torch)
 		features._torches.append(torch)  # lit like the others (Scripts/lighting.gd), and the curse quickens them
 

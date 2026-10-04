@@ -379,9 +379,23 @@ def fire_button():
 # A skull over crossed bones carved in the inlane wall's stone just above the dart trap's
 # gold button: poison (art pixels: its top-left corner)
 DART_RUNE = ["..XXX..", ".XXXXX.", ".X.X.X.", "..XXX..", "X.X.X.X", ".X...X.", "X.....X"]
-DART_RUNE_AT = (59, 248)
+DART_RUNE_AT = (62, 256)  # just above the button, to its left
 
 FRONT_WALLS_FROM = 330  # art rows: the walls along the table's foot, in front of the gutters
+
+
+def dart_rune_lit():
+    """The skull and crossbones over the dart button, glowing poison green while the darts
+    are out (Scripts/dart_trap.gd): laid over the carving"""
+    glow, core = (60, 230, 110, 255), (190, 255, 200, 255)
+    w, h = len(DART_RUNE[0]), len(DART_RUNE)
+    img = Image.new("RGBA", (w, h), T)
+    for y, row in enumerate(DART_RUNE):
+        for x, ch in enumerate(row):
+            if ch == "X":
+                inner = all(0 <= y + dy < h and 0 <= x + dx < w and DART_RUNE[y + dy][x + dx] == "X" for dx, dy in ((1, 0), (-1, 0), (0, 1), (0, -1)))
+                img.putpixel((x, y), core if inner else glow)
+    return img
 
 
 def front_walls(walls):
@@ -1993,6 +2007,7 @@ def main():
     spring_sheet().save("Sprites/table/spring.png")
     totem_heads().save("Sprites/table/totem_heads.png")
     totem_door().save("Sprites/table/totem_door.png")
+    dart_rune_lit().save("Sprites/table/dart_rune_lit.png")
     feathers().save("Sprites/table/feathers.png")
     leaves().save("Sprites/table/leaves.png")
     for side, direction in ROAD_ARROWS.items():

@@ -13,6 +13,8 @@ extends Node2D
 const FALLING := preload("res://Sprites/table/dart_falling.png")  # tools/make_table.py
 const STUCK := preload("res://Sprites/table/dart_stuck.png")      # still, quivering
 const SHADOW := preload("res://Sprites/table/dart_shadow.png")
+const RUNE_LIT := preload("res://Sprites/table/dart_rune_lit.png")  # the skull and crossbones over the button, glowing
+const RUNE_ART := Vector2(62, 256)  # its top left, in table-art pixels (tools/make_table.py DART_RUNE_AT)
 const BUTTON_AT := Vector2(207, 815)     # the gold button on the left inlane wall's tip
 const BUTTON_REACH := 32.0               # a knock into the wall this near it presses it
 const BUTTON_POINTS := 500
@@ -50,6 +52,7 @@ var features: Node2D  # TableFeatures
 var button_sprite: AnimatedSprite2D  # Scripts/lighting.gd lights it
 var _pressed_left := 0.0
 var _reload_left := 0.0
+var _rune: Sprite2D
 var _to_drop := 0         # darts still to come down this volley
 var _next_dart := 0.0
 var _flaming := false     # this volley's darts are alight
@@ -57,6 +60,13 @@ var _eyes_in_play := false
 var _darts: Array[Dictionary] = []  # each standing (or falling) dart: spot, sprite, body, left, ...
 
 func _ready() -> void:
+	_rune = Sprite2D.new()
+	_rune.texture = RUNE_LIT
+	_rune.centered = false
+	_rune.scale = features.MAP_SCALE
+	_rune.position = RUNE_ART * features.MAP_SCALE
+	_rune.visible = false
+	features.add_child(_rune)
 	features.dart_trap = self
 	button_sprite = features.gold_button("dart_button")
 	# pressed only by a ball knocked into it, not one grazing past or rolling over it
@@ -296,6 +306,10 @@ func _remove(entry: Dictionary, puff: bool = true) -> void:
 		_reload_left = RELOAD_SECONDS
 
 func _physics_process(delta: float) -> void:
+	# the skull over the button glows poison green while the darts are out
+	_rune.visible = _to_drop > 0 or not _darts.is_empty()
+	if _rune.visible:
+		_rune.modulate.a = 0.75 + 0.25 * sin(Time.get_ticks_msec() * 0.008)
 	_pressed_left = maxf(_pressed_left - delta, 0.0)
 	_reload_left = maxf(_reload_left - delta, 0.0)
 	if _to_drop > 0:
