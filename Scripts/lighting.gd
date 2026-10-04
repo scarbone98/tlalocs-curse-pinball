@@ -45,6 +45,11 @@ const EYE_SIZE := 0.3
 const IDOL_SPOT_SIZE := 1.15  # a spotlight on the golden idol, taking in its spinning tower
 const IDOL_SPOT_BELOW := 46.0  # scene units below the idol its middle falls: on the tower
 const IDOL_GLOW := 1.0
+const SKULL_SPOT_SIZE := 0.9  # a spotlight on the crystal skull while its jaws are open
+const SKULL_GLOW := 0.9
+const SPOT_BREATH_SECONDS := 3.2  # the idol's and skull's spots breathe this slowly...
+const SPOT_BREATH := 0.18         # ...brightening and dimming this much
+const SPOT_BREATH_SIZE := 0.08    # ...and swelling and shrinking this much
 const EYE_YELLOW := Color(1.0, 0.9, 0.3)
 const EYE_RED := Color(1.0, 0.15, 0.1)
 
@@ -57,6 +62,9 @@ var _sky_light: PointLight2D
 var _lava_glow: Sprite2D
 var _sacrifice_light: PointLight2D
 var _idol_light: PointLight2D
+var _skull_light: PointLight2D
+var _idol_spot_scale := 1.0
+var _skull_spot_scale := 1.0
 var _skull_shine: Sprite2D
 var _skull_shimmer: Sprite2D
 var _spot_on_skull := false
@@ -109,7 +117,10 @@ func _ready() -> void:
 	_skull_shimmer.vframes = 2
 	_skull_shimmer.hide()
 	_sacrifice_light = _light(Vector2.ZERO, Color(1.0, 0.72, 0.4), 0.95, 0.85)  # a warm spot on the sacrifice
-	_idol_light = _light(Vector2.ZERO, Color(1.0, 0.86, 0.45), IDOL_GLOW, IDOL_SPOT_SIZE)  # a small spot on the golden idol
+	_idol_light = _light(Vector2.ZERO, Color(1.0, 0.86, 0.45), IDOL_GLOW, IDOL_SPOT_SIZE)  # a spot on the golden idol
+	_skull_light = _light(features.skull._sprite.global_position, Color(0.6, 0.85, 1.0), SKULL_GLOW, SKULL_SPOT_SIZE)  # ...and on the skull, open
+	_idol_spot_scale = _idol_light.texture_scale
+	_skull_spot_scale = _skull_light.texture_scale
 	_whirl_light = _light(features.temple.AT, Color(0.85, 0.45, 1.0), 0.9, 1.4)
 	for sprite: AnimatedSprite2D in [features.idol_tower._button, features.journey._button_sprite, features.dart_trap.button_sprite]:
 		var glow := _light(sprite.position, Color(1.0, 0.85, 0.4), BUTTON_GLOW, 0.6)
@@ -248,7 +259,15 @@ func _process(delta: float) -> void:
 	var idol: Sprite2D = features.idol_tower._idol
 	_idol_light.visible = idol.visible and not features.idol_tower._claimed
 	_idol_light.global_position = features.idol_tower.position + Vector2(idol.position.x, minf(idol.position.y + IDOL_SPOT_BELOW, features.idol_tower.IDOL_ON_FLOOR.y * features.MAP_SCALE.y))
-	_idol_light.energy = IDOL_GLOW * (1.0 + 0.08 * sin(_clock * 2.6))  # it gleams, gently
+	# the spots breathe: slowly swelling and brightening, then easing back
+	var breath := sin(_clock * TAU / SPOT_BREATH_SECONDS)
+	_idol_light.energy = IDOL_GLOW * (1.0 + SPOT_BREATH * breath)
+	_idol_light.texture_scale = _idol_spot_scale * (1.0 + SPOT_BREATH_SIZE * breath)
+	_skull_light.visible = features.skull.lit()  # while its jaws are open
+	_skull_light.global_position = features.skull._sprite.global_position
+	var skull_breath := sin(_clock * TAU / SPOT_BREATH_SECONDS + PI)  # out of step with the idol's
+	_skull_light.energy = SKULL_GLOW * (1.0 + SPOT_BREATH * skull_breath)
+	_skull_light.texture_scale = _skull_spot_scale * (1.0 + SPOT_BREATH_SIZE * skull_breath)
 	for pair: Array in _lamp_lights:
 		var lamp: AnimatedSprite2D = pair[0]
 		(pair[1] as PointLight2D).visible = lamp.is_visible_in_tree() and lamp.frame >= pair[2]
