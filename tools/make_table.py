@@ -1604,12 +1604,21 @@ def idol_spin():
     """The golden idol turning round on its tower, in depth: each row of it is a slice
     whose front shrinks as its side swings into view (shaded, as it turns from the light)
     and then the back comes round, plain where the face was. Eight frames, a full turn,
-    on the table's pixel grid (built from idol.png's first frame)."""
+    on the table's pixel grid (built from idol.png's first frame), a row for each city's
+    idol."""
     import math
 
     idol = Image.open("Sprites/table/idol.png").convert("RGBA")
-    size = idol.height
-    front = idol.crop((0, 0, size, size))
+    size = 22  # tools/make_tiki_idol.py's frames
+    cities = idol.height // size
+    sheet = Image.new("RGBA", (size * IDOL_TURN_FRAMES, size * cities), T)
+    for city in range(cities):
+        sheet.paste(_idol_turning(idol.crop((0, city * size, size, (city + 1) * size)), size), (0, city * size))
+    return sheet
+
+
+def _idol_turning(front, size):
+    import math
     gold, dark = (248, 192, 0, 255), (176, 112, 0, 255)
     face_rows = range(3, 18)  # the jewel, the face and the pectoral (tools/make_tiki_idol.py)
     rows = []

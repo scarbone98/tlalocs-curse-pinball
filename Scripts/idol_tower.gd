@@ -18,6 +18,7 @@ const SHARD := preload("res://Sprites/table/shard.png")
 const Shatter := preload("res://Scripts/shatter.gd")
 const IDOL_SPIN_FPS := 8.0
 const IDOL_TURN_FRAMES := 8  # a full turn, in depth
+const CITIES := 4  # each city on the journey has its own idol, set with its own gem: a row each (tools/make_tiki_idol.py)
 # Between the spikes and the tower's foot, where a ball can be when the spikes come back up
 const PIT := Rect2(214, 470, 76, 98)
 const SPIKES := preload("res://Sprites/table/spikes.png")
@@ -91,9 +92,11 @@ func _ready() -> void:
 		drum.position = (DRUM_ART - Vector2(0, DRUM_STEP * i)) * features.MAP_SCALE
 		_drums.append(drum)
 	_idol = _sheet_sprite(IDOL, IDOL_FRAMES)
+	_idol.vframes = CITIES
 	_idol.z_index = 3  # in front of the palm behind the tower (the palms are z 2)
 	_idol.z_as_relative = false
 	_turning = _sheet_sprite(IDOL_SPIN, IDOL_TURN_FRAMES)
+	_turning.vframes = CITIES
 	_turning.z_index = 3
 	_turning.z_as_relative = false
 	_shards = _shard_burst()
@@ -294,6 +297,13 @@ func _physics_process(delta: float) -> void:
 		if _reset_left <= 0.0:
 			_raise(true)
 
+# The idol of the city the journey's at (Scripts/journey.gd)
+func _city() -> int:
+	return clampi(features.journey.city, 0, CITIES - 1) if features.journey else 0
+
+func _show_idol(frame: int) -> void:
+	_idol.frame_coords = Vector2i(frame, _city())
+
 func _ball_in_pit() -> bool:
 	for node in get_tree().get_nodes_in_group("ball"):
 		if PIT.has_point((node as Node2D).global_position):
@@ -331,18 +341,18 @@ func _render_idol() -> void:
 	var spinning := not _claimed and _standing > 0 and _struck_left <= 0.0 and _rock_left <= 0.0
 	_turning.visible = spinning and _idol.visible
 	if spinning:
-		_turning.frame = int(_clock * IDOL_SPIN_FPS) % IDOL_TURN_FRAMES
+		_turning.frame_coords = Vector2i(int(_clock * IDOL_SPIN_FPS) % IDOL_TURN_FRAMES, _city())
 	if _claimed:
 		return
 	_idol.self_modulate.a = 0.0 if _turning.visible else 1.0
 	if _struck_left > 0.0:
-		_idol.frame = STRUCK
+		_show_idol(STRUCK)
 	elif _rock_left > 0.0:
-		_idol.frame = ROCK_LEFT if int(_rock_left * 10.0) % 2 == 0 else ROCK_RIGHT
+		_show_idol(ROCK_LEFT if int(_rock_left * 10.0) % 2 == 0 else ROCK_RIGHT)
 	elif idol_open():
-		_idol.frame = GLINT if int(_clock * 4.0) % 2 == 0 else GLEAM  # it gleams, waiting
+		_show_idol(GLINT if int(_clock * 4.0) % 2 == 0 else GLEAM)  # it gleams, waiting
 	else:
-		_idol.frame = GLINT if fposmod(_clock, 2.5) < 0.2 else GLEAM
+		_show_idol(GLINT if fposmod(_clock, 2.5) < 0.2 else GLEAM)
 
 func _on_button(body: Node) -> void:
 	if not features._is_ball_on_playfield(body):
@@ -384,7 +394,7 @@ func _on_idol_hit(body: Node) -> void:
 	if not idol_open() or not features._is_ball_on_playfield(body):
 		return
 	_claimed = true
-	_idol.frame = TOPPLED
+	_show_idol(TOPPLED)
 	_place.call_deferred()
 	features._award(CLAIM_POINTS, _idol.position)
 	GameManager.add_bonus_multiplier(1)
