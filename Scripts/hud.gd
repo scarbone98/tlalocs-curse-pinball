@@ -3,6 +3,8 @@ class_name Hud
 
 # The table viewport is 720 wide, twice the 360 the shared theme was tuned for.
 const UI_SCALE := 2.0
+const BORDER := preload("res://Sprites/table/aztec_border.png")  # tools/make_table.py
+const BORDER_SCALE := 3  # its pixels, at the frames' size
 const DESKTOP_SCALE := 0.62  # the HUD in the desktop view, which is barely half a phone's height
 # The score and balls pills, sized to leave the pause button room between them. A long
 # score shrinks toward SCORE_FONT_MIN rather than growing past SCORE_ROOM.
@@ -30,6 +32,7 @@ var _menu: MainMenu
 var _objective_label: Label
 var _billboard: Billboard
 var _codex: CodexScreen
+var _border: Control
 var _pause: Button
 var _status_label: Label   # the ball saver's countdown while one runs, under the objective
 var _shown_score := 0      # the score rolls up toward the real one rather than jumping
@@ -44,6 +47,7 @@ func _ready() -> void:
 	theme = TempleTheme.build(UI_SCALE)
 	process_mode = Node.PROCESS_MODE_ALWAYS
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_build_border()
 	_style_top_bar()
 	_build_toast()
 	_build_launch_button()
@@ -76,14 +80,51 @@ func _ready() -> void:
 # Phone view: the HUD fills the screen at its own size. Desktop view: it's drawn at
 # DESKTOP_SCALE over an area that much bigger, so everything keeps its place, just smaller
 func _fit_view(desktop: bool) -> void:
+	var view := get_viewport_rect().size
+	# a phone held sideways: an Aztec band along the top and bottom of the screen, the HUD
+	# just under the top one
+	var sideways := desktop and DisplayServer.is_touchscreen_available() and view.x > view.y
+	_border.visible = sideways or OS.get_environment("TLALOC_BORDER") == "1"
+	var below := Vector2(0, BORDER.get_height() * BORDER_SCALE if _border.visible else 0)
 	if desktop:
 		set_anchors_preset(Control.PRESET_TOP_LEFT)
-		position = Vector2.ZERO
+		position = below
 		scale = Vector2.ONE * DESKTOP_SCALE
-		size = get_viewport_rect().size / DESKTOP_SCALE
+		size = (view - below) / DESKTOP_SCALE
 	else:
 		scale = Vector2.ONE
 		set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	# ...but not the menu, the Spirit Codex and the border: they fill the screen as they are
+	for screen: Control in [_menu, _codex, _border]:
+		if desktop:
+			screen.set_anchors_preset(Control.PRESET_TOP_LEFT)
+			screen.position = -below / DESKTOP_SCALE
+			screen.scale = Vector2.ONE / DESKTOP_SCALE
+			screen.size = view
+		else:
+			screen.scale = Vector2.ONE
+			screen.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+
+func _build_border() -> void:
+	_border = Control.new()
+	_border.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_border.visible = false
+	for top in [true, false]:
+		var band := TextureRect.new()
+		band.texture = BORDER
+		band.stretch_mode = TextureRect.STRETCH_TILE
+		band.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+		band.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		band.scale = Vector2.ONE * BORDER_SCALE
+		band.set_anchors_preset(Control.PRESET_TOP_WIDE if top else Control.PRESET_BOTTOM_WIDE)
+		band.custom_minimum_size.y = BORDER.get_height()
+		band.flip_v = not top
+		_border.add_child(band)
+		_border.resized.connect(func():
+			band.size = Vector2(_border.size.x / BORDER_SCALE, BORDER.get_height())
+			band.position = Vector2(0, 0 if top else _border.size.y - BORDER.get_height() * BORDER_SCALE))
+	add_child(_border)
+	move_child(_border, 0)  # under the rest of the HUD
 
 func _style_top_bar() -> void:
 	var bar: HBoxContainer = $HBoxContainer
@@ -236,7 +277,7 @@ func _build_objective() -> void:
 	_objective_label.add_theme_font_size_override("font_size", TempleTheme.snap(int(8 * UI_SCALE)))
 	_objective_label.set_anchors_preset(Control.PRESET_TOP_LEFT)
 	_objective_label.offset_left = HUD_LEFT * UI_SCALE
-	_objective_label.offset_top = 34 * UI_SCALE  # under the score
+	_objective_label.offset_top = 40 * UI_SCALE  # under the score and the pause button
 	_objective_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_objective_label.add_theme_stylebox_override("normal", TempleTheme.pill_box(UI_SCALE))
 	_objective_label.visible = false
@@ -249,7 +290,7 @@ func _build_status() -> void:
 	_status_label.add_theme_font_size_override("font_size", TempleTheme.snap(int(8 * UI_SCALE)))
 	_status_label.set_anchors_preset(Control.PRESET_TOP_LEFT)
 	_status_label.offset_left = HUD_LEFT * UI_SCALE
-	_status_label.offset_top = 58 * UI_SCALE
+	_status_label.offset_top = 64 * UI_SCALE
 	_status_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_status_label.add_theme_stylebox_override("normal", TempleTheme.pill_box(UI_SCALE))
 	add_child(_status_label)
@@ -281,7 +322,7 @@ func _build_billboard() -> void:
 	_billboard = Billboard.new()
 	_billboard.set_anchors_preset(Control.PRESET_CENTER_TOP)
 	_billboard.grow_horizontal = Control.GROW_DIRECTION_BOTH
-	_billboard.offset_top = 74 * UI_SCALE
+	_billboard.offset_top = 80 * UI_SCALE
 	add_child(_billboard)
 
 # The pause button between the score and balls opens the menu (Resume, the Spirit Codex,

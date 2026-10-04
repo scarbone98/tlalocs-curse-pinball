@@ -1450,6 +1450,29 @@ def leaves():
     return _flutter_sheet(shapes, palettes)
 
 
+def aztec_border():
+    """A band of carved stone with a gold meander running along it, edged in gold: laid along
+    the top and bottom of the screen when a phone's held sideways (Scripts/hud.gd). One
+    repeat of it; it tiles across."""
+    ink, gold, gold_d = (20, 16, 24, 255), (248, 200, 40, 255), (176, 118, 16, 255)
+    stone, stone_d = (58, 48, 66, 255), (42, 34, 50, 255)
+    key = ["XXXXXXX.", "X.....X.", "X.XXX.X.", "X.X...X.", "X.XXXXX.", "X......."]
+    w, h = len(key[0]), len(key) + 4
+    img = Image.new("RGBA", (w, h), T)
+    for x in range(w):
+        img.putpixel((x, 0), ink)
+        img.putpixel((x, 1), gold)
+        img.putpixel((x, h - 2), gold_d)
+        img.putpixel((x, h - 1), ink)
+        for y, row in enumerate(key):
+            lit = row[x] == "X"
+            below = y + 1 < len(key) and key[y + 1][x] == "X"
+            img.putpixel((x, y + 2), (gold if not below else gold) if lit else (stone if y < 3 else stone_d))
+            if lit and not below and y + 3 < h - 2:
+                pass
+    return img
+
+
 def spring_sheet():
     """The plunger, drawn round like a real one: a gold cap seen a little from above (its lit
     top face, then its side turning from a bright edge on the left into shadow on the right),
@@ -2076,6 +2099,7 @@ def main():
     spring_sheet().save("Sprites/table/spring.png")
     totem_heads().save("Sprites/table/totem_heads.png")
     totem_door().save("Sprites/table/totem_door.png")
+    aztec_border().save("Sprites/table/aztec_border.png")
     dart_rune_lit().save("Sprites/table/dart_rune_lit.png")
     feathers().save("Sprites/table/feathers.png")
     leaves().save("Sprites/table/leaves.png")
