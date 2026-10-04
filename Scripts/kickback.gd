@@ -97,7 +97,6 @@ func add_speed_charge(speed: float) -> void:
 	_charge = 0.0
 	charged = true
 	_render()
-	PinballEvents.toast.emit("Kickback ready!")
 	AudioSfx.play("charge")
 
 ## The roulette's kickback: guards both outlanes until it saves a ball. False if one's
@@ -109,7 +108,6 @@ func charge() -> bool:
 	charged = true
 	both_sides = true
 	_render()
-	PinballEvents.toast.emit("Kickback ready both sides!")
 	AudioSfx.play("charge")
 	return true
 
@@ -138,7 +136,6 @@ func _on_kick_zone_entered(body: Node, index: int) -> void:
 	_carry_out(ball, CARRY_PATHS[index])
 	PinballEvents.kickback_saved.emit()
 	features._award(KICK_POINTS, frogs[index].global_position)
-	PinballEvents.toast.emit("Kickback!")
 	PinballEvents.effect.emit("splash", frogs[index].global_position)
 	PinballEvents.rumble.emit(6.0)
 	AudioSfx.play("kickback")

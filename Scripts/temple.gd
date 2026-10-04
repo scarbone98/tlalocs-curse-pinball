@@ -103,7 +103,6 @@ func _offering() -> void:
 	for i in _gems.size():
 		_gem_glow[i] = GEM_GLOW_SECONDS * 2.0  # the whole ring blazes as the offering's made
 	features._award(OFFERING_POINTS, LOOP_CENTRE + Vector2(0, 60))
-	PinballEvents.toast.emit("An offering to Tlaloc!")
 	PinballEvents.effect.emit("gold", LOOP_CENTRE)
 	features.stir_tlaloc()
 	if features.ramps.arrows["summon"] >= ARROWS_TO_SUMMON:

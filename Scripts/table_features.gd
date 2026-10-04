@@ -389,7 +389,6 @@ func _physics_process(delta: float) -> void:
 			_tier -= 1
 			_tier_left = UPGRADE_SECONDS
 			_apply_tier()
-			PinballEvents.toast.emit("%s Ball x%d" % BALL_TIERS[_tier])
 			AudioSfx.play("downgrade")
 	for area in _lane_cooldowns:
 		_lane_cooldowns[area] = maxf(_lane_cooldowns[area] - delta, 0.0)
@@ -410,7 +409,6 @@ func _on_top_lane(index: int) -> void:
 	if _skill_shot_left > 0.0:
 		_skill_shot_left = 0.0
 		_award(SKILL_SHOT_POINTS, _top_lamps[index].global_position + Vector2(0, -40))
-		PinballEvents.toast.emit("Skill shot!")
 	_award(TOP_LANE_POINTS, _top_lamps[index].global_position)
 	_top_lit[index] = true
 	_render_top_lanes()
@@ -429,7 +427,6 @@ func _upgrade_ball() -> void:
 	_tier_left = UPGRADE_SECONDS
 	if _tier == BALL_TIERS.size() - 1:
 		_award(TOP_TIER_POINTS, _top_lamps[1].global_position + Vector2(0, -40))
-		PinballEvents.toast.emit("Gold Ball renewed!")
 		return
 	_tier += 1
 	_apply_tier()
@@ -475,7 +472,6 @@ func stir_tlaloc() -> void:
 	if _face_hits >= _face_hits_needed():
 		_start_curse()
 	else:
-		PinballEvents.toast.emit("Tlaloc stirs %d/%d" % [_face_hits, _face_hits_needed()])
 		_render_shrine()
 
 func _face_hits_needed() -> int:
@@ -522,7 +518,6 @@ func _end_curse() -> void:
 	GameManager.set_curse_active(false)
 	_rest_left = CURSE_REST_SECONDS
 	_render_shrine()
-	PinballEvents.toast.emit("The rain passes")
 	_rain.emitting = false
 	create_tween().tween_property(_storm_tint, "color", Lighting.MOOD, 1.2)
 	for torch in _torches:
@@ -605,11 +600,15 @@ func _flash_face_eyes() -> void:
 
 # ---------- score popups ----------
 
+const POPUP_MIN_POINTS := 5000  # smaller awards add to the score without a number floating up
+
 func _spawn_popup(points: int, at: Vector2) -> void:
+	if points < POPUP_MIN_POINTS:
+		return  # the small stuff just adds to the score
 	var label := Label.new()
 	label.text = "+%d" % (points * GameManager.score_factor())
 	label.add_theme_font_override("font", TempleTheme.BODY_FONT)
-	label.add_theme_font_size_override("font_size", TempleTheme.snap(30))
+	label.add_theme_font_size_override("font_size", TempleTheme.snap(24))
 	label.add_theme_color_override("font_color", TempleTheme.GOLD)
 	label.add_theme_color_override("font_outline_color", TempleTheme.SHADOW)
 	label.add_theme_constant_override("outline_size", 8)

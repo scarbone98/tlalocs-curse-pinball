@@ -89,7 +89,6 @@ func _physics_process(delta: float) -> void:
 	if at.distance_to(target) < 0.5:
 		_next += 1
 		if _next >= PATH.size():
-			PinballEvents.toast.emit("The hatchling wandered off")
 			_end()
 			return
 	_sprite.flip_h = target.x < _area.position.x
@@ -113,7 +112,6 @@ func _on_ball(body: Node) -> void:
 	AudioSfx.play("spirit_hit", 0.0, Vector2.ONE * (1.0 + 0.2 * _hits))
 	features._award(HIT_POINTS, _area.position)
 	if _hits < HITS_TO_CATCH:
-		PinballEvents.toast.emit("Hatchling %d/%d" % [_hits, HITS_TO_CATCH])
 		return
 	var spirit: Dictionary = SpiritCodex.SPECIES[_species]
 	var first := SpiritCodex.register(_species)

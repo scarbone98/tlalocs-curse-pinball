@@ -153,7 +153,6 @@ func _physics_process(delta: float) -> void:
 		_shown_seconds = ceili(_time_left)
 		_show_progress()
 	if _time_left <= 0.0:
-		PinballEvents.toast.emit("The spirit slipped away")
 		_dismiss()
 		return
 
@@ -208,7 +207,6 @@ func _lightning() -> void:
 			tile.hide()
 			PinballEvents.effect.emit("dust", tile.position)
 	features._award(LIGHTNING_POINTS, SPAWN_AT)
-	PinballEvents.toast.emit("Lightning strike!")
 	PinballEvents.effect.emit("gold", SPAWN_AT)
 	PinballEvents.rumble.emit(6.0)
 	AudioSfx.play("upgrade")
@@ -247,7 +245,6 @@ func _on_body_entered(body: Node) -> void:
 	features._award(HIT_POINTS, SPAWN_AT)
 
 	if _hits < HITS_TO_CATCH:
-		PinballEvents.toast.emit("Spirit %d/%d" % [_hits, HITS_TO_CATCH])
 		return
 	caught += 1
 	var spirit: Dictionary = SpiritCodex.SPECIES[species]

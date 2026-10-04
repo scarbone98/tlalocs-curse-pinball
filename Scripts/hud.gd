@@ -89,7 +89,7 @@ func _style_top_bar() -> void:
 func _build_toast() -> void:
 	_toast_label = Label.new()
 	_toast_label.theme_type_variation = "TitleLabel"
-	_toast_label.add_theme_font_size_override("font_size", TempleTheme.snap(int(20 * UI_SCALE)))
+	_toast_label.add_theme_font_size_override("font_size", TempleTheme.snap(int(12 * UI_SCALE)))  # only the big moments get one
 	_toast_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_toast_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART  # long ones wrap, not run off
 	_toast_label.set_anchors_preset(Control.PRESET_CENTER)

@@ -179,8 +179,6 @@ func _finish_ball() -> void:
 		_game_over()
 	elif lives == 1:
 		PinballEvents.toast.emit("Last ball!")
-	else:
-		PinballEvents.toast.emit("Ball drained!")
 
 func _on_add_score(points: int):
 	score += points * score_factor()

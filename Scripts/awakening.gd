@@ -58,7 +58,6 @@ func light() -> void:
 	if lit or active or SpiritCodex.awakenable().is_empty():
 		return
 	lit = true
-	PinballEvents.toast.emit("Awakening lit in the den!")
 
 ## Starts the Awakening for one of the caught spirits. False if none is waiting to awaken.
 func start() -> bool:
@@ -88,7 +87,6 @@ func _physics_process(delta: float) -> void:
 		_shown_seconds = ceili(_time_left)
 		_show_progress()
 	if _time_left <= 0.0:
-		PinballEvents.toast.emit("The %s sleeps on" % SpiritCodex.SPECIES[_species].name)
 		_end()
 
 func _place_offering() -> void:
@@ -111,7 +109,6 @@ func _on_offering(body: Node) -> void:
 	_offering.set_deferred("monitoring", false)
 	_offering.hide()
 	if _collected < OFFERINGS:
-		PinballEvents.toast.emit("Offering %d/%d" % [_collected, OFFERINGS])
 		_show_progress()
 		_place_offering.call_deferred()
 		return

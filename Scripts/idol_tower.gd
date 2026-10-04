@@ -283,7 +283,6 @@ func _on_front_hit(body: Node) -> void:
 	_shards.position = (DRUM_ART - Vector2(0, DRUM_STEP * _standing)) * features.MAP_SCALE
 	_shards.restart()
 	PinballEvents.rumble.emit(3.0)
-	PinballEvents.toast.emit("The idol is down!" if _standing == 0 else "Tower %d/%d" % [DRUMS - _standing, DRUMS])
 
 func _on_idol_hit(body: Node) -> void:
 	if not idol_open() or not features._is_ball_on_playfield(body):

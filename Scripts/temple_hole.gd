@@ -81,7 +81,6 @@ func light_roulette() -> void:
 	if roulette_lit:
 		return
 	roulette_lit = true
-	PinballEvents.toast.emit("Temple roulette lit!")
 
 func _el_dorado_open() -> bool:
 	return gate_open or GameManager.bonus_lamps >= GameManager.BONUS_LAMPS_FOR_EL_DORADO

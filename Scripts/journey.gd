@@ -245,7 +245,6 @@ func _physics_process(delta: float) -> void:
 		if ceili(_travel_left) != ceili(_travel_left + delta):
 			_announce_goal()
 		if _travel_left <= 0.0:
-			PinballEvents.toast.emit("The road closes")
 			_end_travel()
 
 func _on_serpent_hit(body: Node, side: int, facing: Vector2) -> void:
