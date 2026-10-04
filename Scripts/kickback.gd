@@ -8,9 +8,8 @@ extends Node2D
 ##  - the temple roulette and the market can award one that guards both outlanes, like
 ##    Ruby & Sapphire's Pichu: it doesn't get used up, it lasts until the ball drains
 ## The stone frog statue at the guarded outlane wakes up jade when it's ready and leaps
-## when it fires. A ball it doesn't save doesn't drain in the frog's pit: it rolls on along
-## the gutter track under the inlane and the flipper, down into the lava pit in the middle,
-## and drains there.
+## when it fires. A ball it doesn't save rolls on down the slope past the frog's pit and
+## along the gutter track under the inlane and the flipper, into the lava pit in the middle.
 ##
 ## The outlanes aren't straight: the ball gets in through a slot between a wall ledge
 ## (y ~951) and the top of the inlane post (y ~1002), and no straight kick clears both.
@@ -26,15 +25,6 @@ const FROG_AT := [Vector2(88, 1166), Vector2(586, 1166)]  # each squatting on it
 # Just above each outlane drain, so the kick fires before the ball reaches it
 const KICK_ZONES := [Vector2(90, 1128), Vector2(586, 1131)]
 const KICK_ZONE_SIZE := Vector2(50, 40)
-# The bottom of each frog's pit, and the gutter track from there down into the lava pit
-const PIT_ZONES := [Vector2(90, 1182), Vector2(586, 1184)]
-const PIT_ZONE_SIZE := Vector2(48, 28)
-# (each ends just above the drain, which it then drops into like any ball)
-const GUTTERS := [
-	[Vector2(88, 1178), Vector2(130, 1190), Vector2(178, 1210), Vector2(232, 1228), Vector2(284, 1236), Vector2(322, 1236)],
-	[Vector2(586, 1180), Vector2(546, 1192), Vector2(498, 1212), Vector2(446, 1230), Vector2(392, 1236), Vector2(350, 1236)],
-]
-const GUTTER_SECONDS := 0.9
 # Per outlane: top of the lane, just through the slot, and the fling out into the playfield
 const CARRY_PATHS := [
 	[Vector2(95, 977), Vector2(164, 977), Vector2(650, -950)],
@@ -58,7 +48,6 @@ var side := 0             # the outlane it guards: 0 left, 1 right
 var both_sides := false   # the roulette's version guards both
 
 var frogs: Array[AnimatedSprite2D] = []  # Scripts/lighting.gd lights an awake one
-var _roll: Tween  # a ball rolling down a gutter
 var _charge := 0.0
 
 func _ready() -> void:
@@ -66,7 +55,6 @@ func _ready() -> void:
 		frogs.append(features._sprite(FROG, 3, at))
 	for i in KICK_ZONES.size():
 		_add_kick_zone(KICK_ZONES[i], i)
-		_add_pit_zone(PIT_ZONES[i], i)
 	var lips := StaticBody2D.new()
 	for lip in OUTLANE_LIPS:
 		var shape := CollisionPolygon2D.new()
@@ -74,9 +62,6 @@ func _ready() -> void:
 		lips.add_child(shape)
 	add_child(lips)
 	PinballEvents.ball_drained.connect(_reset)
-	PinballEvents.ball_drained.connect(func():
-		if _roll:
-			_roll.kill())
 	_reset()
 
 func _add_kick_zone(at: Vector2, index: int) -> void:
@@ -90,45 +75,6 @@ func _add_kick_zone(at: Vector2, index: int) -> void:
 	area.add_child(shape)
 	area.body_entered.connect(_on_kick_zone_entered.bind(index))
 	add_child(area)
-
-func _add_pit_zone(at: Vector2, index: int) -> void:
-	var area := Area2D.new()
-	area.position = at
-	area.monitorable = false
-	var shape := CollisionShape2D.new()
-	var rect := RectangleShape2D.new()
-	rect.size = PIT_ZONE_SIZE
-	shape.shape = rect
-	area.add_child(shape)
-	area.body_entered.connect(_on_pit.bind(index))
-	add_child(area)
-
-# Unsaved, it rolls on down the gutter track into the lava pit, where it drains
-func _on_pit(body: Node, index: int) -> void:
-	var ball := body as RigidBody2D
-	if ball == null or not ball.is_in_group("ball") or ball.freeze or not features._is_ball_on_playfield(ball):
-		return
-	ball.freeze_mode = RigidBody2D.FREEZE_MODE_KINEMATIC
-	ball.set_deferred("freeze", true)
-	var path: Array = GUTTERS[index]
-	var lengths: Array[float] = [0.0]
-	for i in range(1, path.size()):
-		lengths.append(lengths[-1] + (path[i] - path[i - 1]).length())
-	if _roll:
-		_roll.kill()
-	var roll := create_tween().set_process_mode(Tween.TWEEN_PROCESS_PHYSICS)
-	_roll = roll
-	roll.tween_method(func(t: float):
-		var along := t * lengths[-1]
-		var i := 1
-		while i < lengths.size() - 1 and lengths[i] < along:
-			i += 1
-		var k := inverse_lerp(lengths[i - 1], lengths[i], along)
-		ball.global_position = (path[i - 1] as Vector2).lerp(path[i], k),
-		0.0, 1.0, GUTTER_SECONDS).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
-	roll.tween_callback(func():
-		ball.freeze = false
-		ball.linear_velocity = Vector2(0, 300))  # down into the lava pit's drain
 
 func _physics_process(_delta: float) -> void:
 	# The flippers move the guard between outlanes, as they move Pikachu

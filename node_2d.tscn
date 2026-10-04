@@ -267,7 +267,7 @@ collision_mask = 0
 
 [node name="CollisionPolygon2D2" type="CollisionPolygon2D" parent="layer_1_colliders"]
 position = Vector2(439, -261)
-polygon = PackedVector2Array(271, 1492, 221, 1493, 220, 1452, 219, 1126, 223, 943, 222, 885, 220, 818, 211, 755, 200, 705, 189, 685, 179, 679, 178, 694, 192, 754, 206, 881, 192, 961, 162, 1041, 130, 1092, 104, 1123, 106, 1205, 168, 1218, 171, 1389, 173, 1459, 125, 1460, 124, 1422, 46, 1479, -44, 1524, -43, 1541, 175, 1540, 269, 1538, 281, 1493, 281, 1003, 269, 575, 261, 444, 259, 420, 231, 393, 176, 381, 6, 354, -104, 458, -18, 467, 108, 528, 155, 560, 179, 592, 199, 623, 239, 693, 245, 713, 249, 726, 263, 805, 270, 950, 270, 1371)
+polygon = PackedVector2Array(271, 1492, 221, 1493, 220, 1452, 219, 1126, 223, 943, 222, 885, 220, 818, 211, 755, 200, 705, 189, 685, 179, 679, 178, 694, 192, 754, 206, 881, 192, 961, 162, 1041, 130, 1092, 104, 1123, 106, 1205, 168, 1218, 171, 1389, 124, 1422, 46, 1479, -44, 1524, -43, 1541, 175, 1540, 269, 1538, 281, 1493, 281, 1003, 269, 575, 261, 444, 259, 420, 231, 393, 176, 381, 6, 354, -104, 458, -18, 467, 108, 528, 155, 560, 179, 592, 199, 623, 239, 693, 245, 713, 249, 726, 263, 805, 270, 950, 270, 1371)
 
 [node name="CollisionShape2D" type="CollisionShape2D" parent="layer_1_colliders"]
 position = Vector2(719, 642)
@@ -283,7 +283,7 @@ polygon = PackedVector2Array(213, 121, 236, 101, 251, 92, 261, 87, 271, 82, 279,
 
 [node name="CollisionPolygon2D5" type="CollisionPolygon2D" parent="layer_1_colliders"]
 position = Vector2(-84, 264)
-polygon = PackedVector2Array(205, 738, 213, 735, 223, 740, 225, 818, 227, 827, 240, 840, 264, 856, 337, 902, 323, 907, 321, 921, 325, 935, 314, 933, 300, 924, 225, 874, 209, 863, 204, 858, 204, 851)
+polygon = PackedVector2Array(205, 738, 213, 735, 223, 740, 225, 818, 227, 827, 240, 840, 264, 856, 337, 902, 323, 907, 321, 921, 325, 935, 314, 933, 300, 924, 225, 866, 209, 855, 204, 850, 204, 845)
 
 [node name="CollisionPolygon2D6" type="CollisionPolygon2D" parent="layer_1_colliders"]
 position = Vector2(128, 264)
@@ -291,7 +291,7 @@ polygon = PackedVector2Array(408, 740, 418, 734, 426, 738, 427, 782, 428, 847, 4
 
 [node name="CollisionPolygon2D7" type="CollisionPolygon2D" parent="layer_1_colliders"]
 position = Vector2(-182, -250)
-polygon = PackedVector2Array(269, 1052, 226, 956, 183, 1122, 182, 1288, 182, 1529, 460, 1531, 459, 1513, 355, 1459, 298, 1412, 292, 1411, 292, 1427, 292, 1445, 248, 1445, 248, 1214, 251, 1208, 263, 1202, 311, 1198, 312, 1117)
+polygon = PackedVector2Array(269, 1052, 226, 956, 183, 1122, 182, 1288, 182, 1529, 460, 1531, 459, 1520, 355, 1466, 298, 1412, 248, 1395, 248, 1214, 251, 1208, 263, 1202, 311, 1198, 312, 1117)
 
 [node name="CollisionPolygon2D8" type="CollisionPolygon2D" parent="layer_1_colliders"]
 position = Vector2(206, 1052)
@@ -355,12 +355,6 @@ shape = SubResource("RectangleShape2D_kdubu")
 metadata/_edit_lock_ = true
 
 [node name="ball_trap_plugs" type="StaticBody2D" parent="."]
-
-[node name="right" type="CollisionPolygon2D" parent="ball_trap_plugs"]
-polygon = PackedVector2Array(440, 1188, 456, 1188, 492, 1214, 486, 1219, 448, 1238, 436, 1210)
-
-[node name="left" type="CollisionPolygon2D" parent="ball_trap_plugs"]
-polygon = PackedVector2Array(242, 1188, 226, 1188, 190, 1214, 196, 1219, 234, 1238, 246, 1210)
 
 [node name="u_wall_top" type="CollisionPolygon2D" parent="ball_trap_plugs"]
 polygon = PackedVector2Array(539, 599, 557, 593, 574, 613, 565, 643, 516, 642)

@@ -30,7 +30,7 @@ const EMERGE_PER_SECOND := 40.0  # art pixels a second as a head slides out or b
 # The golden button on the left inlane wall's tip that wakes them (scene units)
 const BUTTON_AT := Vector2(207, 815)
 const BUTTON_RADIUS := 36.0  # it's set into the wall's tip, so it reaches out past the face
-const OUT_SECONDS := 25.0
+const OUT_SECONDS := 10.0  # not long, so they aren't forever in the way of shots up the rails
 const BUTTON_POINTS := 1000
 const LURK_POINTS := 100  # a hit on a head still in its slot
 enum { HEAD_WATCHING, HEAD_ROARING, HEAD_BLINKING }
@@ -291,8 +291,7 @@ func _start_travel() -> void:
 func _pick_way(side: String) -> void:
 	if not traveling:
 		return
-	travel_steps = 1 if side == "left" else 2
-	PinballEvents.toast.emit("Next city: shoot Tlaloc's mouth!" if travel_steps == 1 else "Skip a city: shoot Tlaloc's mouth!")
+	travel_steps = 1 if side == "left" else 2  # his mouth opens on its whirl: the way's open
 	_announce_goal()
 
 ## The temple hole caught the ball during Travel mode with a way picked
@@ -371,10 +370,10 @@ func _need() -> int:
 func _announce_goal() -> void:
 	var text: String
 	if el_dorado_open:
-		text = "El Dorado is open! Shoot Tlaloc's mouth"
+		text = "El Dorado is open!"
 	elif traveling:
 		var left := maxi(ceili(_travel_left), 0)
-		var way := "shoot Tlaloc's mouth" if travel_steps > 0 else "left ramp: next city, right: skip one"
+		var way := "the portal is open" if travel_steps > 0 else "left ramp: next city, right: skip one"
 		text = "Travel: %s   %d:%02d" % [way, left / 60, left % 60]
 	else:
 		var goal: String = CITIES[city].goal

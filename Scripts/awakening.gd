@@ -112,8 +112,7 @@ func _on_offering(body: Node) -> void:
 		_show_progress()
 		_place_offering.call_deferred()
 		return
-	finishing = true
-	PinballEvents.toast.emit("Shoot Tlaloc's mouth!")
+	finishing = true  # Tlaloc's mouth opens on its whirl: that says where to shoot
 	_show_progress()
 
 ## The temple caught the ball with all three offerings found: the spirit awakens
@@ -141,6 +140,6 @@ func _end() -> void:
 
 func _show_progress() -> void:
 	var left := maxi(ceili(_time_left), 0)
-	var goal := "shoot Tlaloc's mouth!" if finishing else "offerings %d/%d" % [_collected, OFFERINGS]
+	var goal := "the portal is open" if finishing else "offerings %d/%d" % [_collected, OFFERINGS]
 	PinballEvents.objective_changed.emit("Awaken the %s: %s   %d:%02d" % [
 		SpiritCodex.SPECIES[_species].name, goal, left / 60, left % 60])
