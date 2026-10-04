@@ -557,14 +557,19 @@ PATH_SUPERSAMPLE = 4
 PATH_SPACING = 6.0  # art pixels between points
 PATH_SMOOTHING = 9  # art pixels either side averaged in
 RAIL_PATHS = {  # name: [the mouth (art pixels, or an opening), ..., the end]
-    # the left one starts from the foot of the chute under the rail's end
-    "left_lanes": [(74.7, 232.5), "left_entry", "left_exit"],
-    "left_temple": [(74.7, 232.5), "left_entry", "left_pipe"],
+    "left_lanes": ["left_entry", "left_exit"],
+    "left_temple": ["left_entry", "left_pipe"],
     "right": ["right_entry", "right_top"],
 }
-# Straight lead-ins before a path's mouth (art pixels): the right rail's mouth is barely
-# wider than the ball, so a ball is taken on below it, on the line up into it
-RAIL_LEADS = {"right": (174.9, 251.7)}
+# Straight lead-ins before a path's mouth (art pixels), on the line of the track up into it:
+# the right rail's mouth is barely wider than the ball, so a ball is taken on below it; the
+# left one's wires end raggedly, one pair well short of the other, so its line starts from
+# just past them, running straight up between them rather than wandering in from the floor
+RAIL_LEADS = {"right": (174.9, 251.7), "left_lanes": (63.9, 220.3), "left_temple": (63.9, 220.3)}
+# ...and below where the trace settles onto the left track's middle (art row), the left
+# rail's line runs dead straight down to its lead-in: the trace wanders between the ragged
+# wire ends there
+RAIL_STRAIGHT_BELOW = {"left_lanes": 182.0, "left_temple": 182.0}
 
 
 def rail_paths(blob):
@@ -636,6 +641,9 @@ def rail_paths(blob):
         for a, b in zip(stops, stops[1:]):
             leg = middle(a, b)
             points += leg if not points else leg[1:]
+        if name in RAIL_STRAIGHT_BELOW:
+            join = next(i for i, q in enumerate(points) if q[1] <= RAIL_STRAIGHT_BELOW[name])
+            points = points[join:]
         if name in RAIL_LEADS:
             lead, mouth = RAIL_LEADS[name], points[0]
             steps = max(2, int(((mouth[0] - lead[0]) ** 2 + (mouth[1] - lead[1]) ** 2) ** 0.5 * ss))

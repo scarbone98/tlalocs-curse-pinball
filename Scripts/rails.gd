@@ -19,7 +19,7 @@ const Geometry := preload("res://Scripts/rails_geometry.gd")
 
 const RAIL_LAYER := 2
 const ENTRIES := {  # opening -> the way up the rail from its mouth
-	"left_entry": Vector2(-0.46, -0.89),  # up the chute at the rail's foot
+	"left_entry": Vector2(-0.52, -0.855),  # up the track from its mouth
 	"right_entry": Vector2(0.55, -0.84),
 }
 const ARROWS_TO_TEMPLE := 2
@@ -27,8 +27,8 @@ const ARROWS_TO_TEMPLE := 2
 # (the blue flippers' lane right of the left one, the skull's lane left of the right
 # one), so only a ball heading along the rail is taken: within this much of its line
 const ENTRY_AREAS := {
-	"left_entry": Rect2(145, 665, 60, 50),
-	"right_entry": Rect2(500, 690, 70, 80),  # over its whole mouth as drawn, and the approach below it
+	"left_entry": Rect2(130, 612, 60, 58),   # over its mouth as drawn, between the wires' ends
+	"right_entry": Rect2(487, 682, 70, 80),  # over its mouth as drawn, and the approach below it
 }
 const ENTRY_ALIGN := {"left_entry": 0.94, "right_entry": 0.94}  # cosines: about 20 degrees
 # ...and only on the rail's own line: the lanes running up under the rails, beside their
