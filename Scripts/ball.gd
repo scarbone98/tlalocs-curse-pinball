@@ -91,8 +91,10 @@ var _impact_cooldown := 0.0
 var _falling_left := 0.0  # going under in the lava pit
 var in_lava := false  # it's in the lava (the spotlight stops following it)
 const LAVA_SINK := preload("res://Scripts/lava_sink.gdshader")
-const LAVA_SURFACE_Y := 1228.0  # the lava's top edge in the pit (Sprites/table/lava_glow.png, art row ~406)
-const SINK_DEPTH := 24.0  # scene units below the surface it goes, enough to go right under
+const LAVA_SURFACE_Y := 1275.0  # the bright lava at the very bottom of the pit, along the table's foot
+const SINK_DEPTH := 40.0  # scene units below the surface it goes: right under, and off the bottom
+const ROLL_SPEED_MIN := 320.0   # it rolls down the pit's slope at least this fast...
+const ROLL_SECONDS_MAX := 0.5   # ...taking no longer than this to reach the lava
 const PLOP_SPEED := 450.0   # faster than this, it plops straight in; slower, it sinks
 const PLOP_SECONDS := 1.3
 const SINK_SECONDS := 1.6
@@ -297,7 +299,8 @@ func _on_start_region_body_exited(body: Node) -> void:
 # smoke), before it counts as drained
 func _on_death_zone_body_entered(body: Node) -> void:
 	if body == self and not _pending_respawn and _falling_left <= 0.0:
-		var plop := linear_velocity.length() > PLOP_SPEED
+		var speed := linear_velocity.length()
+		var plop := speed > PLOP_SPEED
 		collision_layer = 0
 		collision_mask = 0
 		freeze_mode = RigidBody2D.FREEZE_MODE_KINEMATIC
@@ -305,31 +308,34 @@ func _on_death_zone_body_entered(body: Node) -> void:
 		linear_velocity = Vector2.ZERO
 		in_lava = true
 		var at := global_position
-		# it goes under: hidden below the lava's surface as it sinks through it
+		# it rolls on down the pit's slope to the lava at the bottom, then goes under: hidden
+		# below the lava's surface as it sinks through it, down off the bottom of the table
 		var sink := ShaderMaterial.new()
 		sink.shader = LAVA_SINK
 		sink.set_shader_parameter("surface_y", LAVA_SURFACE_Y)
-		var under := Vector2(at.x, maxf(at.y, LAVA_SURFACE_Y) + SINK_DEPTH)
-		var surface := Vector2(at.x, maxf(at.y, LAVA_SURFACE_Y - 4.0))  # it drops onto the lava first
 		anim.material = sink
+		var surface := Vector2(at.x, maxf(at.y, LAVA_SURFACE_Y))
+		var under := surface + Vector2(0, SINK_DEPTH)
+		var roll := clampf((surface.y - at.y) / maxf(speed, ROLL_SPEED_MIN), 0.05, ROLL_SECONDS_MAX)
 		var down := create_tween()
+		down.tween_property(self, "global_position", surface, roll).set_ease(Tween.EASE_IN).set_trans(Tween.TRANS_QUAD)
 		if plop:
-			_falling_left = PLOP_SECONDS
-			PinballEvents.effect.emit("lava", at)
-			PinballEvents.effect.emit("smoke", at)
+			_falling_left = roll + PLOP_SECONDS
+			down.tween_callback(func():
+				PinballEvents.effect.emit("lava", surface)
+				PinballEvents.effect.emit("smoke", surface))
 			# a splash, a bob in the lava, then it sinks
-			down.tween_property(self, "global_position", surface + Vector2(0, 8), 0.1)
-			down.tween_property(self, "global_position", surface + Vector2(0, 3), 0.2).set_ease(Tween.EASE_OUT)
+			down.tween_property(self, "global_position", surface + Vector2(0, 10), 0.1)
+			down.tween_property(self, "global_position", surface + Vector2(0, 4), 0.2).set_ease(Tween.EASE_OUT)
 			down.tween_property(self, "global_position", under, PLOP_SECONDS - 0.4).set_ease(Tween.EASE_IN).set_trans(Tween.TRANS_SINE)
 			down.parallel().tween_property(anim, "modulate", Color(1.0, 0.55, 0.4), PLOP_SECONDS - 0.4)
-			down.parallel().tween_callback(PinballEvents.effect.emit.bind("smoke", at)).set_delay(0.5)
+			down.parallel().tween_callback(PinballEvents.effect.emit.bind("smoke", surface)).set_delay(0.5)
 		else:
-			_falling_left = SINK_SECONDS
-			PinballEvents.effect.emit("smoke", at)
-			down.tween_property(self, "global_position", surface, SINK_SECONDS * 0.2)
-			down.tween_property(self, "global_position", under, SINK_SECONDS * 0.7).set_ease(Tween.EASE_IN).set_trans(Tween.TRANS_SINE)
-			down.parallel().tween_property(anim, "modulate", Color(1.0, 0.55, 0.4), SINK_SECONDS * 0.7)  # heating as it goes
-			down.parallel().tween_callback(PinballEvents.effect.emit.bind("smoke", at)).set_delay(SINK_SECONDS * 0.5)
+			_falling_left = roll + SINK_SECONDS
+			down.tween_callback(PinballEvents.effect.emit.bind("smoke", surface))
+			down.tween_property(self, "global_position", under, SINK_SECONDS * 0.9).set_ease(Tween.EASE_IN).set_trans(Tween.TRANS_SINE)
+			down.parallel().tween_property(anim, "modulate", Color(1.0, 0.55, 0.4), SINK_SECONDS * 0.9)  # heating as it goes
+			down.parallel().tween_callback(PinballEvents.effect.emit.bind("smoke", surface)).set_delay(SINK_SECONDS * 0.5)
 
 func _drained() -> void:
 	in_lava = false

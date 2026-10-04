@@ -28,8 +28,9 @@ and the playfield sprites cut from the hand-drawn sheets in tools/source_art/:
                               silver, emerald and gold, all hand-drawn)
   paddle_left.png, paddle_right.png
   Sprites/table/torch.png     6 burning frames, then the same 6 as embers
-  Sprites/table/blue_flipper.png  15 frames of the flipper plate turning, in blue
-  Sprites/table/red_flipper.png  ...and in its own red, for the right lane's spinner
+  Sprites/table/blue_flipper.png  15 frames of the flipper plate turning, carved in blue stone
+                              with a jade frog inlaid (the left lane's spinners)
+  Sprites/table/red_flipper.png  ...and in red stone with a gold spirit spiral (the right lane's)
   Sprites/table/wall_jaguar.png  the jaguar heads set in the side walls, facing into the
                               table from the left: watching, roaring, blinking
   Sprites/table/whirl.png     3 frames of the spirit whirl
@@ -609,19 +610,87 @@ def torch_sheet():
     return out
 
 
-def blue_flipper():
-    """The hand-drawn flipper plate (flipper.png), turned from red to blue."""
+# The spinners' plates, carved in stone: the hand-drawn flipper plate's frames (its two
+# faces and its axle, turning) give each frame's shape; its faces become tinted stone,
+# bevelled and grained, with a glyph inlaid in the front face that foreshortens as it turns.
+FROG_GLYPH = [  # a frog seen from above: the blue spinners charge the frog kickback
+    ".oo....oo.",
+    "oJJo..oJJo",
+    "oJJooooJJo",
+    ".oJJJJJJo.",
+    ".oJJooJJo.",
+    "oJJJJJJJJo",
+    "oJoJJJJoJo",
+    "oo.oJJo.oo",
+    "...o..o...",
+    "..........",
+]
+SPIRIT_GLYPH = [  # a spirit's spiral, curling in: the red spinner lights the spirit lamps
+    ".oooooooo.",
+    "oJJJJJJJJo",
+    "oJooooooJo",
+    "oJoJJJJoJo",
+    "oJoJooJoJo",
+    "oJoJoJJoJo",
+    "oJoJoooooo",
+    "oJoJJJJJJo",
+    "oJoooooooo",
+    "oo........",
+]
+STONE_TINTS = {
+    "blue": [(40, 52, 80), (62, 80, 116), (90, 108, 148), (126, 144, 182), (168, 182, 210)],
+    "red": [(74, 36, 34), (110, 54, 46), (144, 76, 62), (180, 106, 88), (212, 144, 122)],
+}
+INLAYS = {"frog": ((60, 200, 130), (24, 110, 70)), "spirit": ((246, 206, 96), (150, 104, 30))}
+PLATE_AXLE = {(184, 192, 192), (248, 248, 248), (0, 0, 0)}
+PLATE_FRONT = (248, 112, 112)  # the plate's light face: the glyph's on this one
+PLATE_EDGE = (248, 56, 0)
+
+
+def stone_spinner(tint, glyph_name):
     sheet = Image.open(SRC / "flipper.png").convert("RGBA")
+    ramp = STONE_TINTS[tint]
+    glyph = FROG_GLYPH if glyph_name == "frog" else SPIRIT_GLYPH
+    inlay, inlay_dark = INLAYS[glyph_name]
+    fw = sheet.height  # square frames
     out = sheet.copy()
-    for y in range(sheet.height):
-        for x in range(sheet.width):
-            r, g, b, a = sheet.getpixel((x, y))
-            if not a:
-                continue
-            h, s, v = colorsys.rgb_to_hsv(r / 255, g / 255, b / 255)
-            if s > 0.3 and (h < 0.08 or h > 0.9):  # the reds
-                r2, g2, b2 = colorsys.hsv_to_rgb(0.62, s, v)
-                out.putpixel((x, y), (round(r2 * 255), round(g2 * 255), round(b2 * 255), a))
+    rng = random.Random(7)
+    grain = {(u, v): rng.random() for u in range(fw) for v in range(64)}
+    for f in range(sheet.width // fw):
+        face = [(x, y) for y in range(fw) for x in range(f * fw, f * fw + fw)
+                if sheet.getpixel((x, y))[3] and sheet.getpixel((x, y))[:3] not in PLATE_AXLE]
+        if not face:
+            continue
+        x0 = min(x for x, _ in face)
+        x1 = max(x for x, _ in face)
+        y0 = min(y for _, y in face)
+        y1 = max(y for _, y in face)
+        w, h = x1 - x0 + 1, y1 - y0 + 1
+        front = sum(1 for x, y in face if sheet.getpixel((x, y))[:3] == PLATE_FRONT) > len(face) // 3
+        base = 2 if front else 1  # the front face catches the light; the back's in shade
+        for x, y in face:
+            u, v = x - x0, (y - y0) / max(h - 1, 1)
+            k = base
+            if y == y0:
+                k += 1  # the bevel's top edge, lit
+            elif y == y1:
+                k -= 1  # ...and its foot, in shadow
+            if sheet.getpixel((x, y))[:3] == PLATE_EDGE:
+                k = base + 2  # the edge facing the light
+            if grain[(u, int(v * 15))] < 0.12:
+                k -= 1  # a fleck in the stone
+            col = ramp[max(0, min(len(ramp) - 1, k))]
+            # the glyph, inlaid in the front face, squashed with it as it turns away
+            if front and h >= 5 and 0 < y - y0 < h - 1:
+                gx = u - (w - len(glyph[0])) // 2
+                gy = int(v * len(glyph))
+                if 0 <= gx < len(glyph[0]) and 0 <= gy < len(glyph):
+                    c = glyph[gy][gx]
+                    if c == "J":
+                        col = inlay
+                    elif c == "o":
+                        col = inlay_dark if h >= 9 else col
+            out.putpixel((x, y), col + (255,))
     return out
 
 
@@ -1403,8 +1472,8 @@ def main():
     for name in ("paddle_left.png", "paddle_right.png"):
         Image.open(SRC / name).convert("RGBA").save(name)
     torch_sheet().save("Sprites/table/torch.png")
-    blue_flipper().save("Sprites/table/blue_flipper.png")
-    Image.open(SRC / "flipper.png").convert("RGBA").save("Sprites/table/red_flipper.png")  # as drawn
+    stone_spinner("blue", "frog").save("Sprites/table/blue_flipper.png")
+    stone_spinner("red", "spirit").save("Sprites/table/red_flipper.png")
     jaguar_head().save("Sprites/table/wall_jaguar.png")
     Image.open(SRC / "magicWhirl.png").convert("RGBA").save("Sprites/table/whirl.png")
     Image.open(SRC / "warrior.png").convert("RGBA").save("Sprites/table/warrior.png")

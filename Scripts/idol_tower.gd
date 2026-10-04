@@ -72,6 +72,7 @@ var _rock_left := 0.0
 var _reset_left := 0.0
 var _clock := 0.0
 var _turning: Sprite2D  # the idol turning, while it rides the tower
+var _glitter: CPUParticles2D  # gold sparkles twinkling round the idol, like the rail emerald's
 var _shards: CPUParticles2D
 var _button: AnimatedSprite2D
 var _pressed_left := 0.0
@@ -171,8 +172,38 @@ func _place() -> void:
 	_idol_shape.set_deferred("disabled", not open or _claimed)
 	_idol_sensor.set_deferred("monitoring", open and not _claimed)
 
+# Gold glints twinkling about the idol, like the rail emerald's (Scripts/rails.gd)
+func _make_glitter() -> CPUParticles2D:
+	var dot := Image.create(1, 1, false, Image.FORMAT_RGBA8)
+	dot.fill(Color.WHITE)
+	var glitter := CPUParticles2D.new()
+	glitter.texture = ImageTexture.create_from_image(dot)
+	glitter.amount = 7
+	glitter.lifetime = 0.9
+	glitter.emission_shape = CPUParticles2D.EMISSION_SHAPE_RECTANGLE
+	glitter.emission_rect_extents = Vector2(24, 26)
+	glitter.direction = Vector2(0, -1)
+	glitter.spread = 40.0
+	glitter.initial_velocity_min = 5.0
+	glitter.initial_velocity_max = 16.0
+	glitter.gravity = Vector2.ZERO
+	glitter.scale_amount_min = 2.9
+	glitter.scale_amount_max = 2.9
+	var twinkle := Gradient.new()
+	twinkle.offsets = PackedFloat32Array([0.0, 0.3, 0.7, 1.0])
+	twinkle.colors = PackedColorArray([Color(1.0, 0.9, 0.5, 0.0), Color(1, 1, 1, 1), Color(1.0, 0.85, 0.3, 0.8), Color(1.0, 0.7, 0.1, 0.0)])
+	glitter.color_ramp = twinkle
+	glitter.z_index = 4
+	glitter.z_as_relative = false
+	features.add_child(glitter)
+	return glitter
+
 func _physics_process(delta: float) -> void:
 	_clock += delta
+	if _glitter == null:
+		_glitter = _make_glitter()
+	_glitter.position = _idol.position + Vector2(0, -6)
+	_glitter.emitting = _idol.visible and not _claimed
 	_cooldown = maxf(_cooldown - delta, 0.0)
 	_pressed_left = maxf(_pressed_left - delta, 0.0)
 	features.show_gold_button(_button, _pressed_left, _spikes_down())

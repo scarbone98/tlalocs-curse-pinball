@@ -23,6 +23,10 @@ const SWIRL := 900.0  # ...and round it, so the ball's drawn in spiralling, like
 const SPIRAL_SECONDS := 0.7  # a caught ball circles in to the middle of his mouth
 const SPIRAL_TURNS := 1.5
 const HOLD_SECONDS := 1.1
+const MOUTH_SPIN_SECONDS := 1.2  # it whirls round in his mouth this long before he swallows it
+const MOUTH_SPIN_TURNS := 3.0
+const MOUTH_SPIN_RADIUS := 9.0
+const MOUTH_SPIN_ROLL := 25.0    # how fast it's drawn rolling as it whirls (radians a second)
 const REARM_SECONDS := 1.5  # after spitting a ball out, so it can't be caught again at once
 const EJECT_SPEED := 450.0
 const EJECT_SPREAD := 150.0
@@ -171,14 +175,27 @@ func _catch(ball: RigidBody2D) -> void:
 		PinballEvents.roulette_spun.emit()
 		eject(ball)
 
-# Gulp: once it's spiralled in, the ball goes down his throat and he shuts his mouth on it
+# Once it's spiralled in, the ball whirls round and round in his mouth a while, tighter
+# and tighter; then gulp: it goes down his throat and he shuts his mouth on it
 func _swallow(ball: RigidBody2D) -> void:
 	get_tree().create_timer(SPIRAL_SECONDS).timeout.connect(func():
 		if _held != ball:
 			return
-		swallowed = true
-		ball.anim.hide()
-		AudioSfx.play("tiki", 0.0, Vector2.ONE * 0.6))
+		ball.z_index = 2  # over the magic whirl in his mouth, so you see it go round
+		var whirl := create_tween().set_process_mode(Tween.TWEEN_PROCESS_PHYSICS)
+		whirl.tween_method(func(t: float):
+			if _held != ball or swallowed:
+				return
+			ball.global_position = AT + Vector2.from_angle(t * TAU * MOUTH_SPIN_TURNS) * MOUTH_SPIN_RADIUS * (1.0 - 0.7 * t)
+			ball.set("_spin", MOUTH_SPIN_ROLL),
+			0.0, 1.0, MOUTH_SPIN_SECONDS)
+		whirl.tween_callback(func():
+			if _held != ball:
+				return
+			swallowed = true
+			ball.global_position = AT
+			ball.anim.hide()
+			AudioSfx.play("tiki", 0.0, Vector2.ONE * 0.6)))
 
 ## Sends a held ball back down toward the flippers (the bonus stage returns it here too)
 func eject(ball: RigidBody2D) -> void:
@@ -188,6 +205,7 @@ func eject(ball: RigidBody2D) -> void:
 	ball.global_position = AT
 	ball.anim.modulate.a = 1.0
 	ball.anim.show()
+	ball.z_index = 1  # back on the playfield's level
 	if features._face_sprite:
 		features._face_sprite.frame = MOUTH_OPEN  # he spits it out
 	ball.freeze = false

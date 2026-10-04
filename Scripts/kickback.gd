@@ -7,8 +7,8 @@ extends Node2D
 ##    outlane, so the frogs are always there for the first save
 ##  - the temple roulette and the market can award one that guards both outlanes, like
 ##    Ruby & Sapphire's Pichu: it doesn't get used up, it lasts until the ball drains
-## The stone frog statue at the guarded outlane wakes up jade when it's ready and leaps
-## when it fires. A ball it doesn't save rolls on down the slope past the frog's pit and
+## The stone frog statue at the guarded outlane wakes up jade when it's ready, and when it
+## fires it leaps up off its pad under the ball, shoving it up out of the gutter. A ball it doesn't save rolls on down the slope past the frog's pit and
 ## along the gutter track under the inlane and the flipper, into the lava pit in the middle.
 ##
 ## The outlanes aren't straight: the ball gets in through a slot between a wall ledge
@@ -19,6 +19,10 @@ const FROG := preload("res://Sprites/table/kickback_frog.png")
 
 const FULL_CHARGE_SPEED := 600.0  # one pass at this speed charges it fully
 const CARRY_UP_SECONDS := 0.18
+const LEAP_UNDER := 14.0          # how far under the ball the leaping frog comes up
+const LEAP_POUNCE_SECONDS := 0.05
+const LEAP_REACH := 0.55          # how far up the lane it rises with the ball, of the way to the slot
+const LEAP_FALL_SECONDS := 0.3
 const CARRY_OUT_SECONDS := 0.1
 const KICK_POINTS := 500
 const FROG_AT := [Vector2(88, 1166), Vector2(586, 1166)]  # each squatting on its outlane's green pad
@@ -141,9 +145,27 @@ func _on_kick_zone_entered(body: Node, index: int) -> void:
 	PinballEvents.rumble.emit(6.0)
 	AudioSfx.play("kickback")
 
-	_render()
-	frogs[index].frame = LEAP
-	get_tree().create_timer(0.3).timeout.connect(_render)
+	_leap(index, ball)
+
+# The frog leaps up off its pad under the ball and shoves it up out of the gutter, rising
+# with it partway up the lane, then drops back down onto its pad with a splash
+func _leap(index: int, ball: RigidBody2D) -> void:
+	var frog := frogs[index]
+	var home: Vector2 = FROG_AT[index]
+	var under := ball.global_position + Vector2(0, LEAP_UNDER)  # right under the ball
+	var top := home.lerp(CARRY_PATHS[index][0], LEAP_REACH)
+	frog.frame = LEAP
+	frog.z_index = 2  # over the ball as it shoves it
+	frog.z_as_relative = false
+	var jump := create_tween().set_process_mode(Tween.TWEEN_PROCESS_PHYSICS)
+	jump.tween_property(frog, "position", under, LEAP_POUNCE_SECONDS).set_ease(Tween.EASE_OUT)
+	jump.tween_property(frog, "position", top, CARRY_UP_SECONDS).set_ease(Tween.EASE_OUT).set_trans(Tween.TRANS_QUAD)
+	jump.tween_property(frog, "position", home, LEAP_FALL_SECONDS).set_ease(Tween.EASE_IN).set_trans(Tween.TRANS_QUAD)
+	jump.tween_callback(func():
+		frog.z_index = 0
+		frog.z_as_relative = true
+		PinballEvents.effect.emit("splash", home)
+		_render())
 
 func _carry_out(ball: RigidBody2D, path: Array) -> void:
 	ball.freeze_mode = RigidBody2D.FREEZE_MODE_KINEMATIC

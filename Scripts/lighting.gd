@@ -42,6 +42,8 @@ const SHIMMER_FPS := 14.0
 const SHIMMER_REACH := 150.0  # the spotlight coming within this of the skull, or leaving, sets it shimmering
 const LAMP_SIZE := 0.45
 const EYE_SIZE := 0.3
+const IDOL_SPOT_SIZE := 0.5  # a small spotlight on the golden idol
+const IDOL_GLOW := 1.0
 const EYE_YELLOW := Color(1.0, 0.9, 0.3)
 const EYE_RED := Color(1.0, 0.15, 0.1)
 
@@ -53,6 +55,7 @@ var _whirl_light: PointLight2D
 var _sky_light: PointLight2D
 var _lava_glow: Sprite2D
 var _sacrifice_light: PointLight2D
+var _idol_light: PointLight2D
 var _skull_shine: Sprite2D
 var _skull_shimmer: Sprite2D
 var _spot_on_skull := false
@@ -105,6 +108,7 @@ func _ready() -> void:
 	_skull_shimmer.vframes = 2
 	_skull_shimmer.hide()
 	_sacrifice_light = _light(Vector2.ZERO, Color(1.0, 0.72, 0.4), 0.95, 0.85)  # a warm spot on the sacrifice
+	_idol_light = _light(Vector2.ZERO, Color(1.0, 0.86, 0.45), IDOL_GLOW, IDOL_SPOT_SIZE)  # a small spot on the golden idol
 	_whirl_light = _light(features.temple.AT, Color(0.85, 0.45, 1.0), 0.9, 1.4)
 	for sprite: AnimatedSprite2D in [features.idol_tower._button, features.journey._button_sprite, features.dart_trap.button_sprite]:
 		var glow := _light(sprite.position, Color(1.0, 0.85, 0.4), BUTTON_GLOW, 0.6)
@@ -240,6 +244,10 @@ func _process(delta: float) -> void:
 	var sacrifice: AnimatedSprite2D = features.sacrifices.current()
 	_sacrifice_light.visible = sacrifice.visible and sacrifice.modulate.a > 0.3
 	_sacrifice_light.global_position = sacrifice.global_position
+	var idol: Sprite2D = features.idol_tower._idol
+	_idol_light.visible = idol.visible and not features.idol_tower._claimed
+	_idol_light.global_position = idol.global_position + Vector2(0, -4)
+	_idol_light.energy = IDOL_GLOW * (1.0 + 0.08 * sin(_clock * 2.6))  # it gleams, gently
 	for pair: Array in _lamp_lights:
 		var lamp: AnimatedSprite2D = pair[0]
 		(pair[1] as PointLight2D).visible = lamp.is_visible_in_tree() and lamp.frame >= pair[2]
