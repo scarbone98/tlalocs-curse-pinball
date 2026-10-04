@@ -548,7 +548,7 @@ func _start_curse() -> void:
 	GameManager.set_curse_active(true)
 	PinballEvents.toast.emit("Tlaloc's Curse!")
 	_rain.emitting = true
-	create_tween().tween_property(_storm_tint, "color", Lighting.STORM, 0.8)
+	create_tween().tween_property(_storm_tint, "color", Lighting.storm(), 0.8)
 	for torch in _torches:
 		torch.speed_scale = 2.0
 	if _face_sprite:
@@ -580,7 +580,7 @@ func _end_curse() -> void:
 	_rest_left = CURSE_REST_SECONDS
 	_render_shrine()
 	_rain.emitting = false
-	create_tween().tween_property(_storm_tint, "color", Lighting.MOOD, 1.2)
+	create_tween().tween_property(_storm_tint, "color", Lighting.mood(), 1.2)
 	for torch in _torches:
 		torch.speed_scale = 1.0
 	if _face_sprite:

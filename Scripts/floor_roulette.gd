@@ -17,6 +17,7 @@ const AT := Vector2(339, 958)  # under the face, between the slingshots
 const SHOW_SECONDS := 2.2
 const DOOR_SECONDS := 0.3
 const SPIN_START_FPS := 18.0
+const SINK := 1.0  # art pixels the tablet sinks under a ball
 
 var features: Node2D  # TableFeatures
 
@@ -34,6 +35,9 @@ var _spin_step := 0.0
 var _spin_index := 0
 var _hide_left := 0.0
 var _starting := false  # the doors changing over to the reel before a spin
+var _pieces: Array[Sprite2D] = []  # the reel, the doors and the frame: all sink together
+var _on_it := 0  # balls rolling over it
+var _sunk := false
 
 func _ready() -> void:
 	features.roulette = self
@@ -46,6 +50,22 @@ func _ready() -> void:
 	_piece(BORDER)
 	_render_doors()
 	_open_on_city.call_deferred()
+	# it gives a little under a ball rolling over it, like a button (and does nothing)
+	var tread := Area2D.new()
+	tread.position = AT
+	tread.monitorable = false
+	var shape := CollisionShape2D.new()
+	var rect := RectangleShape2D.new()
+	rect.size = PICTURE * features.MAP_SCALE
+	shape.shape = rect
+	tread.add_child(shape)
+	tread.body_entered.connect(func(body: Node):
+		if body.is_in_group("ball"):
+			_on_it += 1)
+	tread.body_exited.connect(func(body: Node):
+		if body.is_in_group("ball"):
+			_on_it = maxi(_on_it - 1, 0))
+	add_child(tread)
 	PinballEvents.billboard_spin.connect(func(result: int, seconds: float, caption: String):
 		spin(PRIZE_FRAMES, Billboard.PRIZES.size(), PRIZE_FRAMES + result - Billboard.PRIZE, seconds, caption))
 
@@ -55,6 +75,7 @@ func _piece(texture: Texture2D) -> Sprite2D:
 	sprite.scale = features.MAP_SCALE
 	sprite.position = AT
 	features.add_child(sprite)
+	_pieces.append(sprite)
 	return sprite
 
 # The city the journey's at: what it shows between spins
@@ -104,6 +125,12 @@ func spin_to_city(city: int, caption: String) -> void:
 	spin(CITY_FRAMES, 4, CITY_FRAMES + city, 1.6, caption)
 
 func _process(delta: float) -> void:
+	var sunk := _on_it > 0
+	if sunk != _sunk:
+		_sunk = sunk
+		for piece in _pieces:
+			piece.offset.y = SINK if sunk else 0.0  # a pixel down, and a touch darker
+			piece.self_modulate = Color(0.85, 0.85, 0.85) if sunk else Color.WHITE
 	if _spin_left > 0.0:
 		_spin_left -= delta
 		# fast at first, then slower, like a slot machine coming to rest

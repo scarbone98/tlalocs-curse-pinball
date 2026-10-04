@@ -89,10 +89,13 @@ var _spin := 0.0   # radians per second, clockwise
 var rail_guide := Callable()
 var _impact_cooldown := 0.0
 var _falling_left := 0.0  # going under in the lava pit
-var in_lava := false  # it's in the lava (the spotlight stops following it)
-const LAVA_SINK := preload("res://Scripts/lava_sink.gdshader")
+var in_lava := false
+var _masked := true  # hidden behind the front walls (not while it rides a rail)  # it's in the lava (the spotlight stops following it)
+const BALL_MASK := preload("res://Scripts/ball_mask.gdshader")  # hidden behind the front walls, and under the lava
+const FRONT_WALLS := preload("res://Sprites/table/front_walls.png")  # tools/make_table.py
 const LAVA_SURFACE_Y := 1280.0  # the lava: the very bottom edge of the table (and the screen)
 const SINK_DEPTH := 40.0  # scene units below the surface it goes: right under, and off the bottom
+const LAVA_SPAN := Vector2(298.0, 375.0)  # where its middle can go under: inside the lava's banks (lava_glow.png)
 const ROLL_SPEED_MIN := 320.0   # it rolls down the pit's slope at least this fast...
 const ROLL_SECONDS_MAX := 0.6   # ...taking no longer than this to reach the lava
 const PLOP_SPEED := 450.0   # faster than this, it plops straight in; slower, it sinks
@@ -140,6 +143,10 @@ func _ready() -> void:
 	if anim:
 		anim.stop()
 		draw_scale = anim.scale
+		var mask := ShaderMaterial.new()
+		mask.shader = BALL_MASK
+		mask.set_shader_parameter("front_walls", FRONT_WALLS)
+		anim.material = mask
 		set_tier(0)
 
 func _physics_process(delta: float) -> void:
@@ -150,6 +157,11 @@ func _physics_process(delta: float) -> void:
 		_turn = fposmod(_turn - _spin * delta, TAU)
 		anim.frame = int(_turn / TAU * SPIN_FRAMES) % SPIN_FRAMES
 
+	if anim and anim.material:
+		var on_rail := rail_guide.is_valid() or (collision_mask & RAMP_LAYER_BIT) != 0
+		if on_rail == _masked:
+			_masked = not on_rail
+			(anim.material as ShaderMaterial).set_shader_parameter("occlude", _masked)  # up on a rail it's over everything
 	if freeze:
 		# held by the temple or the kickback
 		_moved_v = Vector2.ZERO
@@ -310,13 +322,12 @@ func _on_death_zone_body_entered(body: Node) -> void:
 		var at := global_position
 		# it rolls on down the pit's slope to the lava at the bottom, then goes under: hidden
 		# below the lava's surface as it sinks through it, down off the bottom of the table
-		var sink := ShaderMaterial.new()
-		sink.shader = LAVA_SINK
-		sink.set_shader_parameter("surface_y", LAVA_SURFACE_Y)
-		anim.material = sink
-		var surface := Vector2(at.x, maxf(at.y, LAVA_SURFACE_Y))
+		(anim.material as ShaderMaterial).set_shader_parameter("surface_y", LAVA_SURFACE_Y)
+		# it rolls on into the lava itself, not straight down through the pit's walls (a ball
+		# coming in off a gutter catches the drain at its side)
+		var surface := Vector2(clampf(at.x, LAVA_SPAN.x, LAVA_SPAN.y), maxf(at.y, LAVA_SURFACE_Y))
 		var under := surface + Vector2(0, SINK_DEPTH)
-		var roll := clampf((surface.y - at.y) / maxf(speed, ROLL_SPEED_MIN), 0.05, ROLL_SECONDS_MAX)
+		var roll := clampf(at.distance_to(surface) / maxf(speed, ROLL_SPEED_MIN), 0.05, ROLL_SECONDS_MAX)
 		var down := create_tween()
 		down.tween_property(self, "global_position", surface, roll).set_ease(Tween.EASE_IN).set_trans(Tween.TRANS_QUAD)
 		if plop:
@@ -340,7 +351,7 @@ func _on_death_zone_body_entered(body: Node) -> void:
 func _drained() -> void:
 	in_lava = false
 	anim.modulate = Color.WHITE  # it comes back looking like itself
-	anim.material = null
+	(anim.material as ShaderMaterial).set_shader_parameter("surface_y", 1.0e6)
 	if get_tree().get_nodes_in_group("ball").size() > 1:
 		# Multiball: a ball that drains while others are still up just leaves play
 		remove_from_group("ball")

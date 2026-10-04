@@ -40,6 +40,7 @@ var extra_ball_bought := false
 const SPEEDS := [["1:1", 1.0], ["Relaxed", 0.8]]
 const SETTINGS_PATH := "user://settings.cfg"
 var speed_index := 0
+var night := true  # night: the dusk and all its lights; day: daylight, only the torches lit (Scripts/lighting.gd)
 
 var _ball_save_left := 0.0
 var _first_ball := true
@@ -51,6 +52,7 @@ func _ready():
 	var config := ConfigFile.new()
 	if config.load(SETTINGS_PATH) == OK:
 		speed_index = clampi(int(config.get_value("options", "speed", 0)), 0, SPEEDS.size() - 1)
+		night = bool(config.get_value("options", "night", true))
 	_apply_speed()
 	lives = starting_lives
 	score = 0
@@ -199,6 +201,13 @@ func cycle_speed() -> void:
 	var config := ConfigFile.new()
 	config.load(SETTINGS_PATH)
 	config.set_value("options", "speed", speed_index)
+	config.save(SETTINGS_PATH)
+
+func toggle_night() -> void:
+	night = not night
+	var config := ConfigFile.new()
+	config.load(SETTINGS_PATH)
+	config.set_value("options", "night", night)
 	config.save(SETTINGS_PATH)
 
 func speed_name() -> String:

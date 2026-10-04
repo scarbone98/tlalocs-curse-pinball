@@ -39,6 +39,12 @@ const RAIL_GRAVITY := 650.0  # pulls a riding ball back down the slope (scene un
 const RAIL_DRAG := 40.0      # speed lost each second to the wires
 const SETTLE_SECONDS := 0.12 # a ball lifted on slides over onto the track's middle this quickly
 const MIN_ENTRY_SPEED := 300.0
+const BALL_RADIUS := 19.0      # for how fast it's drawn rolling along a track
+const SWAY := 2.0              # scene units it sways either side of a track's middle
+const SWAY_WAVELENGTH := 90.0  # ...over this much track
+const RELEASE_EARLY := 26.0    # it leaves a track that drops it on the playfield this far short of its end
+const END_SPREAD := 0.18       # radians either way it flies off the end
+const END_SPEED_MIN := 160.0
 const BAKE_INTERVAL := 2.0
 # Paths that end in the temple: running out of them, the ball carries on into it
 const INTO_TEMPLE := ["left_temple", "right"]
@@ -197,16 +203,21 @@ func _steer(ball: RigidBody2D, state: PhysicsDirectBodyState2D) -> bool:
 	var curve: Curve2D = _curves[ride.path]
 	var tangent := _tangent(curve, ride.offset)
 	ride.speed += RAIL_GRAVITY * tangent.y * dt
+	ball.set("_spin", clampf(ride.speed / BALL_RADIUS, -ball.MAX_DRAWN_SPIN, ball.MAX_DRAWN_SPIN))  # it rolls along the wires
 	ride.speed -= signf(ride.speed) * minf(RAIL_DRAG * dt, absf(ride.speed))
 	ride.offset += ride.speed * dt
 	ride.drift = ride.drift.lerp(Vector2.ZERO, minf(dt / SETTLE_SECONDS, 1.0))
 	var length := curve.get_baked_length()
-	var off_end := ride.offset >= length
+	# short of a track's end that drops it on the playfield, it leaves under its own steam
+	var release_at := length if ride.path in INTO_TEMPLE else length - RELEASE_EARLY
+	var off_end := ride.offset >= release_at
 	var off_mouth := ride.offset <= 0.0
 	ride.offset = clampf(ride.offset, 0.0, length)
 	tangent = _tangent(curve, ride.offset)
 	var xf := state.transform
-	xf.origin = curve.sample_baked(ride.offset) + ride.drift
+	# a little sway from wire to wire as it goes, rather than running dead on the line
+	var sway := tangent.orthogonal() * sin(ride.offset / SWAY_WAVELENGTH * TAU) * SWAY
+	xf.origin = curve.sample_baked(ride.offset) + ride.drift + sway
 	state.transform = xf
 	state.linear_velocity = tangent * ride.speed
 	state.angular_velocity = 0.0
@@ -214,6 +225,9 @@ func _steer(ball: RigidBody2D, state: PhysicsDirectBodyState2D) -> bool:
 		_take_gem.call_deferred()
 	if off_mouth:
 		state.linear_velocity = (tangent * ride.speed).rotated(randf_range(-MOUTH_SPREAD, MOUTH_SPREAD)) 			* randf_range(MOUTH_SPEED.x, MOUTH_SPEED.y)
+	elif off_end and not ride.path in INTO_TEMPLE:
+		# off the end it flies on as it was going, a little differently each time
+		state.linear_velocity = (tangent * maxf(ride.speed, END_SPEED_MIN)).rotated(randf_range(-END_SPREAD, END_SPREAD))
 	if off_end or off_mouth:
 		_rides.erase(ball)
 		ball.rail_guide = Callable()

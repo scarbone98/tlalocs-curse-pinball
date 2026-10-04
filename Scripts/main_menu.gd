@@ -129,6 +129,10 @@ func _build() -> void:
 	speed.pressed.connect(func():
 		GameManager.cycle_speed()
 		speed.text = "Speed: " + GameManager.speed_name())
+	var time := _button("Time: " + ("Night" if GameManager.night else "Day"), func(): pass)
+	time.pressed.connect(func():
+		GameManager.toggle_night()
+		time.text = "Time: " + ("Night" if GameManager.night else "Day"))
 	if _paused_game:
 		_button("Restart", func():
 			get_tree().paused = false

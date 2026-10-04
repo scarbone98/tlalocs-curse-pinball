@@ -6,6 +6,9 @@ extends Node2D
 ## next pair up catches with a flare, then burns for a while before dying back. Light all six before any goes out and the torches
 ## blaze up and hold a ball saver for a while, like Pokemon Pinball's Pikachu saver:
 ## drain in that time and the ball comes back. When it runs out they die back to embers.
+## Up past the lane's top palm is a fourth button, a flame on it: with every torch lit, run
+## up over all three stone buttons and on over it soon after, and it's an Inferno - the
+## torches flare, a ball saver, and the ball goes about trailing fire for a while.
 
 const TORCH := preload("res://Sprites/table/torch.png")
 const BUTTON := preload("res://Sprites/table/torch_button.png")  # tools/make_table.py
@@ -18,10 +21,17 @@ const PAIRS := [  # moved up the lane to make room for the dart trap at its foot
 ]
 # Torches that just burn, for the look of the place: on the side walls, by the outlanes,
 # beside the stone face (scene units)
-const DECOR := [Vector2(40, 870), Vector2(612, 858), Vector2(40, 1135), Vector2(632, 1105), Vector2(165, 105), Vector2(35, 300)]
+const DECOR := [Vector2(40, 870), Vector2(612, 858), Vector2(40, 1135), Vector2(632, 1105), Vector2(165, 105), Vector2(35, 300), Vector2(548, 378)]  # ...and one above the skull's palms
 # The stone buttons in the lane, one per pair (scene units, from the layout mock-up)
 const BUTTONS := [Vector2(71.0, 658.4), Vector2(86.4, 721.6), Vector2(117.9, 784.2)]  # top to bottom, spread along the lane
 const SEQUENCE_GAP := 1.5  # each button in the run up the lane must follow the last within this
+const FIRE_BUTTON := preload("res://Sprites/table/fire_button.png")  # tools/make_table.py
+const FIRE_AT := Vector2(165, 250)  # up past the lane's top palm, where it bends round over the top
+const FIRE_WINDOW := 2.0      # after a run up the three, the fire button must come within this
+const FIRE_POINTS := 100
+const INFERNO_POINTS := 30000
+const INFERNO_SECONDS := 20.0  # the ball saver, and the fire trailing off the ball
+const INFERNO_REST := 30.0
 const BUTTON_RADIUS := 22.0
 const PRESSED_SECONDS := 0.35
 enum { BUTTON_UP, BUTTON_DOWN }
@@ -47,6 +57,12 @@ var _trip_left := 0.0
 var _expect := 2         # the button the run up the lane needs next: bottom (2), then 1, then top (0)
 var _since_press := 0.0
 var _ablaze_left := 0.0
+var _fire_button: AnimatedSprite2D
+var _fire_cooldown := 0.0
+var _run_done_left := 0.0  # a run up the three just finished: the fire button's open this long
+var _inferno_left := 0.0
+var _inferno_rest := 0.0
+var _trails := {}  # ball -> the fire trailing off it
 var _rest_left := 0.0
 
 ## Every torch burning (all three pairs lit, or the blaze after): the dart trap's darts
@@ -102,8 +118,91 @@ func _ready() -> void:
 		sensor.add_child(shape)
 		sensor.body_entered.connect(_on_button.bind(i))
 		add_child(sensor)
+	_fire_button = features._sprite(FIRE_BUTTON, 2, FIRE_AT)
+	_fire_button.flip_h = true  # lying along the lane where it bends up and to the right
+	features.move_child(_fire_button, 0)
+	var fire_sensor := Area2D.new()
+	fire_sensor.position = FIRE_AT
+	fire_sensor.monitorable = false
+	var fire_shape := CollisionShape2D.new()
+	var fire_circle := CircleShape2D.new()
+	fire_circle.radius = BUTTON_RADIUS
+	fire_shape.shape = fire_circle
+	fire_sensor.add_child(fire_shape)
+	fire_sensor.body_entered.connect(_on_fire_button)
+	add_child(fire_sensor)
+
+func _on_fire_button(body: Node) -> void:
+	if _fire_cooldown > 0.0 or not features._is_ball_on_playfield(body):
+		return
+	_fire_cooldown = PASS_COOLDOWN
+	_fire_button.frame = BUTTON_DOWN
+	get_tree().create_timer(PRESSED_SECONDS, false).timeout.connect(func(): _fire_button.frame = BUTTON_UP)
+	AudioSfx.play("spinner", 0.0, Vector2.ONE * 1.2)
+	if _run_done_left > 0.0 and all_lit() and _inferno_rest <= 0.0:
+		_inferno()
+	else:
+		features._award(FIRE_POINTS, FIRE_AT)
+
+# Inferno: every torch flares, a ball saver, and each ball goes about trailing fire
+func _inferno() -> void:
+	_run_done_left = 0.0
+	_inferno_left = INFERNO_SECONDS
+	_inferno_rest = INFERNO_REST + INFERNO_SECONDS
+	features._award(INFERNO_POINTS, FIRE_AT)
+	GameManager.grant_ball_save(INFERNO_SECONDS)
+	PinballEvents.toast.emit("Inferno!")
+	PinballEvents.rumble.emit(6.0)
+	AudioSfx.play("torch")
+	PinballEvents.effect.emit("fire", FIRE_AT)
+	for torch: AnimatedSprite2D in features._torches:
+		PinballEvents.effect.emit("fire", torch.position + FLAME_TOP)
+		torch.modulate = Color(1.7, 1.4, 1.0)
+		create_tween().tween_property(torch, "modulate", Color.WHITE, 0.6)
+
+func _trail() -> CPUParticles2D:
+	var dot := Image.create(1, 1, false, Image.FORMAT_RGBA8)
+	dot.fill(Color.WHITE)
+	var fire := CPUParticles2D.new()
+	fire.texture = ImageTexture.create_from_image(dot)
+	fire.amount = 24
+	fire.lifetime = 0.45
+	fire.local_coords = false
+	fire.emission_shape = CPUParticles2D.EMISSION_SHAPE_SPHERE
+	fire.emission_sphere_radius = 10.0
+	fire.direction = Vector2(0, -1)
+	fire.spread = 30.0
+	fire.initial_velocity_min = 20.0
+	fire.initial_velocity_max = 50.0
+	fire.gravity = Vector2(0, -40)
+	fire.scale_amount_min = 2.9
+	fire.scale_amount_max = 2.9
+	var burn := Gradient.new()
+	burn.offsets = PackedFloat32Array([0.0, 0.4, 1.0])
+	burn.colors = PackedColorArray([Color(1.0, 0.95, 0.6), Color(1.0, 0.5, 0.1), Color(0.6, 0.1, 0.0, 0.0)])
+	fire.color_ramp = burn
+	fire.z_index = 4
+	fire.z_as_relative = false
+	return fire
 
 func _physics_process(delta: float) -> void:
+	_fire_cooldown = maxf(_fire_cooldown - delta, 0.0)
+	_run_done_left = maxf(_run_done_left - delta, 0.0)
+	_inferno_rest = maxf(_inferno_rest - delta, 0.0)
+	# the fire trailing off each ball through an Inferno
+	_inferno_left = maxf(_inferno_left - delta, 0.0)
+	for ball in _trails.keys():
+		if not is_instance_valid(ball) or _inferno_left <= 0.0:
+			if is_instance_valid(_trails[ball]):
+				_trails[ball].queue_free()
+			_trails.erase(ball)
+	if _inferno_left > 0.0:
+		for ball in get_tree().get_nodes_in_group("ball"):
+			if not _trails.has(ball):
+				var fire := _trail()
+				features.add_child(fire)
+				_trails[ball] = fire
+			(_trails[ball] as Node2D).global_position = (ball as Node2D).global_position
 	_rest_left = maxf(_rest_left - delta, 0.0)
 	_trip_left = maxf(_trip_left - delta, 0.0)
 	_since_press += delta
@@ -146,6 +245,7 @@ func _on_button(body: Node, button: int) -> void:
 	if _expect >= 0:
 		return  # not up the whole lane yet
 	_expect = BUTTONS.size() - 1
+	_run_done_left = FIRE_WINDOW  # on over the fire button now, with every torch lit, for an Inferno
 	# the next unlit pair up the lane catches
 	var next := -1
 	for pair in range(_lit.size() - 1, -1, -1):

@@ -37,6 +37,7 @@ const PROWL_SECONDS := 8.0
 const PROWL_BOTH := 0.3
 const STUNG_SECONDS := 12.0  # a jaguar hit by a poison dart (Scripts/dart_trap.gd) hides in its hole this long
 const BUTTON_POINTS := 1000
+const PAW_BUTTON := preload("res://Sprites/table/paw_button.png")
 const ROAR_SECONDS := 0.6  # the heads roar at the button's press
 const LURK_POINTS := 100  # a hit on a head still in its slot
 enum { HEAD_WATCHING, HEAD_ROARING, HEAD_BLINKING }
@@ -120,7 +121,9 @@ func _ready() -> void:
 	button.add_child(button_shape)
 	button.body_entered.connect(_on_button)
 	add_child(button)
-	_button_sprite = features.gold_button("skull_button")
+	# the button's a gold paw (tools/make_table.py), there all the time: resting, lit, pressed
+	var gold: Vector2 = features.TableGeometry.GOLD_BUTTONS["skull_button"] * features.MAP_SCALE
+	_button_sprite = features._sprite(PAW_BUTTON, 3, gold)
 	for side in 2:
 		var claw: AnimatedSprite2D = features._sprite(CLAW, 3, Vector2.ZERO, 16.0)
 		claw.flip_h = side == 1
@@ -237,7 +240,8 @@ func _on_button(body: Node) -> void:
 func _physics_process(delta: float) -> void:
 	_clock += delta
 	_pressed_left = maxf(_pressed_left - delta, 0.0)
-	features.show_gold_button(_button_sprite, _pressed_left, _out_left > 0.0)
+	_button_sprite.frame = 2 if _pressed_left > 0.0 else (1 if _out_left > 0.0 else 0)
+	_button_sprite.set_meta("lit", _out_left > 0.0 or _pressed_left > 0.0)  # Scripts/lighting.gd
 	_button_cooldown = maxf(_button_cooldown - delta, 0.0)
 	if _out_left > 0.0:
 		_out_left -= delta

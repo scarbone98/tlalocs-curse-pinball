@@ -10,6 +10,14 @@ extends Node2D
 
 const MOOD := Color(0.56, 0.54, 0.68)   # dusk over the table
 const STORM := Color(0.42, 0.45, 0.62)  # darker and bluer while the curse rains
+const DAY := Color(1.0, 1.0, 1.0)        # by day (GameManager.night off): no dusk over it...
+const DAY_STORM := Color(0.74, 0.76, 0.84)  # ...and the curse just greys the sky
+
+static func mood() -> Color:
+	return MOOD if GameManager.night else DAY
+
+static func storm() -> Color:
+	return STORM if GameManager.night else DAY_STORM
 const TORCH_COLOUR := Color(1.0, 0.62, 0.3)
 const TORCH_SIZE := 1.3
 const TORCH_BLAZE := 0.7
@@ -42,10 +50,10 @@ const SHIMMER_FPS := 14.0
 const SHIMMER_REACH := 150.0  # the spotlight coming within this of the skull, or leaving, sets it shimmering
 const LAMP_SIZE := 0.45
 const EYE_SIZE := 0.3
-const IDOL_SPOT_SIZE := 1.15  # a spotlight on the golden idol, taking in its spinning tower
+const IDOL_SPOT_SIZE := 1.7  # a big soft spotlight on the golden idol, taking in its spinning tower
 const IDOL_SPOT_BELOW := 46.0  # scene units below the idol its middle falls: on the tower
 const IDOL_GLOW := 1.0
-const SKULL_SPOT_SIZE := 0.9  # a spotlight on the crystal skull while its jaws are open
+const SKULL_SPOT_SIZE := 1.45  # a big soft spotlight on the crystal skull while its jaws are open
 const SKULL_GLOW := 0.9
 const WHIRL_GLOW := 0.9
 const WHIRL_BREATH_SECONDS := 2.2  # the whirl's glow breathes a little quicker than the spots
@@ -57,6 +65,8 @@ const EYE_RED := Color(1.0, 0.15, 0.1)
 
 var features: Node2D  # TableFeatures
 
+var _all_lights: Array[PointLight2D] = []
+var _night := true  # what's been applied (GameManager.night can change from the menu)
 var _pools := {}  # size -> its pixel pool
 var _torch_lights: Array[PointLight2D] = []
 var _whirl_light: PointLight2D
@@ -105,7 +115,7 @@ func _tile_map() -> void:
 
 func _ready() -> void:
 	_tile_map()
-	features._storm_tint.color = MOOD
+	features._storm_tint.color = mood()
 	for torch: AnimatedSprite2D in features._torches:
 		var light := _light(torch.position + FLAME_ABOVE, TORCH_COLOUR, TORCH_BLAZE, TORCH_SIZE)
 		_torch_lights.append(light)
@@ -120,8 +130,8 @@ func _ready() -> void:
 	_skull_shimmer.vframes = 2
 	_skull_shimmer.hide()
 	_sacrifice_light = _light(Vector2.ZERO, Color(1.0, 0.72, 0.4), 0.95, 0.85)  # a warm spot on the sacrifice
-	_idol_light = _light(Vector2.ZERO, Color(1.0, 0.86, 0.45), IDOL_GLOW, IDOL_SPOT_SIZE)  # a spot on the golden idol
-	_skull_light = _light(features.skull._sprite.global_position, Color(0.6, 0.85, 1.0), SKULL_GLOW, SKULL_SPOT_SIZE)  # ...and on the skull, open
+	_idol_light = _light(Vector2.ZERO, Color(1.0, 0.86, 0.45), IDOL_GLOW, IDOL_SPOT_SIZE, true)  # a spot on the golden idol
+	_skull_light = _light(features.skull._sprite.global_position, Color(0.6, 0.85, 1.0), SKULL_GLOW, SKULL_SPOT_SIZE, true)  # ...and on the skull, open
 	_idol_spot_scale = _idol_light.texture_scale
 	_skull_spot_scale = _skull_light.texture_scale
 	_whirl_light = _light(features.temple.AT, Color(0.85, 0.45, 1.0), WHIRL_GLOW, 1.4)
@@ -183,13 +193,19 @@ func _lava() -> void:
 # the middle, one texel to an art pixel (so it's built to each light's size)
 const BAND_EDGES := [0.5, 1.0]
 const BAND_ALPHA := [1.0, 0.42]
+# ...and a softer pool, fading out over more bands, for the spotlights on the idol and skull
+const SOFT_EDGES := [0.3, 0.5, 0.7, 0.86, 1.0]
+const SOFT_ALPHA := [0.95, 0.72, 0.5, 0.3, 0.14]
 const POOL_PIXELS := 128.0  # a light of size 1 lights a circle this many scene units across
 const ART_PIXEL := 2.9      # scene units to an art pixel (MAP_SCALE, about)
 const POOL_BLOCK := 3       # screen texels each art-pixel texel is drawn as
 
-func _pixel_pool(size: float) -> ImageTexture:
-	if _pools.has(size):
-		return _pools[size]
+func _pixel_pool(size: float, soft: bool = false) -> ImageTexture:
+	var key := Vector2(size, 1.0 if soft else 0.0)
+	if _pools.has(key):
+		return _pools[key]
+	var edges: Array = SOFT_EDGES if soft else BAND_EDGES
+	var alphas: Array = SOFT_ALPHA if soft else BAND_ALPHA
 	var texels := maxi(4, int(roundf(POOL_PIXELS * size / ART_PIXEL)))
 	var image := Image.create(texels, texels, false, Image.FORMAT_RGBA8)
 	var middle := texels / 2.0
@@ -197,19 +213,20 @@ func _pixel_pool(size: float) -> ImageTexture:
 		for x in texels:
 			var r := Vector2(x + 0.5 - middle, y + 0.5 - middle).length() / middle
 			var alpha := 0.0
-			for band in BAND_EDGES.size():
-				if r < BAND_EDGES[band]:
-					alpha = BAND_ALPHA[band]
+			for band in edges.size():
+				if r < edges[band]:
+					alpha = alphas[band]
 					break
 			image.set_pixel(x, y, Color(1, 1, 1, alpha))
 	# blown up blockily here, so the renderer's smoothing can't soften a texel's edges
 	image.resize(texels * POOL_BLOCK, texels * POOL_BLOCK, Image.INTERPOLATE_NEAREST)
-	_pools[size] = ImageTexture.create_from_image(image)
-	return _pools[size]
+	_pools[key] = ImageTexture.create_from_image(image)
+	return _pools[key]
 
-func _light(at: Vector2, colour: Color, energy: float, size: float) -> PointLight2D:
+func _light(at: Vector2, colour: Color, energy: float, size: float, soft: bool = false) -> PointLight2D:
 	var light := PointLight2D.new()
-	light.texture = _pixel_pool(size)
+	_all_lights.append(light)
+	light.texture = _pixel_pool(size, soft)
 	light.texture_scale = ART_PIXEL / POOL_BLOCK
 	light.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 	light.color = colour
@@ -220,6 +237,12 @@ func _light(at: Vector2, colour: Color, energy: float, size: float) -> PointLigh
 
 func _process(delta: float) -> void:
 	_clock += delta
+	if _night != GameManager.night:
+		_night = GameManager.night
+		features._storm_tint.color = storm() if GameManager.curse_active else mood()
+		if _night:
+			for light in _all_lights:
+				light.visible = true  # the ones that come and go hide themselves again below
 	for i in _torch_lights.size():
 		var torch: AnimatedSprite2D = features._torches[i]
 		# a torch only throws light while it's burning, not smouldering on embers
@@ -287,8 +310,18 @@ func _process(delta: float) -> void:
 	for i in _button_lights.size():
 		var pair: Array = _button_lights[i]
 		var light := pair[1] as PointLight2D
-		light.visible = (pair[0] as AnimatedSprite2D).visible
+		var button := pair[0] as AnimatedSprite2D
+		light.visible = button.get_meta("lit") if button.has_meta("lit") else button.visible
 		# they breathe like the torches' light, only gentler
 		var waver := sin(_clock * FLICKER_RATES.x * 0.6 + i * 2.3) * 0.5 + sin(_clock * FLICKER_RATES.y * 0.6 + i * 1.1) * 0.5
 		light.energy = BUTTON_GLOW * (1.0 + BUTTON_FLICKER * waver)
 		light.texture_scale = pair[2] * (1.0 + BUTTON_FLICKER_SIZE * waver)
+	if not _night:
+		# by day the sun's up: only the torches throw any light
+		for light in _all_lights:
+			if not _torch_lights.has(light):
+				light.visible = false
+		_skull_shine.visible = false
+		_skull_shimmer.visible = false
+	else:
+		_skull_shine.visible = true
