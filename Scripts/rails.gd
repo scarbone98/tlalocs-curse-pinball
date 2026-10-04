@@ -28,13 +28,13 @@ const ARROWS_TO_TEMPLE := 2
 # one), so only a ball heading along the rail is taken: within this much of its line
 const ENTRY_AREAS := {
 	"left_entry": Rect2(145, 665, 60, 50),
-	"right_entry": Rect2(496, 715, 34, 55),  # below its mouth, which is barely wider than the ball
+	"right_entry": Rect2(500, 690, 70, 80),  # over its whole mouth as drawn, and the approach below it
 }
 const ENTRY_ALIGN := {"left_entry": 0.94, "right_entry": 0.94}  # cosines: about 20 degrees
 # ...and only on the rail's own line: the lanes running up under the rails, beside their
 # mouths, head the same way, so a ball has to be within this much of the track's middle
 # (or of the line it runs in on, short of the mouth)
-const ENTRY_LATERAL := 40.0
+const ENTRY_LATERAL := 60.0
 const RAIL_GRAVITY := 650.0  # pulls a riding ball back down the slope (scene units/s²)
 const RAIL_DRAG := 40.0      # speed lost each second to the wires
 const SETTLE_SECONDS := 0.12 # a ball lifted on slides over onto the track's middle this quickly
@@ -64,6 +64,7 @@ var to_temple := false
 var _curves := {}  # path name -> Curve2D
 var _fork_offset := 0.0  # along the left rail: short of here the diverter can still switch a ball
 var _rides := {}  # ball -> Ride
+var _entry_areas := {}  # opening -> its Area2D
 var _gem: AnimatedSprite2D
 var _gem_shadow: AnimatedSprite2D
 var _gem_left := 0.0  # until the next emerald turns up
@@ -94,7 +95,7 @@ func _ready() -> void:
 	_fork_offset = (_curves["left_lanes"] as Curve2D).get_closest_offset(lanes[maxi(shared - 3, 0)])
 	for opening: String in ENTRIES:
 		var rect: Rect2 = ENTRY_AREAS[opening]
-		_add_area(rect.get_center(), rect.size, _on_entry.bind(opening))
+		_entry_areas[opening] = _add_area(rect.get_center(), rect.size, _on_entry.bind(opening))
 
 # A smooth curve through the points: each one's handles point along the line from the
 # point before it to the one after (Catmull-Rom)
@@ -108,7 +109,7 @@ func _curve(points: Array) -> Curve2D:
 		curve.add_point(points[i], -handle, handle)
 	return curve
 
-func _add_area(at: Vector2, size: Vector2, on_ball: Callable) -> void:
+func _add_area(at: Vector2, size: Vector2, on_ball: Callable) -> Area2D:
 	var area := Area2D.new()
 	area.position = at
 	area.monitorable = false
@@ -119,6 +120,7 @@ func _add_area(at: Vector2, size: Vector2, on_ball: Callable) -> void:
 	area.add_child(shape)
 	area.body_entered.connect(on_ball)
 	add_child(area)
+	return area
 
 func _on_entry(body: Node, opening: String) -> void:
 	var ball := body as RigidBody2D
@@ -229,6 +231,10 @@ func _take_gem() -> void:
 
 func _physics_process(delta: float) -> void:
 	to_temple = features.ramps.arrows["summon"] >= ARROWS_TO_TEMPLE
+	# a ball already in a mouth that turns to head up it (off a bounce, say) is taken too
+	for opening: String in _entry_areas:
+		for body in (_entry_areas[opening] as Area2D).get_overlapping_bodies():
+			_on_entry(body, opening)
 	_clock += delta
 	_gem.frame = 1 if fposmod(_clock, 2.0) < 0.15 else 0  # a glint now and then
 	_gem.offset.y = -GEM_HOVER - (1.0 if fposmod(_clock / GEM_BOB_SECONDS, 1.0) < 0.5 else 0.0)  # hovering, bobbing

@@ -11,7 +11,7 @@ extends Node2D
 
 const FLIPPER := preload("res://Sprites/table/blue_flipper.png")  # tools/make_table.py
 
-const PLATES := [Vector2(164.5, 386), Vector2(164.5, 456), Vector2(170, 525)]  # top to bottom
+const PLATES := [Vector2(171.5, 393), Vector2(164.5, 456), Vector2(170, 525)]  # top to bottom, as in the layout mock-up
 const SENSOR_SIZE := Vector2(58, 14)  # the full width of the lane, so every ball through it counts
 const FRAMES := 15  # one full turn
 const TURNS_PER_SPEED := 1.0 / 150.0  # turns per second for each unit of ball speed
