@@ -18,8 +18,14 @@ const CATCH_RADIUS := 30.0
 # The ring the ball races round inside (scene units; the temple's round body)
 const LOOP_CENTRE := Vector2(588, 182)
 const LOOP_RADIUS := Vector2(72, 78)
-const LOOP_LAPS := 2.0
-const LOOP_SECONDS := 1.5
+# How far round the ring the ball races depends on how fast it came in: a lap for each
+# SPEED_PER_LAP, up to MAX_LAPS. One too slow to get all the way round slides back out
+# the way it came, down its rail, with no offering.
+const SPEED_PER_LAP := 450.0
+const MAX_LAPS := 3.0
+const LAPS_TO_MAKE_IT := 1.0
+const LAP_SECONDS := 0.55
+const ROLL_BACK_SPEED := 260.0
 const SPIT_FROM := Vector2(440, 100)   # just back down the pipe, on the rail's upper branch
 const SPIT_VELOCITY := Vector2(-760, 30)
 const REARM_SECONDS := 1.0
@@ -81,23 +87,48 @@ func _physics_process(delta: float) -> void:
 
 func _swallow(ball: RigidBody2D) -> void:
 	_held = ball
+	var speed := ball.linear_velocity.length()
+	var pipe: Vector2 = Geometry.OPENINGS["left_pipe"][0]
+	var chute: Vector2 = Geometry.OPENINGS["right_top"][0]
+	var came_up := "right" if ball.global_position.distance_to(chute) < ball.global_position.distance_to(pipe) else "left_temple"
 	ball.freeze_mode = RigidBody2D.FREEZE_MODE_KINEMATIC
 	ball.set_deferred("freeze", true)
 	ball.linear_velocity = Vector2.ZERO
 	ball.z_index = 1  # under the temple's art, out of sight inside it
 	var start := (ball.global_position - LOOP_CENTRE) / LOOP_RADIUS
 	var from_angle := atan2(start.y, start.x)
+	var laps := clampf(speed / SPEED_PER_LAP, 0.2, MAX_LAPS)
+	var made_it := laps >= LAPS_TO_MAKE_IT
+	var seconds := LAP_SECONDS * laps
 	var loop := create_tween().set_process_mode(Tween.TWEEN_PROCESS_PHYSICS)
-	loop.tween_method(func(t: float):
-		var angle := from_angle - t * TAU * LOOP_LAPS
-		ball.global_position = LOOP_CENTRE + Vector2(cos(angle), sin(angle)) * LOOP_RADIUS,
-		0.0, 1.0, LOOP_SECONDS).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
-	loop.tween_callback(_offering)
-	loop.tween_interval(0.3)
-	loop.tween_callback(_spit.bind(ball))
-	AudioSfx.play("shrine")
-	PinballEvents.rumble.emit(4.0)
-	features._flash_shrine(LOOP_SECONDS + 0.3)
+	var at := func(t: float):
+		var angle := from_angle - t * TAU * laps
+		ball.global_position = LOOP_CENTRE + Vector2(cos(angle), sin(angle)) * LOOP_RADIUS
+	if made_it:
+		# round and round, slowing as it goes
+		loop.tween_method(at, 0.0, 1.0, seconds).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+		loop.tween_callback(_offering)
+		loop.tween_interval(0.3)
+		loop.tween_callback(_spit.bind(ball))
+		AudioSfx.play("shrine")
+		PinballEvents.rumble.emit(4.0)
+		features._flash_shrine(seconds + 0.3)
+	else:
+		# not enough to get round: up the ring a way, back down it, and out again
+		loop.tween_method(at, 0.0, 1.0, seconds).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
+		loop.tween_method(at, 1.0, 0.0, seconds).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN)
+		loop.tween_callback(_roll_back.bind(ball, came_up))
+
+# Out of the temple the way it came in, rolling back down that rail
+func _roll_back(ball: RigidBody2D, path: String) -> void:
+	_held = null
+	_rearm = REARM_SECONDS
+	var curve: Curve2D = features.rails._curves[path]
+	var end := curve.get_baked_length()
+	ball.global_position = curve.sample_baked(end)
+	ball.freeze = false
+	ball.linear_velocity = -features.rails._tangent(curve, end) * ROLL_BACK_SPEED
+	features.rails.lift(ball, path)
 
 func _offering() -> void:
 	for i in _gems.size():
