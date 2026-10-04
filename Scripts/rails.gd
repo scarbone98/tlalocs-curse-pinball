@@ -226,7 +226,6 @@ func _take_gem() -> void:
 	_gem_left = GEM_RETURN_SECONDS
 	features._award(GEM_POINTS, _gem.position)
 	PinballEvents.effect.emit("sparks", _gem.position)
-	features.sacrifices.bring.call_deferred("emerald", _gem.position)  # off to Tlaloc's mouth as a sacrifice
 	AudioSfx.play("catch")
 
 func _physics_process(delta: float) -> void:

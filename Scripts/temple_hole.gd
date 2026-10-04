@@ -94,7 +94,7 @@ func _physics_process(delta: float) -> void:
 	_rearm = maxf(_rearm - delta, 0.0)
 	# his mouth opens, the whirl turning in it, while something waits (or he's holding the
 	# ball); while a sacrifice sits in it, it takes nothing else (Scripts/sacrifices.gd)
-	var heart_in: bool = features.sacrifices != null and features.sacrifices._kind != ""
+	var heart_in: bool = features.sacrifices != null and features.sacrifices.active
 	var open: bool = not heart_in and (_held != null or _waiting())
 	_whirl.visible = open
 	if open and features._face_sprite:

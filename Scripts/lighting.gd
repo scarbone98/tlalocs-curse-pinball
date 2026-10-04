@@ -23,7 +23,7 @@ const SKY_AT := Vector2(390, 450)
 const SKY_COLOUR := Color(0.75, 0.82, 1.0)
 const SKY := 0.38
 const SKY_SIZE := 4.4
-const SKY_FOLLOW := 7.0  # how quickly it drifts after the ball: just a little lag
+const SKY_FOLLOW := 9.0  # how quickly it drifts after the ball: just a little lag
 # A red glow welling up out of the drain between the flippers, slowly pulsing: a low,
 # flat band of light along the drain rather than a round pool
 const GUTTER_AT := Vector2(339, 1250)
