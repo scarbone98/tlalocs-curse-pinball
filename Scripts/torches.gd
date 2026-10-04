@@ -21,7 +21,7 @@ const PAIRS := [  # moved up the lane to make room for the dart trap at its foot
 ]
 # Torches that just burn, for the look of the place: on the side walls, by the outlanes,
 # beside the stone face (scene units)
-const DECOR := [Vector2(40, 870), Vector2(612, 858), Vector2(40, 1135), Vector2(632, 1105), Vector2(165, 105), Vector2(35, 300), Vector2(548, 378)]  # ...and one above the skull's palms
+const DECOR := [Vector2(98, 866), Vector2(577, 866), Vector2(88, 1100), Vector2(587, 1100), Vector2(165, 105), Vector2(35, 300), Vector2(548, 378)]  # ...and one above the skull's palms
 # The stone buttons in the lane, one per pair (scene units, from the layout mock-up)
 const BUTTONS := [Vector2(71.0, 658.4), Vector2(86.4, 721.6), Vector2(117.9, 784.2)]  # top to bottom, spread along the lane
 const SEQUENCE_GAP := 1.5  # each button in the run up the lane must follow the last within this
