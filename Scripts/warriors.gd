@@ -26,8 +26,9 @@ const AWAY_EVERY := Vector2(45.0, 80.0)
 const AWAY_SECONDS := 15.0
 const HOLE := preload("res://Sprites/table/arena_hole.png")  # tools/make_table.py: sun up, turning, edge-on (open), turning, underside up
 const HOLE_FRAMES := 9
-const HOLE_OPEN := 4             # edge-on, the hole either side of it
-const HOLE_FLIP_SECONDS := 0.3   # the cover turns from shut to open (or on round to shut) this quickly
+const HOLE_FLIP_SECONDS := 0.0   # (a warrior waits this long on the cover before going through it)
+const SPIN_HALF_TURNS := Vector2i(3, 5)  # a warrior going through spins the cover round this many half turns...
+const SPIN_SECONDS := 1.1                # ...slowing to rest over this long
 const Flutter := preload("res://Scripts/flutter.gd")
 const FEATHERS := preload("res://Sprites/table/feathers.png")  # tools/make_table.py
 const FEATHERS_PER_HIT := 5
@@ -78,7 +79,7 @@ var _home: Array[Vector2] = []    # where each one's sprite sits on its warrior
 var _stung_left: Array[float] = []  # each one down the hole on its own after a dart, this much longer
 var _solo: Array[bool] = []  # each one hopping on its own (the formation leaves it be)
 var _sink: Array[float] = []  # how far down the hole each one's sunk
-var _shut_at := 0  # the frame the cover turns on round to when it next shuts: it turns right over, alternately
+var _hole_phase := 0.0  # how far round the cover's spun, in frames (it ping-pongs through its sheet)
 var _rest_left := 0.0
 var _linger := 0.0
 var _clock := 0.0
@@ -114,24 +115,30 @@ func _ready() -> void:
 
 var _hole_tween: Tween
 
-# The cover flips over like a flipper: through its turning frames to open, or back to shut
-func _flip_hole(open: bool) -> void:
-	var to := HOLE_OPEN if open else _shut_at
-	if open and _hole.frame != HOLE_OPEN:
-		_shut_at = HOLE_FRAMES - 1 if _hole.frame < HOLE_OPEN else 0  # it'll shut by turning on over
-	if _hole.frame == to:
-		return
+# The cover's a spinner, like the frog's blue one: a warrior going through it, down or up,
+# sets it spinning round on its middle, a few turns and slowing, till it comes to rest
+# flat (sun side up or underside up, whichever it ends on). The hole's only open while it
+# spins.
+func _flip_hole(_open: bool) -> void:
+	pass  # (it spins as each warrior goes through: _spin_hole)
+
+func _spin_hole() -> void:
 	if _hole_tween:
 		_hole_tween.kill()
+	var from := _hole_phase
+	var half_turns := randi_range(SPIN_HALF_TURNS.x, SPIN_HALF_TURNS.y)
 	_hole_tween = create_tween()
-	_hole_tween.tween_method(func(v: float): _hole.frame = int(round(v)), float(_hole.frame), float(to),
-		HOLE_FLIP_SECONDS * absf(to - _hole.frame) / HOLE_OPEN)
-	AudioSfx.play("tiki", 0.0, Vector2.ONE * (1.1 if open else 0.9))
+	_hole_tween.tween_method(func(v: float):
+		_hole_phase = v
+		_hole.frame = int(round(pingpong(v, HOLE_FRAMES - 1))),
+		from, roundf(from / (HOLE_FRAMES - 1)) * (HOLE_FRAMES - 1) + half_turns * (HOLE_FRAMES - 1), SPIN_SECONDS) 		.set_ease(Tween.EASE_OUT).set_trans(Tween.TRANS_CUBIC)
+	AudioSfx.play("tiki", 0.0, Vector2.ONE * 1.1)
 
 # Down into the hole, or up out of it, sinking behind its near rim as the jaguars slide
 # into their slots: the warrior stands on the hole's middle the while
 func _sink_tween(i: int, down: bool) -> Tween:
 	var sprite := _sprites[i]
+	_spin_hole()  # through the spinner it goes, setting it turning
 	(sprite.material as ShaderMaterial).set_shader_parameter("clip_y", CENTRE.y + HOLE_RIM)
 	var sink := create_tween()
 	sink.tween_method(func(v: float): _sink[i] = v, 0.0 if down else SINK_DEPTH, SINK_DEPTH if down else 0.0, SINK_SECONDS) \
