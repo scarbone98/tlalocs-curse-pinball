@@ -51,7 +51,7 @@ const Totem := preload("res://Scripts/totem.gd")
 # The road's two ways, inlaid in the floor at the foot of each rail's lane, pointing up it
 # (tools/make_table.py: dark, lit): they light, flashing turn about, while a way's to be picked
 const ROAD_ARROWS := {
-	"left": [preload("res://Sprites/table/road_arrow_left.png"), Vector2(152, 836)],
+	"left": [preload("res://Sprites/table/road_arrow_left.png"), Vector2(186, 648)],
 	"right": [preload("res://Sprites/table/road_arrow_right.png"), Vector2(506, 736)],
 }
 const ROAD_FLASH := 3.0  # flashes a second
