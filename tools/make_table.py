@@ -57,7 +57,7 @@ and the playfield sprites cut from the hand-drawn sheets in tools/source_art/:
   Sprites/table/spirit_lamp.png  the right lane's floor lamps (dark, lit)
   Sprites/table/shard.png     a crystal sliver, for the tower breaking
   Sprites/table/temple_interior.png  the inside of the golden temple, seen through its windows
-  Sprites/table/arena_hole.png  the stone tablet in the warriors' arena (shut, open)
+  Sprites/table/arena_hole.png  the stone tablet in the warriors' arena, flipping: shut ... open
   Sprites/table/front_walls.png  the walls along the table's foot, that a ball in a gutter
                               passes behind (a mask for Scripts/ball_mask.gdshader)
   Sprites/table/runes.png     the carved glyphs on the walls, alone, for them to flash
@@ -1234,15 +1234,21 @@ def lava_layers():
 HOLE_SIZE = (24, 16)
 
 
+HOLE_FLIP = [1.0, 0.6, 0.3, 0.08, 0.0]  # how much of the cover faces up in each frame: shut ... open
+
+
 def arena_hole():
-    """A round stone tablet set in the middle of the warriors' arena: shut, with a carved
-    step-fret on it, then slid aside, a dark hole the warriors jump down into."""
+    """A round stone tablet set in the middle of the warriors' arena, a cover over the hole
+    they jump down into. It flips over on its middle like a flipper: shut (a step-fret carved
+    on it), turning (seen ever more edge-on, the dark hole showing past it), edge-on, then
+    open. Played forward it opens, backward it shuts (Scripts/warriors.gd)."""
     w, h = HOLE_SIZE
     ink, rim, stone, stone_l, carve = (20, 24, 36, 255), (84, 90, 100, 255), (112, 118, 128, 255), (148, 154, 160, 255), (70, 74, 84, 255)
+    underside = (88, 94, 104, 255)
     pit, pit_d = (34, 26, 30, 255), (16, 12, 18, 255)
-    out = Image.new("RGBA", (w * 2, h), T)
+    out = Image.new("RGBA", (w * len(HOLE_FLIP), h), T)
     cx, cy = (w - 1) / 2, (h - 1) / 2
-    for f in range(2):
+    for f, face in enumerate(HOLE_FLIP):
         for y in range(h):
             for x in range(w):
                 r = ((x - cx) / (w / 2)) ** 2 + ((y - cy) / (h / 2)) ** 2
@@ -1251,15 +1257,25 @@ def arena_hole():
                 if r > 0.78:
                     c = ink
                 elif r > 0.55:
-                    c = rim if f == 0 or y > cy else (60, 64, 74, 255)
-                elif f == 0:
-                    c = stone_l if y < cy - 2 else stone
+                    c = rim if face == 1.0 or y > cy else (60, 64, 74, 255)
                 else:
                     c = pit if y < cy else pit_d
+                    # the cover, turned so only `face` of it shows: squashed toward its middle
+                    if face > 0.0:
+                        ry = (h / 2) * 0.74 * max(face, 0.08)
+                        across = ((x - cx) / ((w / 2) * 0.74)) ** 2
+                        on = across + ((y - cy) / ry) ** 2 <= 1.0 or (face < 0.2 and abs(y - cy) < 0.6 and across <= 1.0)
+                        if on:
+                            if face == 1.0:
+                                c = stone_l if y < cy - 2 else stone
+                            elif face > 0.2:
+                                c = stone if y < cy else underside
+                            else:
+                                c = underside if y < cy else rim  # edge-on: just its thickness
                 out.putpixel((f * w + x, y), c)
-        if f == 0:  # a step-fret carved across the shut tablet
+        if face == 1.0:  # a step-fret carved across the shut tablet
             for dx, dy in ((-4, 0), (-3, 0), (-2, 0), (-2, -1), (-1, -1), (0, -1), (0, 0), (0, 1), (1, 1), (2, 1), (2, 0), (3, 0), (4, 0)):
-                out.putpixel((int(cx + dx + 0.5), int(cy + dy + 0.5)), carve)
+                out.putpixel((f * w + int(cx + dx + 0.5), int(cy + dy + 0.5)), carve)
     return out
 
 

@@ -24,8 +24,11 @@ const MARCH_EVERY := Vector2(20.0, 35.0)
 const LINGER_SECONDS := 0.8           # a ball this long inside the arena sets them marching
 const AWAY_EVERY := Vector2(45.0, 80.0)
 const AWAY_SECONDS := 15.0
-const HOLE := preload("res://Sprites/table/arena_hole.png")  # tools/make_table.py: shut, open
-enum { HOLE_SHUT, HOLE_OPEN }
+const HOLE := preload("res://Sprites/table/arena_hole.png")  # tools/make_table.py: shut, flipping over, open
+const HOLE_FRAMES := 5
+const HOLE_SHUT := 0
+const HOLE_OPEN := HOLE_FRAMES - 1
+const HOLE_FLIP_SECONDS := 0.25  # the cover flips over this quickly, opening or shutting
 const HOP_SECONDS := 0.45
 const HOP_HEIGHT := 8.0   # art pixels up at the top of a hop
 const HOP_STAGGER := 0.2
@@ -92,10 +95,23 @@ func _ready() -> void:
 		_home.append(sprite.position)
 		_solo.append(false)
 		(warrior as Area2D).body_entered.connect(_on_touch.bind(_sprites.size() - 1))
-	_hole = features._sprite(HOLE, 2, CENTRE)  # under the warriors (they're drawn after the table's features)
+	_hole = features._sprite(HOLE, HOLE_FRAMES, CENTRE)  # under the warriors (they're drawn after the table's features)
 	_place()
 	_rest_left = randf_range(MARCH_EVERY.x, MARCH_EVERY.y)
 	_away_wait = randf_range(AWAY_EVERY.x, AWAY_EVERY.y)
+
+var _hole_tween: Tween
+
+# The cover flips over like a flipper: through its turning frames to open, or back to shut
+func _flip_hole(open: bool) -> void:
+	var to := HOLE_OPEN if open else HOLE_SHUT
+	if _hole.frame == to:
+		return
+	if _hole_tween:
+		_hole_tween.kill()
+	_hole_tween = create_tween()
+	_hole_tween.tween_method(func(v: float): _hole.frame = int(round(v)), float(_hole.frame), float(to),
+		HOLE_FLIP_SECONDS * absf(to - _hole.frame) / HOLE_OPEN)
 
 func _frames() -> SpriteFrames:
 	var frames := SpriteFrames.new()
@@ -139,7 +155,7 @@ func _hop_solo(i: int, out_of_hole: bool) -> void:
 	var warrior := _warriors[i]
 	var sprite := _sprites[i]
 	_solo[i] = true
-	_hole.frame = HOLE_OPEN
+	_flip_hole(true)
 	for shape in warrior.find_children("*", "CollisionShape2D", true, false):
 		(shape as CollisionShape2D).set_deferred("disabled", true)
 	var from := warrior.global_position
@@ -161,7 +177,7 @@ func _hop_solo(i: int, out_of_hole: bool) -> void:
 		else:
 			warrior.hide()  # down the hole
 		if _hopping == 0 and not _solo.has(true):
-			_hole.frame = HOLE_SHUT)
+			_flip_hole(false))
 	AudioSfx.play("tiki", 0.0, Vector2.ONE * 0.9)
 
 func _on_touch(body: Node, index: int) -> void:
@@ -267,7 +283,7 @@ func _set_here(here: bool) -> void:
 		for k in range(out_now, order.size()):
 			staying.append(order[k])
 			_stung_left[order[k]] = randf_range(STRAGGLE_SECONDS.x, STRAGGLE_SECONDS.y)
-	_hole.frame = HOLE_OPEN
+	_flip_hole(true)
 	_hopping = _warriors.size() - staying.size()
 	var step := 0
 	for i in _warriors.size():
@@ -299,7 +315,7 @@ func _set_here(here: bool) -> void:
 				warrior.hide()  # down the hole
 			_hopping -= 1
 			if _hopping == 0:
-				_hole.frame = HOLE_SHUT)
+				_flip_hole(false))
 		AudioSfx.play("tiki", 0.0, Vector2.ONE * (0.8 + 0.1 * i))
 
 func _march() -> void:
