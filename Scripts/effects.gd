@@ -86,44 +86,12 @@ func _buzz(strength: float) -> void:
 	if strength >= VIBRATE_FROM:
 		Input.vibrate_handheld(int(strength * VIBRATE_MS_PER_STRENGTH))
 
-const TRAIL_SECONDS := 2.0   # smoke streams up off the lava this long...
-const TRAIL_RISE := 3.2      # ...each wisp rising this long as it fades
+const SmokeStreamers := preload("res://Scripts/smoke_streamers.gd")
+const TRAIL_SECONDS := 2.0   # smoke streams up off the lava this long
 
-# Wisps of smoke streaming up off the lava where a ball's going under: single pixels,
-# rising and slowing, curling a little as they go, pale and fading to nothing
+# Ribbons of smoke streaming up off the lava where a ball's going under
 func _smoke_trail(at: Vector2) -> void:
-	var smoke := CPUParticles2D.new()
-	smoke.texture = _pixel
-	smoke.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
-	smoke.amount = 220
-	smoke.lifetime = TRAIL_RISE
-	smoke.position = at
-	smoke.emission_shape = CPUParticles2D.EMISSION_SHAPE_RECTANGLE
-	smoke.emission_rect_extents = Vector2(10, 3)
-	smoke.direction = Vector2(0, -1)
-	smoke.spread = 10.0
-	smoke.initial_velocity_min = 70.0
-	smoke.initial_velocity_max = 120.0
-	smoke.gravity = Vector2(0, -10)   # hot, still lifting a little
-	smoke.damping_min = 14.0
-	smoke.damping_max = 26.0
-	smoke.orbit_velocity_min = -0.05  # curling as it rises
-	smoke.orbit_velocity_max = 0.05
-	smoke.tangential_accel_min = -14.0
-	smoke.tangential_accel_max = 14.0
-	smoke.scale_amount_min = 1.0      # one or two table-art pixels, thinning as they rise
-	smoke.scale_amount_max = 2.0
-	var thin := Curve.new()
-	thin.add_point(Vector2(0.0, 1.0))
-	thin.add_point(Vector2(1.0, 0.5))
-	smoke.scale_amount_curve = thin
-	var fade := Gradient.new()
-	fade.offsets = PackedFloat32Array([0.0, 0.15, 0.6, 1.0])
-	fade.colors = PackedColorArray([Color(1.0, 0.78, 0.45, 1.0), Color(0.95, 0.93, 0.9, 0.95), Color(0.8, 0.79, 0.79, 0.6), Color(0.6, 0.6, 0.62, 0.0)])
-	smoke.color_ramp = fade
-	smoke.z_index = 4
-	smoke.z_as_relative = false
+	var smoke := SmokeStreamers.new()
+	smoke.seconds = TRAIL_SECONDS
+	smoke.position = (at / SmokeStreamers.PX).floor() * SmokeStreamers.PX  # on the art-pixel grid
 	add_child(smoke)
-	smoke.emitting = true
-	get_tree().create_timer(TRAIL_SECONDS).timeout.connect(func(): smoke.emitting = false)
-	get_tree().create_timer(TRAIL_SECONDS + TRAIL_RISE + 0.2).timeout.connect(smoke.queue_free)

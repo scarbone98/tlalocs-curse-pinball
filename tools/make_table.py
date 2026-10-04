@@ -1097,46 +1097,79 @@ SPRING_SHORT = 4  # pulled all the way down
 
 
 def spring_sheet():
-    """The plunger: a domed gold cap on a steel coil, one frame for each pixel it's pulled
-    down, from at rest to fully pulled, each standing on the frame's bottom edge. The coil's
-    wire slants round a dark rod, lit from the left like a cylinder, its back turns darker
-    through the gaps; its loops close up as it's pulled down."""
+    """The plunger, drawn round like a real one: a gold cap seen a little from above (its lit
+    top face, then its side turning from a bright edge on the left into shadow on the right),
+    casting a shadow onto a steel coil. The coil's a helix: each loop's front wire bows down
+    across the front, lit from the left like a cylinder with a dark underside, and its back
+    wire shows darker through the gaps, slanting the other way; the rod's dark between them.
+    One frame for each pixel it's pulled down, its loops closing up, each frame standing on
+    its bottom edge."""
     ink = (20, 24, 36, 255)
-    gold_l, gold, gold_d, gold_dd = (255, 240, 150, 255), (248, 208, 0, 255), (200, 138, 16, 255), (120, 78, 8, 255)
-    steel = [(232, 238, 244, 255), (186, 198, 210, 255), (132, 146, 160, 255), (84, 96, 112, 255)]  # lit -> shade
-    back, rod = (54, 62, 76, 255), (34, 40, 52, 255)
+    shine, gold_l, gold, gold_d, gold_dd = (255, 252, 214, 255), (255, 232, 120, 255), (248, 200, 0, 255), (196, 132, 12, 255), (122, 76, 8, 255)
+    steel = [(246, 250, 255, 255), (206, 216, 228, 255), (156, 170, 186, 255), (108, 122, 140, 255), (70, 80, 98, 255)]  # lit -> shade
+    under, back, gap = (52, 60, 76, 255), (84, 94, 112, 255), (30, 34, 46, 255)
+    loops = 3.0
     frames = []
     w = SPRING_W
+    c0, c1 = 3, w - 4  # the coil's inside, across (its ink edges either side)
+
+    def lit(ramp, u):  # a cylinder lit from the upper left: brightest a third of the way in
+        k = (u + 1.0) / 2.0
+        return ramp[0] if abs(k - 0.28) < 0.12 else ramp[min(len(ramp) - 1, 1 + int(abs(k - 0.28) * (len(ramp) - 1) / 0.72 * 1.4))]
+
     for tall in range(SPRING_TALL, SPRING_SHORT - 1, -1):
         img = Image.new("RGBA", (w, SPRING_TALL), T)
         top = SPRING_TALL - tall
-        # the cap: a rounded dome, a highlight on its crown, its rim in shadow underneath
-        for x in range(2, w - 2):
+        # the cap: its top face...
+        for x in range(3, w - 3):
             img.putpixel((x, top), ink)
-        img.putpixel((1, top + 1), ink)
-        img.putpixel((w - 2, top + 1), ink)
+        img.putpixel((2, top + 1), ink)
+        img.putpixel((w - 3, top + 1), ink)
+        for x in range(3, w - 3):
+            img.putpixel((x, top + 1), shine if x in (4, 5) else (gold_l if x < w - 5 else gold))
+        # ...and its round side
+        img.putpixel((1, top + 2), ink)
+        img.putpixel((w - 2, top + 2), ink)
+        side = [gold_l, shine, gold_l, gold, gold, gold, gold_d, gold_dd]
         for x in range(2, w - 2):
-            img.putpixel((x, top + 1), gold_l if 3 <= x <= 5 else (gold if x < w - 4 else gold_d))
-        img.putpixel((0, top + 2), ink)
-        img.putpixel((w - 1, top + 2), ink)
-        for x in range(1, w - 1):
-            img.putpixel((x, top + 2), gold_d if x < w - 3 else gold_dd)
+            img.putpixel((x, top + 2), side[x - 2])
         coil = tall - 3
+        pitch = coil / loops
+        y0 = top + 3
+        # the dark inside, then the back of each loop, then its front wire over them
         for r in range(coil):
-            y = top + 3 + r
-            for x in range(2, w - 2):
-                # a turn of wire every other row, its right half a row lower, so each loop
-                # runs down across the front at a slant
-                wire = (r + (1 if x >= w // 2 else 0)) % 2 == 0
-                if wire:
-                    col = steel[min(3, (x - 2) * 4 // (w - 4))]  # lit from the left, like a cylinder
-                elif 5 <= x <= w - 6:
-                    col = rod  # the rod, through the gap
-                else:
-                    col = back  # the coil's far side
-                img.putpixel((x, y), col)
-            img.putpixel((1, y), ink)
-            img.putpixel((w - 2, y), ink)
+            img.putpixel((c0 - 1, y0 + r), ink)
+            img.putpixel((c1 + 1, y0 + r), ink)
+            for x in range(c0, c1 + 1):
+                img.putpixel((x, y0 + r), gap)
+        bow = [0] + [1] * (c1 - c0 - 1) + [0]  # the front wire bows down across the middle
+        k = 0
+        while k * pitch < coil:
+            ys = int(k * pitch + 0.5)
+            if pitch >= 2.5:
+                for i, x in enumerate(range(c0, c1 + 1)):
+                    yb = ys + 1 - bow[i] + int(pitch) - 2  # the back wire, bowing the other way
+                    if y0 + yb < y0 + coil and yb > ys + bow[i]:
+                        img.putpixel((x, y0 + yb), back)
+            for i, x in enumerate(range(c0, c1 + 1)):
+                u = (x - c0 + 0.5) / (c1 - c0 + 1) * 2.0 - 1.0
+                yf = ys + (bow[i] if pitch >= 2.5 else 0)
+                if yf < coil:
+                    img.putpixel((x, y0 + yf), lit(steel, u))
+                if pitch >= 2.5 and yf + 1 < coil and bow[i]:
+                    img.putpixel((x, y0 + yf + 1), steel[4] if u > -0.3 else steel[3])  # its underside
+            # where the wire wraps round the sides it stands proud of the coil
+            if ys < coil:
+                img.putpixel((c0 - 1, y0 + ys), steel[1])
+                img.putpixel((c1 + 1, y0 + ys), steel[4])
+                img.putpixel((c0 - 2, y0 + ys), ink)
+                img.putpixel((c1 + 2, y0 + ys), ink)
+            k += 1
+        if coil > 1:
+            for x in range(c0 - 1, c1 + 2):  # the cap's shadow, cast down onto the coil
+                if img.getpixel((x, y0)) != ink:
+                    r_, g_, b_, _ = img.getpixel((x, y0))
+                    img.putpixel((x, y0), (r_ * 3 // 5, g_ * 3 // 5, b_ * 3 // 4, 255))
         frames.append(img)
     sheet = Image.new("RGBA", (SPRING_W * len(frames), SPRING_TALL), T)
     for i, f in enumerate(frames):
