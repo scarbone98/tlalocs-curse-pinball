@@ -8,8 +8,8 @@ extends Node2D
 ## Chikorita wakes the Linoone on Pokemon Pinball Ruby's field; while they're out, each
 ## hit on one drops a carved head onto the totem by the left one (Scripts/totem.gd), as
 ## each hit on a Linoone brings a Gulpin; three heads and Travel mode starts, like Ruby &
-## Sapphire's. For a minute (with a ball saver) shoot the left
-## ramp to head for the next city or the right ramp to skip one, then sink the temple
+## Sapphire's. For a minute (with a ball saver) shoot the right
+## rail to head for the next city or the left (harder to reach) to skip one, then sink the temple
 ## hole to arrive. Progress at a city is kept if you leave. With all four relics lit, El Dorado opens at the temple hole. After a
 ## trip there the relics reset and the ramp feat gets longer.
 
@@ -85,7 +85,7 @@ var relics := [false, false, false, false]
 var el_dorado_open := false
 var road_open := false  # the totem's full: Travel mode is on
 var traveling := false  # Travel mode: pick a way with a ramp, then the temple hole
-var travel_steps := 0   # 1 the next city (left ramp), 2 skip one (right ramp); 0 not yet picked
+var travel_steps := 0   # 1 the next city (right rail), 2 skip one (left rail, the harder shot); 0 not yet picked
 var _travel_left := 0.0
 var _rest_left := 0.0
 var trips := 0  # visits to El Dorado; each one makes the ramp feat longer
@@ -351,7 +351,7 @@ func _start_travel() -> void:
 func _pick_way(side: String) -> void:
 	if not traveling:
 		return
-	travel_steps = 1 if side == "left" else 2  # his mouth opens on its whirl: the way's open
+	travel_steps = 2 if side == "left" else 1  # the left rail, the harder shot, skips one; his mouth opens on its whirl: the way's open
 	_announce_goal()
 
 ## The temple hole caught the ball during Travel mode with a way picked
@@ -432,7 +432,7 @@ func _announce_goal() -> void:
 		text = "El Dorado is open!"
 	elif traveling:
 		var left := maxi(ceili(_travel_left), 0)
-		var way := "the portal is open" if travel_steps > 0 else "left ramp: next city, right: skip one"
+		var way := "the portal is open" if travel_steps > 0 else "right rail: next city, left: skip one"
 		text = "Travel: %s   %d:%02d" % [way, left / 60, left % 60]
 	else:
 		var goal: String = CITIES[city].goal

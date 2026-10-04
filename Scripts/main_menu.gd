@@ -23,7 +23,7 @@ const HOW_TO_PLAY := [
 	"Hit the idol's spinning tower 3 times (top left) to sink it into its pit, then hit the golden idol to claim it.",
 	"Roll over the stone buttons between the torches to light them; light all six for a ball saver.",
 	"Hit the gold button at the foot of the skull's lane to wake the jaguars in the walls. The gold button on the left inlane wall rains poison darts down into the floor: pegs for the ball to rattle off, for a while.",
-	"While they're out, fill both jaguars' pips to Travel: a ramp picks the way, then Tlaloc's mouth opens to take you.",
+	"While they're out, each hit on a jaguar stacks a head on the totem; three open the road. The right rail heads to the next city, the left skips one, then Tlaloc's mouth opens to take you.",
 	"The bottom lanes light the roulette: Tlaloc's mouth opens, and a shot in spins it for prizes.",
 	"Catches light bonus lamps; 3 lamps (or all four relics) open El Dorado in Tlaloc's mouth.",
 	"The blue flippers' lane pays more each pass and charges the frog kickback.",

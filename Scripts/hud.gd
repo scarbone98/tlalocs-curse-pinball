@@ -16,7 +16,7 @@ const BAR_LEFT := 46.0   # the score and balls start right of the pause button
 const SCORE_ROOM := 140.0  # widest the score pill grows before its font shrinks
 const SCORE_FONT_MIN := 11
 # Launch power that drops the ball into a top lane (see ball.gd); marked on the meter
-const SKILL_SHOT_POWER := Vector2(0.94, 0.965)  # launches here drop into a top lane (measured with real pulls: about 90% of the way down)
+const SKILL_SHOT_POWER := Vector2(0.87, 0.895)  # launches here drop into a top lane (measured with real pulls: about 76% of the way down)
 const MIN_LAUNCH_POWER := 0.5
 const METER_LAMPS := 20
 
