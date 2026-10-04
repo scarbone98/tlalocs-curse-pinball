@@ -215,6 +215,37 @@ def el_dorado():
     return scene
 
 
+def road():
+    """Travel: a white stone road (a sacbe) running off across the jungle at dusk to a
+    pyramid on the horizon, torches burning along it"""
+    c = Canvas(W, H)
+    sky(c, [(0, C('#2a1e4a')), (6, C('#5a2e5e')), (12, C('#b0506a')), (17, C('#f09858'))])
+    # the jungle's far edge, and the pyramid where the road's headed
+    for x in range(W):
+        h = 20 + 1.5 * math.sin(x / 3.1) + 0.8 * math.cos(x / 1.7)
+        for y in range(int(h), H):
+            c.set(x, y, C('#24503e') if y > h + 1 else C('#3a6e52'))
+    top = pyramid(c, 32, 21, [(2, 6), (2, 5), (2, 4)], C('#e8c890'), C('#b08858'), C('#6a4a30'))
+    c.rect(31, top - 2, 32, top - 1, C('#8a5a34'))
+    # the road: wide at our feet, narrowing to the pyramid's foot
+    for y in range(21, H):
+        k = (y - 21) / (H - 1 - 21)
+        half = 1.0 + k * 17.0
+        for x in range(int(round(32 - half)), int(round(32 + half))):
+            edge = x < 32 - half + 1.2 or x >= 32 + half - 1.2
+            row = int((k * k) * 9)  # the paving's rows, closer together toward the horizon
+            seam = int((k * k) * 9 * 2) % 2 == 0 and (x + row) % 4 == 0
+            c.set(x, y, C('#8a7a62') if edge else (C('#c8b898') if seam else (C('#f0e6cc') if row % 2 == 0 else C('#e0d4b4'))))
+    # torches either side of it, smaller as they go
+    for y, d, size in ((37, 21, 2), (30, 13, 1), (25, 7, 1)):
+        for side in (-1, 1):
+            x = 32 + side * d
+            c.rect(x, y - size * 2, x, y, C('#6a4020'))
+            c.set(x, y - size * 2 - 1, C('#f8d000'))
+            if size > 1:
+                c.set(x, y - size * 2 - 2, C('#f08030'))
+    return c.image()
+
 def sunburst(dark, light):
     """A symmetric sunburst backdrop for the prize, relic and ball pictures."""
     c = Canvas(W, H)
@@ -260,7 +291,7 @@ def main():
         coin_pile(2),                                                      # treasure
         framed(frames_of("Sprites/table/kickback_frog.png", 3)[1], 2),     # kickback
         framed(frames_of("Sprites/table/spirit.png", 3)[0], 2),            # water spirit
-        framed(frames_of("Sprites/table/wall_jaguar.png", 3)[0], 1),       # travel
+        road(),                                                            # travel
     ]
     pictures = cities + [el_dorado()] + prizes
     pictures += [framed(r, 3) for r in relics]

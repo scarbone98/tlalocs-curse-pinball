@@ -5,8 +5,9 @@ extends Node2D
 ## journey on to the next city still missing its relic. Two jaguars (the hand-drawn
 ## jaguar) lurk in slots in the side walls with only their snouts showing. Hitting the
 ## gold button at the foot of the crystal skull's lane brings them out for a while, as
-## Chikorita wakes the Linoone on Pokemon Pinball Ruby's field; while they're out,
-## filling both heads' three pips before they fade starts Travel mode, like Ruby &
+## Chikorita wakes the Linoone on Pokemon Pinball Ruby's field; while they're out, each
+## hit on one drops a carved head onto the totem by the left one (Scripts/totem.gd), as
+## each hit on a Linoone brings a Gulpin; three heads and Travel mode starts, like Ruby &
 ## Sapphire's. For a minute (with a ball saver) shoot the left
 ## ramp to head for the next city or the right ramp to skip one, then sink the temple
 ## hole to arrive. Progress at a city is kept if you leave. With all four relics lit, El Dorado opens at the temple hole. After a
@@ -46,8 +47,14 @@ const RELICS := preload("res://Sprites/table/relics.png")  # tools/make_journey_
 # The four relic idols in an arch over Tlaloc's face, lit as each is won (scene units)
 const RELIC_ARCH := [Vector2(238, 729), Vector2(300, 683), Vector2(378, 683), Vector2(440, 729)]
 
-const HITS_TO_TRAVEL := 3
-const PIP_FADE_SECONDS := 10.0  # like a Diglett's count, a jaguar's hits are forgotten if you stop hitting
+const Totem := preload("res://Scripts/totem.gd")
+# The road's two ways, inlaid in the floor at the foot of each rail's lane, pointing up it
+# (tools/make_table.py: dark, lit): they light, flashing turn about, while a way's to be picked
+const ROAD_ARROWS := {
+	"left": [preload("res://Sprites/table/road_arrow_left.png"), Vector2(152, 836)],
+	"right": [preload("res://Sprites/table/road_arrow_right.png"), Vector2(478, 790)],
+}
+const ROAD_FLASH := 3.0  # flashes a second
 const HIT_COOLDOWN := 1.0  # one rattle against a head counts once
 const HIT_POINTS := 750
 const HIT_KICK := 900.0  # a jaguar that's out knocks the ball back, like a bumper
@@ -61,7 +68,7 @@ const SNEAK_SECONDS := 1.4
 const TRAVEL_POINTS := 12500
 const TRAVEL_SECONDS := 60.0
 const TRAVEL_SAVER := 30.0
-const TRAVEL_REST := 30.0  # after a trip the heads' pips won't start another for a while
+const TRAVEL_REST := 30.0  # after a trip a full totem won't start another for a while
 const RELIC_POINTS := 10000
 
 const CITIES := [
@@ -76,7 +83,7 @@ var features: Node2D  # TableFeatures, which owns the shared sprite and scoring 
 var city := 0
 var relics := [false, false, false, false]
 var el_dorado_open := false
-var road_open := false  # a serpent's pips are full: Travel mode is on
+var road_open := false  # the totem's full: Travel mode is on
 var traveling := false  # Travel mode: pick a way with a ramp, then the temple hole
 var travel_steps := 0   # 1 the next city (left ramp), 2 skip one (right ramp); 0 not yet picked
 var _travel_left := 0.0
@@ -84,8 +91,8 @@ var _rest_left := 0.0
 var trips := 0  # visits to El Dorado; each one makes the ramp feat longer
 
 var _progress := [0, 0, 0, 0]
-var _hits := [0, 0]
-var _since_hit := [0.0, 0.0]
+var _totem: Node2D
+var _road_arrows := {}  # side -> Sprite2D
 var _cooldown := [0.0, 0.0]
 var _serpents: Array[Sprite2D] = []
 var _wedges: Array[CollisionPolygon2D] = []
@@ -108,6 +115,17 @@ var _sneak_wait := [5.0, 7.0]
 var _clock := 0.0
 
 func _ready() -> void:
+	_totem = Totem.new()
+	_totem.features = features
+	add_child(_totem)
+	for side: String in ROAD_ARROWS:
+		var arrow := Sprite2D.new()
+		arrow.texture = ROAD_ARROWS[side][0]
+		arrow.hframes = 2
+		arrow.scale = features.MAP_SCALE
+		arrow.position = ROAD_ARROWS[side][1]
+		features.add_child(arrow)
+		_road_arrows[side] = arrow
 	_build_serpent(0, LEFT_WEDGE, Vector2.RIGHT)
 	_build_serpent(1, RIGHT_WEDGE, Vector2.LEFT)
 	# pressed only by a ball knocked into it, not one passing it on the way up the lane
@@ -276,10 +294,15 @@ func _physics_process(delta: float) -> void:
 		_blink_left = randf_range(2.5, 6.0)
 	for side in 2:
 		_cooldown[side] = maxf(_cooldown[side] - delta, 0.0)
-		_since_hit[side] += delta
-		if _hits[side] > 0 and not road_open and _since_hit[side] >= PIP_FADE_SECONDS:
-			_hits[side] = 0
 	_rest_left = maxf(_rest_left - delta, 0.0)
+	# the road's ways light up while one's to be picked, flashing turn about
+	var choosing := traveling and travel_steps == 0
+	var flash := int(_clock * ROAD_FLASH) % 2
+	(_road_arrows["left"] as Sprite2D).frame = 1 if choosing and flash == 0 else 0
+	(_road_arrows["right"] as Sprite2D).frame = 1 if choosing and flash == 1 else 0
+	# a full totem opens the road as soon as nothing else is going on
+	if _totem.full() and not road_open and not el_dorado_open and _rest_left <= 0.0 			and not features.mode_running():
+		_start_travel()
 	if traveling:
 		_travel_left -= delta
 		if ceili(_travel_left) != ceili(_travel_left + delta):
@@ -312,18 +335,15 @@ func _on_serpent_hit(body: Node, side: int, facing: Vector2) -> void:
 		_render_head(side))
 	if road_open or el_dorado_open:
 		return
-	_hits[side] += 1
-	_since_hit[side] = 0.0
-	_hits[side] = mini(_hits[side], HITS_TO_TRAVEL)
-	if _hits[0] >= HITS_TO_TRAVEL and _hits[1] >= HITS_TO_TRAVEL and _rest_left <= 0.0 			and not features.mode_running():
-		_start_travel()
+	_totem.add_head()  # (the road opens once it's full: _physics_process)
 
 func _start_travel() -> void:
 	road_open = true
 	traveling = true
 	travel_steps = 0
 	_travel_left = TRAVEL_SECONDS
-	PinballEvents.banner.emit("The road opens!", Billboard.PRIZE + 4)
+	_totem.lit = true
+	AudioSfx.play("roar", 0.0, Vector2(0.9, 1.1))
 	GameManager.grant_ball_save(TRAVEL_SAVER)
 	PinballEvents.mode_changed.emit()
 	_announce_goal()
@@ -348,7 +368,7 @@ func _end_travel() -> void:
 	traveling = false
 	road_open = false
 	travel_steps = 0
-	_hits = [0, 0]
+	_totem.crumble()
 	PinballEvents.mode_changed.emit()
 	_announce_goal()
 
@@ -356,7 +376,6 @@ func _end_travel() -> void:
 ## the temple's roulette all call this). Nowhere left to go once all four are found.
 func travel(announce := true) -> void:
 	road_open = false
-	_hits = [0, 0]
 	if not relics.has(false):
 		_announce_goal()
 		return

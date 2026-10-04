@@ -79,6 +79,7 @@ MAP_SCALE (720/256 by 1280/424) puts it all on one pixel grid.
 
 Run from the repo root:  python3 tools/make_table.py
 """
+import math
 import colorsys
 import random
 from pathlib import Path
@@ -1118,6 +1119,158 @@ def sling_unlit(lit):
     return out
 
 
+# ---------- the travel totem ----------
+
+TOTEM_W, TOTEM_H = 16, 19
+TOTEM_RY = 3  # the half-height of its top face's ellipse
+
+
+def totem_heads():
+    """The totem a jaguar's hits build (Scripts/totem.gd): three carved stone heads, each a
+    drum of stone like the idol tower's (tower_drum.png), seen from a little above: its
+    oval top face, then its round side, lit from the left and going round into shadow, its
+    bottom edge curving with it. Carved into the side, curving round with it too: a band of
+    paint across the brow (jade, red, gold, bottom to top), deep eye sockets with a glint
+    of the paint, a broad nose and a wide mouth of teeth."""
+    ink = (16, 22, 36, 255)
+    side = [(214, 204, 182, 255), (182, 170, 146, 255), (148, 136, 114, 255), (112, 100, 84, 255), (78, 68, 58, 255), (54, 46, 42, 255)]
+    face_top = [(240, 234, 216, 255), (222, 214, 194, 255), (198, 188, 166, 255)]
+    paints = [
+        [(150, 246, 210, 255), (40, 196, 150, 255), (22, 140, 110, 255), (14, 86, 70, 255)],   # jade
+        [(255, 168, 136, 255), (220, 72, 44, 255), (164, 40, 28, 255), (98, 24, 20, 255)],     # red
+        [(255, 240, 150, 255), (244, 196, 24, 255), (190, 132, 12, 255), (120, 80, 8, 255)],   # gold
+    ]
+    socket, teeth = (28, 22, 26, 255), (240, 234, 216, 255)
+    w, h, ry = TOTEM_W, TOTEM_H, TOTEM_RY
+    top_c = ry           # the top face's middle row
+    bottom_c = h - 1 - ry  # ...and the bottom's, hidden but for its front edge
+    sheet = Image.new("RGBA", (w * 3, h), T)
+
+    def lit(ramp, u):  # a cylinder lit from the upper left: brightest a third of the way in
+        k = abs(u + 0.35)
+        return ramp[min(len(ramp) - 1, int(k / 1.35 * len(ramp)))]
+
+    for f in range(3):
+        img = Image.new("RGBA", (w, h), T)
+        px = img.load()
+        paint = paints[f]
+        for x in range(w):
+            u = (x + 0.5 - w / 2) / (w / 2)
+            arc = ry * math.sqrt(max(0.0, 1 - u * u))
+            y_top = int(round(top_c - arc))       # the top face's back edge
+            y_front = int(round(top_c + arc))     # ...its front edge, where the side starts
+            y_bottom = int(round(bottom_c + arc))  # the side's bottom edge
+            for y in range(y_top, y_bottom + 1):
+                if y == y_top or y == y_bottom:
+                    px[x, y] = ink
+                elif y < y_front:
+                    px[x, y] = face_top[0] if u < -0.2 and y <= top_c else (face_top[1] if u < 0.4 else face_top[2])
+                elif y == y_front:
+                    px[x, y] = lit(side[:3], u)  # the lip round the top
+                else:
+                    px[x, y] = lit(side, u)
+            # the carving, a row at a time down the side, curving round with it
+            k = lambda row: y_front + row
+            if abs(u) < 0.95:
+                px[x, k(1)] = lit(paint, u)  # the painted brow band
+                px[x, k(2)] = lit(paint[1:], u)
+            if abs(u) < 0.75 and x not in (7, 8):  # the eyes, either side of the nose
+                if 0.2 < abs(u) < 0.65:
+                    px[x, k(4)] = socket
+                    px[x, k(5)] = socket
+                    if (u < 0 and abs(u + 0.5) < 0.12) or (u > 0 and abs(u - 0.3) < 0.12):
+                        px[x, k(4)] = paint[0]  # a glint of paint in each
+            if x in (7, 8):  # the nose
+                px[x, k(5)] = lit(side, u - 0.4)
+                px[x, k(6)] = side[4] if x == 8 else side[3]
+            if abs(u) < 0.62:  # the mouth: a dark slot full of teeth
+                px[x, k(8)] = socket
+                px[x, k(9)] = teeth if x % 2 == 0 else socket
+                if y_bottom > k(10):
+                    px[x, k(10)] = side[4]
+        sheet.paste(img, (f * w, 0))
+    return sheet
+
+
+def totem_door():
+    """The trap door the totem stands on (Scripts/totem.gd): a round stone hatch in the wall
+    top, shut, then open on the dark below that the heads drop into"""
+    ink = (16, 22, 36, 255)
+    stone = [(150, 140, 120, 255), (120, 110, 94, 255), (92, 84, 72, 255)]
+    w, h = 20, 8
+    sheet = Image.new("RGBA", (w * 2, h), T)
+    px = sheet.load()
+    for f in range(2):
+        for y in range(h):
+            for x in range(w):
+                u = (x + 0.5 - w / 2) / (w / 2)
+                v = (y + 0.5 - h / 2) / (h / 2)
+                r = u * u + v * v
+                if r > 1.0:
+                    continue
+                edge = r > 0.62
+                if edge:
+                    px[f * w + x, y] = ink if r > 0.86 else stone[2]
+                elif f == 0:
+                    # shut: a slab, split down the middle where it opens
+                    px[f * w + x, y] = ink if x in (w // 2 - 1, w // 2) and abs(v) < 0.6 else (stone[0] if v < 0 else stone[1])
+                else:
+                    px[f * w + x, y] = (6, 6, 10, 255) if v > -0.2 else (24, 22, 30, 255)  # open: the dark below
+    return sheet
+
+
+# ---------- the road arrows ----------
+
+# The two ways the road goes in Travel mode (Scripts/journey.gd), inlaid in the floor at
+# the foot of each rail's lane and pointing up it: dark stone, and lit gold while the
+# road's open. Each is drawn at its own angle, pixel by pixel, so it stays crisp.
+ROAD_ARROWS = {"left": (-0.46, -0.89), "right": (0.457, -0.89)}  # up each lane (the rails' entry directions)
+ROAD_ARROW_SIZE = 21
+
+
+def road_arrow(direction):
+    """Two chevrons, one behind the other, pointing up a lane"""
+    ink = (20, 24, 36, 255)
+    looks = [
+        [(64, 70, 88, 255), (96, 104, 120, 255), (44, 48, 62, 255)],     # dark: inlaid stone
+        [(248, 204, 0, 255), (255, 244, 170, 255), (184, 120, 12, 255)],  # lit: gold
+    ]
+    n = ROAD_ARROW_SIZE
+    def chevron(tip):  # a fat V pointing up, its tip at local y = tip
+        return [(0.0, tip), (6.5, tip + 6.5), (6.5, tip + 10.0), (0.0, tip + 3.5), (-6.5, tip + 10.0), (-6.5, tip + 6.5)]
+    shapes = [chevron(-8.0), chevron(-1.0)]
+    dx, dy = direction
+    length = math.hypot(dx, dy)
+    dx, dy = dx / length, dy / length
+    def to_local(x, y):  # local up runs along the direction; local right is (-dy, dx)
+        return (x * -dy + y * dx, -(x * dx + y * dy))
+    def inside(poly, x, y):
+        hit = False
+        for i in range(len(poly)):
+            (ax, ay), (bx, by) = poly[i], poly[i - 1]
+            if (ay > y) != (by > y) and x < (bx - ax) * (y - ay) / (by - ay) + ax:
+                hit = not hit
+        return hit
+    filled = set()
+    for y in range(n):
+        for x in range(n):
+            lx, ly = to_local(x + 0.5 - n / 2, y + 0.5 - n / 2)
+            if any(inside(shape, lx, ly) for shape in shapes):
+                filled.add((x, y))
+    sheet = Image.new("RGBA", (n * 2, n), T)
+    px = sheet.load()
+    for f, (fill, light, dark) in enumerate(looks):
+        for (x, y) in filled:
+            lit_edge = (x - 1, y) not in filled or (x, y - 1) not in filled
+            dark_edge = (x + 1, y) not in filled or (x, y + 1) not in filled
+            px[f * n + x, y] = light if lit_edge and not dark_edge else (dark if dark_edge and not lit_edge else fill)
+        for y in range(n):
+            for x in range(n):
+                if (x, y) not in filled and any((x + ox, y + oy) in filled for ox, oy in ((1, 0), (-1, 0), (0, 1), (0, -1))):
+                    px[f * n + x, y] = ink
+    return sheet
+
+
 def spring_sheet():
     """The plunger, drawn round like a real one: a gold cap seen a little from above (its lit
     top face, then its side turning from a bright edge on the left into shadow on the right),
@@ -1724,6 +1877,10 @@ def main():
     skull_shimmer(skull_top).save("Sprites/table/skull_shimmer.png")
     skull_jaw.save("Sprites/table/skull_jaw.png")
     spring_sheet().save("Sprites/table/spring.png")
+    totem_heads().save("Sprites/table/totem_heads.png")
+    totem_door().save("Sprites/table/totem_door.png")
+    for side, direction in ROAD_ARROWS.items():
+        road_arrow(direction).save("Sprites/table/road_arrow_%s.png" % side)
     gem, gem_shadow = rail_gem()
     gem.save("Sprites/table/rail_gem.png")
     gem_shadow.save("Sprites/table/rail_gem_shadow.png")

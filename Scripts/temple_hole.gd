@@ -56,7 +56,7 @@ const PRIZE_CAPTIONS := {
 	"points_small": "Temple offering!", "points_big": "Temple treasure!", "points_huge": "Temple hoard!",
 	"saver_short": "Ball saver 30s!", "saver_long": "Ball saver 60s!",
 	"bonus_x": "Bonus +1!", "bonus_x2": "Bonus +2!", "kickback": "Kickback both sides!",
-	"spirit": "A spirit rises!", "upgrade": "Ball upgrade!", "travel": "The road opens!",
+	"spirit": "A spirit rises!", "upgrade": "Ball upgrade!", "travel": "Travel!",
 	"awaken": "The spirits stir!", "bonus_lamp": "A bonus lamp!",
 }
 
@@ -218,7 +218,7 @@ func _rescue(ball: RigidBody2D) -> void:
 	var tornado := SmokeTornado.new()
 	tornado.from = Vector2(clampf(ball.global_position.x, 300.0, 375.0), 1262.0)
 	tornado.to = AT + Vector2(0, 14)
-	tornado.seconds = RESCUE_RISE_SECONDS + 0.6
+	tornado.seconds = SmokeTornado.GROW_SECONDS + RESCUE_RISE_SECONDS + 0.6
 	features.add_child(tornado)
 	PinballEvents.toast.emit("Ball saved!")
 	PinballEvents.effect.emit("lava", ball.global_position)
@@ -226,6 +226,7 @@ func _rescue(ball: RigidBody2D) -> void:
 	PinballEvents.rumble.emit(5.0)
 	var start := ball.global_position
 	var rise := create_tween().set_process_mode(Tween.TWEEN_PROCESS_PHYSICS)
+	rise.tween_interval(SmokeTornado.GROW_SECONDS)  # it reaches down to the ball, then takes it
 	rise.tween_method(func(t: float):
 		# caught up in it: round and round, higher and higher, tighter and tighter
 		var along := t * t * (3.0 - 2.0 * t)
