@@ -33,6 +33,8 @@ const PLUNGER_SHIFT := 48.0
 ## swings right for the launch lane, and for the right rail up into the golden temple (and
 ## while the ball's inside it).
 const RIGHT_X := 720.0     # as far right as the limits allow
+const PHONE_ZOOM := 1.12
+const DESKTOP_WIDTH := 655.0  # scene units across the desktop view shows: the playfield, short of the launch tube
 const REST_LEFT_EDGE := 0.0  # at rest the view's left edge: the table's own, border and all
 const SHRINE := Rect2(439, 42, 281, 290)  # inside the golden temple
 ## A nudge jolts the table a few pixels the way it was pushed, and settles back
@@ -45,6 +47,8 @@ var _look := Vector2.ZERO
 var _jolt := Vector2.ZERO
 
 func _ready() -> void:
+	_set_view(GameManager.desktop_view)
+	PinballEvents.view_changed.connect(_set_view)
 	drag_vertical_enabled = true
 	drag_horizontal_enabled = false
 	drag_top_margin = DRAG_TOP
@@ -76,6 +80,12 @@ func _process(dt):
 	_shake *= exp(-SHAKE_DECAY * dt)
 	_jolt *= exp(-NUDGE_SETTLE * dt)
 	offset = _jolt + (Vector2(randf_range(-1.0, 1.0), randf_range(-1.0, 1.0)) * _shake if _shake > 0.3 else Vector2.ZERO)
+
+# Phone: the whole table's width (but the launch tube) in its tall window. Desktop: zoomed in
+# just enough that the playfield's width fills the squarer window, the tube hidden off its edge
+func _set_view(desktop: bool) -> void:
+	var z := PHONE_ZOOM if not desktop else 720.0 / DESKTOP_WIDTH
+	zoom = Vector2(z, z)
 
 func _view_x(target: Node2D) -> float:
 	var at := target.global_position

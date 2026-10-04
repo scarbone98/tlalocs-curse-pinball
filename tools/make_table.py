@@ -1234,16 +1234,25 @@ def lava_layers():
 HOLE_SIZE = (24, 16)
 
 
+COVER_SUN = [  # a sun, its rays all round, carved on the arena's cover
+    "X...X...X",
+    ".X.XXX.X.",
+    "..XX.XX..",
+    "XXX...XXX",
+    "..XX.XX..",
+    ".X.XXX.X.",
+    "X...X...X",
+]
 HOLE_FLIP = [1.0, 0.6, 0.3, 0.08, 0.0]  # how much of the cover faces up in each frame: shut ... open
 
 
 def arena_hole():
     """A round stone tablet set in the middle of the warriors' arena, a cover over the hole
-    they jump down into. It flips over on its middle like a flipper: shut (a step-fret carved
-    on it), turning (seen ever more edge-on, the dark hole showing past it), edge-on, then
+    they jump down into. It flips over on its middle like a flipper: shut (a sun carved on
+    it), turning (seen ever more edge-on, the dark hole showing past it), edge-on, then
     open. Played forward it opens, backward it shuts (Scripts/warriors.gd)."""
     w, h = HOLE_SIZE
-    ink, rim, stone, stone_l, carve = (20, 24, 36, 255), (84, 90, 100, 255), (112, 118, 128, 255), (148, 154, 160, 255), (70, 74, 84, 255)
+    ink, rim, stone, stone_l, carve = (20, 24, 36, 255), (84, 90, 100, 255), (112, 118, 128, 255), (148, 154, 160, 255), (58, 62, 72, 255)
     underside = (88, 94, 104, 255)
     pit, pit_d = (34, 26, 30, 255), (16, 12, 18, 255)
     out = Image.new("RGBA", (w * len(HOLE_FLIP), h), T)
@@ -1273,9 +1282,19 @@ def arena_hole():
                             else:
                                 c = underside if y < cy else rim  # edge-on: just its thickness
                 out.putpixel((f * w + x, y), c)
-        if face == 1.0:  # a step-fret carved across the shut tablet
-            for dx, dy in ((-4, 0), (-3, 0), (-2, 0), (-2, -1), (-1, -1), (0, -1), (0, 0), (0, 1), (1, 1), (2, 1), (2, 0), (3, 0), (4, 0)):
-                out.putpixel((f * w + int(cx + dx + 0.5), int(cy + dy + 0.5)), carve)
+        if face >= 0.6:  # the sun carved on the cover, squashed with it as it turns
+            sun = COVER_SUN
+            gx0 = int(cx - len(sun[0]) / 2 + 0.5)
+            for gy, row in enumerate(sun):
+                y = int(cy + (gy - (len(sun) - 1) / 2) * face + 0.5)
+                for gx, ch in enumerate(row):
+                    if ch == "X":
+                        out.putpixel((f * w + gx0 + gx, y), carve)
+                        below = sun[gy + 1][gx] if gy + 1 < len(sun) else "."
+                        if below != "X" and face == 1.0 and y + 1 < h:
+                            px = out.getpixel((f * w + gx0 + gx, y + 1))
+                            if px[:3] in (stone[:3], stone_l[:3]):
+                                out.putpixel((f * w + gx0 + gx, y + 1), (176, 182, 188, 255))  # the groove's lit lip
     return out
 
 

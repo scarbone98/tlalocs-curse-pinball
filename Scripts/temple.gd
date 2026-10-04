@@ -88,14 +88,19 @@ func _physics_process(delta: float) -> void:
 		var ball := node as RigidBody2D
 		if ball.freeze or (ball.collision_mask & 2) == 0:
 			continue
+		# only a ball riding up a rail into the temple, never one going the other way along it
+		var ride = features.rails._rides.get(ball)
+		var going_in: bool = ball.get_meta("into_temple", false) 			or (ride != null and ride.path in features.rails.INTO_TEMPLE and ride.speed > 0.0)
+		if not going_in:
+			continue
 		var p := ball.global_position
-		if (p.distance_to(pipe) < CATCH_RADIUS and ball.linear_velocity.x > 0.0) \
-				or (p.distance_to(chute) < CATCH_RADIUS and ball.linear_velocity.y < 0.0):
+		if p.distance_to(pipe) < CATCH_RADIUS or p.distance_to(chute) < CATCH_RADIUS:
 			_swallow(ball)
 			return
 
 func _swallow(ball: RigidBody2D) -> void:
 	_held = ball
+	ball.remove_meta("into_temple")
 	var speed := ball.linear_velocity.length()
 	var pipe: Vector2 = Geometry.OPENINGS["left_pipe"][0]
 	var chute: Vector2 = Geometry.OPENINGS["right_top"][0]

@@ -40,6 +40,11 @@ var extra_ball_bought := false
 const SPEEDS := [["1:1", 1.0], ["Relaxed", 0.8]]
 const SETTINGS_PATH := "user://settings.cfg"
 var speed_index := 0
+## The view: phone (the whole tall table, as made for a phone held upright) or desktop (a
+## squarer, zoomed-in window like Pokemon Pinball Ruby & Sapphire's, scrolling after the ball)
+const PHONE_CANVAS := Vector2i(720, 1280)
+const DESKTOP_CANVAS := Vector2i(720, 648)  # the Game Boy Advance's 10:9, at the table's width
+var desktop_view := false
 var night := true  # night: the dusk and all its lights; day: daylight, only the torches lit (Scripts/lighting.gd)
 
 var _ball_save_left := 0.0
@@ -53,6 +58,10 @@ func _ready():
 	if config.load(SETTINGS_PATH) == OK:
 		speed_index = clampi(int(config.get_value("options", "speed", 0)), 0, SPEEDS.size() - 1)
 		night = bool(config.get_value("options", "night", true))
+	# with no choice saved, a landscape screen (a desktop's) starts in the desktop view
+	desktop_view = bool(config.get_value("options", "desktop_view", _landscape_screen())) if config.has_section("options") \
+		else _landscape_screen()
+	apply_view.call_deferred()
 	_apply_speed()
 	lives = starting_lives
 	score = 0
@@ -202,6 +211,25 @@ func cycle_speed() -> void:
 	config.load(SETTINGS_PATH)
 	config.set_value("options", "speed", speed_index)
 	config.save(SETTINGS_PATH)
+
+func _landscape_screen() -> bool:
+	var screen := DisplayServer.screen_get_size()
+	return screen.x > screen.y
+
+func toggle_view() -> void:
+	desktop_view = not desktop_view
+	var config := ConfigFile.new()
+	config.load(SETTINGS_PATH)
+	config.set_value("options", "desktop_view", desktop_view)
+	config.save(SETTINGS_PATH)
+	apply_view()
+
+## Sizes the game's canvas for the view (the camera zooms to suit: Scripts/camera.gd)
+func apply_view() -> void:
+	var window := get_tree().root
+	window.content_scale_size = DESKTOP_CANVAS if desktop_view else PHONE_CANVAS
+	window.content_scale_aspect = Window.CONTENT_SCALE_ASPECT_KEEP if desktop_view else Window.CONTENT_SCALE_ASPECT_KEEP_WIDTH
+	PinballEvents.view_changed.emit(desktop_view)
 
 func toggle_night() -> void:
 	night = not night

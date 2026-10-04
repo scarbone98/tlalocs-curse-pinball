@@ -96,6 +96,23 @@ func _build() -> void:
 	column.alignment = BoxContainer.ALIGNMENT_CENTER
 	column.add_theme_constant_override("separation", 18)
 	center.add_child(column)
+	# in the shorter desktop view it shrinks to fit, about its middle
+	var fit := func():
+		var view_h := get_viewport_rect().size.y
+		var k := minf(1.0, view_h * 0.97 / maxf(column.size.y, 1.0))
+		column.scale = Vector2(k, k)
+		if k >= 1.0:
+			column.pivot_offset = column.size / 2.0
+			return
+		# taller than the screen, the container pins its top to the screen's top: shrink it
+		# about the point that lands its middle in the middle of the screen
+		var top := column.position.y
+		var y := (view_h / 2.0 - k * (top + column.size.y / 2.0)) / (1.0 - k) - top
+		column.pivot_offset = Vector2(column.size.x / 2.0, y)
+	column.resized.connect(fit)
+	get_viewport().size_changed.connect(fit)
+	PinballEvents.view_changed.connect(func(_desktop: bool): fit.call_deferred())
+	fit.call_deferred()
 
 	_mask_atlas = AtlasTexture.new()
 	_mask_atlas.atlas = MASK
@@ -129,6 +146,10 @@ func _build() -> void:
 	speed.pressed.connect(func():
 		GameManager.cycle_speed()
 		speed.text = "Speed: " + GameManager.speed_name())
+	var view := _button("View: " + ("Desktop" if GameManager.desktop_view else "Phone"), func(): pass)
+	view.pressed.connect(func():
+		GameManager.toggle_view()
+		view.text = "View: " + ("Desktop" if GameManager.desktop_view else "Phone"))
 	var time := _button("Time: " + ("Night" if GameManager.night else "Day"), func(): pass)
 	time.pressed.connect(func():
 		GameManager.toggle_night()

@@ -207,6 +207,7 @@ func lift(ball: RigidBody2D, path: String = "") -> void:
 			if d < best:
 				best = d
 				path = name
+	ball.remove_meta("into_temple")
 	var ride := Ride.new()
 	ride.path = path
 	var curve: Curve2D = _curves[path]
@@ -270,6 +271,8 @@ func _steer(ball: RigidBody2D, state: PhysicsDirectBodyState2D) -> bool:
 		ball.rail_guide = Callable()
 		if not (off_end and ride.path in INTO_TEMPLE):
 			ball.drop_off_rail.call_deferred()  # onto the top lanes, or back out of its mouth
+		else:
+			ball.set_meta("into_temple", true)  # it ran off the top, on into the temple
 		# running into the temple it carries on still riding, for the temple to catch
 		return false
 	return true
