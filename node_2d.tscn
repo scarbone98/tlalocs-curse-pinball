@@ -1,4 +1,4 @@
-[gd_scene load_steps=50 format=3 uid="uid://cscmeg24j6nwy"]
+[gd_scene load_steps=49 format=3 uid="uid://cscmeg24j6nwy"]
 
 [ext_resource type="Script" uid="uid://s1m1784ldb4k" path="res://Scripts/camera.gd" id="1_0hol4"]
 [ext_resource type="Script" uid="uid://bx3qt0dcuh56u" path="res://Scripts/ball.gd" id="2_epypp"]
@@ -191,9 +191,6 @@ font_size = 32
 [sub_resource type="LabelSettings" id="LabelSettings_fs4d3"]
 font_size = 32
 
-[sub_resource type="RectangleShape2D" id="RectangleShape2D_outlane"]
-size = Vector2(44, 26)
-
 [node name="Node2D" type="Node2D"]
 
 [node name="Map" type="Node2D" parent="."]
@@ -356,18 +353,6 @@ position = Vector2(335, 1272)
 position = Vector2(1.5, 0)
 shape = SubResource("RectangleShape2D_kdubu")
 metadata/_edit_lock_ = true
-
-[node name="outlane_drain_left" type="Area2D" parent="." groups=["death_zone"]]
-position = Vector2(90, 1180)
-
-[node name="CollisionShape2D" type="CollisionShape2D" parent="outlane_drain_left"]
-shape = SubResource("RectangleShape2D_outlane")
-
-[node name="outlane_drain_right" type="Area2D" parent="." groups=["death_zone"]]
-position = Vector2(586, 1183)
-
-[node name="CollisionShape2D" type="CollisionShape2D" parent="outlane_drain_right"]
-shape = SubResource("RectangleShape2D_outlane")
 
 [node name="ball_trap_plugs" type="StaticBody2D" parent="."]
 

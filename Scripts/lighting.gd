@@ -18,18 +18,21 @@ const FLICKER := 0.18            # how much a flame's light wavers
 const FLICKER_SIZE := 0.06       # ...and how much its pool swells and shrinks
 const FLAME_ABOVE := Vector2(0, -22)  # the flame sits above a torch's centre (Scripts/torches.gd)
 const TEMPLE_AT := Vector2(588, 170)
-# A wide, dim pool of sky light over the arena, the idol's tower and the skull
+# A wide, dim pool of sky light, drifting after the ball (it starts over the arena)
 const SKY_AT := Vector2(390, 450)
 const SKY_COLOUR := Color(0.75, 0.82, 1.0)
 const SKY := 0.38
 const SKY_SIZE := 4.4
-# A red glow welling up out of the drain between the flippers, slowly pulsing
-const GUTTER_AT := Vector2(339, 1262)
-const GUTTER_COLOUR := Color(1.0, 0.18, 0.12)
-const GUTTER := 0.9
-const GUTTER_SIZE := 2.2
+const SKY_FOLLOW := 2.5  # how quickly it drifts after the ball
+# A red glow welling up out of the drain between the flippers, slowly pulsing: a low,
+# flat band of light along the drain rather than a round pool
+const GUTTER_AT := Vector2(339, 1250)
+const GUTTER_COLOUR := Color(1.0, 0.25, 0.1)
+const GUTTER := 1.4
+const GUTTER_SIZE := Vector2(170, 56)  # scene units: the band's width and height
 const GUTTER_PULSE_SECONDS := 2.6
 const GUTTER_SWELL := 0.08  # the lava's pool swells and shrinks with its pulse
+const GUTTER_GLOW := Color(0.85, 0.18, 0.06, 0.55)  # the glow drawn on the gutter, added to what's there
 const GUTTER_WIDTH := 130.0  # the sparks spit up across this much of the drain
 const LAMP_SIZE := 0.45
 const EYE_SIZE := 0.3
@@ -42,7 +45,9 @@ var _pools := {}  # size -> its pixel pool
 var _torch_lights: Array[PointLight2D] = []
 var _whirl_light: PointLight2D
 var _gutter_light: PointLight2D
+var _sky_light: PointLight2D
 var _gutter_size := 1.0
+var _gutter_glow: Sprite2D
 var _button_lights: Array = []  # [sprite, light]
 var _lamp_lights: Array = []  # [sprite, light, the first frame that counts as lit]
 var _eye_lights: Array[PointLight2D] = []
@@ -82,9 +87,23 @@ func _ready() -> void:
 		_torch_lights.append(light)
 		_torch_sizes.append(light.texture_scale)
 	_light(TEMPLE_AT, Color(1.0, 0.8, 0.4), 0.55, 2.6)
-	_light(SKY_AT, SKY_COLOUR, SKY, SKY_SIZE)
-	_gutter_light = _light(GUTTER_AT, GUTTER_COLOUR, GUTTER, GUTTER_SIZE)
+	_sky_light = _light(SKY_AT, SKY_COLOUR, SKY, SKY_SIZE)
+	_gutter_light = _light(GUTTER_AT, GUTTER_COLOUR, GUTTER, 1.0)
+	_gutter_light.texture = _pixel_band(GUTTER_SIZE)
 	_gutter_size = _gutter_light.texture_scale
+	# the lava's own glow, drawn on (a light only tints the dark green floor down there)
+	_gutter_glow = Sprite2D.new()
+	_gutter_glow.texture = _gutter_light.texture
+	_gutter_glow.scale = Vector2.ONE * _gutter_light.texture_scale
+	_gutter_glow.position = GUTTER_AT
+	_gutter_glow.modulate = GUTTER_GLOW
+	var add := CanvasItemMaterial.new()
+	add.blend_mode = CanvasItemMaterial.BLEND_MODE_ADD
+	add.light_mode = CanvasItemMaterial.LIGHT_MODE_UNSHADED
+	_gutter_glow.material = add
+	_gutter_glow.z_index = 1
+	_gutter_glow.z_as_relative = false
+	features.add_child(_gutter_glow)
 	_whirl_light = _light(features.temple.AT, Color(0.85, 0.45, 1.0), 0.9, 1.4)
 	for sprite: AnimatedSprite2D in [features.idol_tower._button, features.journey._button_sprite]:
 		_button_lights.append([sprite, _light(sprite.position, Color(1.0, 0.85, 0.4), 0.7, 0.6)])
@@ -118,9 +137,9 @@ func _gutter_sparks() -> void:
 	sparks.emission_rect_extents = Vector2(GUTTER_WIDTH * 0.5, 4)
 	sparks.direction = Vector2(0, -1)
 	sparks.spread = 25.0
-	sparks.initial_velocity_min = 60.0
-	sparks.initial_velocity_max = 150.0
-	sparks.gravity = Vector2(0, 140)
+	sparks.initial_velocity_min = 25.0
+	sparks.initial_velocity_max = 65.0
+	sparks.gravity = Vector2(0, 90)
 	sparks.scale_amount_min = ART_PIXEL
 	sparks.scale_amount_max = ART_PIXEL
 	var heat := Gradient.new()
@@ -159,6 +178,17 @@ func _pixel_pool(size: float) -> ImageTexture:
 	_pools[size] = ImageTexture.create_from_image(image)
 	return _pools[size]
 
+# A flat band of light in the same chunky pixels: two nested rectangles, the inner brighter
+func _pixel_band(size: Vector2) -> ImageTexture:
+	var texels := Vector2i((size / ART_PIXEL).round())
+	var image := Image.create(texels.x, texels.y, false, Image.FORMAT_RGBA8)
+	for y in texels.y:
+		for x in texels.x:
+			var edge := minf(minf(x + 0.5, texels.x - x - 0.5) / (texels.x * 0.5), minf(y + 0.5, texels.y - y - 0.5) / (texels.y * 0.5))
+			image.set_pixel(x, y, Color(1, 1, 1, BAND_ALPHA[0] if edge > 0.5 else BAND_ALPHA[1]))
+	image.resize(texels.x * POOL_BLOCK, texels.y * POOL_BLOCK, Image.INTERPOLATE_NEAREST)
+	return ImageTexture.create_from_image(image)
+
 func _light(at: Vector2, colour: Color, energy: float, size: float) -> PointLight2D:
 	var light := PointLight2D.new()
 	light.texture = _pixel_pool(size)
@@ -183,9 +213,16 @@ func _process(delta: float) -> void:
 		_torch_lights[i].energy = TORCH_BLAZE * (1.0 + FLICKER * waver)
 		_torch_lights[i].texture_scale = _torch_sizes[i] * (1.0 + FLICKER_SIZE * waver)
 	_whirl_light.visible = features.temple._whirl.visible
+	# the sky light drifts after the ball, a dim spot following it about the table
+	var camera := get_viewport().get_camera_2d()
+	var followed: Variant = camera.get("_followed") if camera else null
+	if is_instance_valid(followed):
+		_sky_light.global_position = _sky_light.global_position.lerp((followed as Node2D).global_position, minf(SKY_FOLLOW * delta, 1.0))
 	var pulse := sin(_clock / GUTTER_PULSE_SECONDS * TAU)
 	_gutter_light.energy = GUTTER * (0.8 + 0.2 * pulse)
 	_gutter_light.texture_scale = _gutter_size * (1.0 + GUTTER_SWELL * pulse)
+	_gutter_glow.scale = Vector2.ONE * _gutter_light.texture_scale
+	_gutter_glow.modulate.a = GUTTER_GLOW.a * (0.75 + 0.25 * pulse)
 	for pair: Array in _lamp_lights:
 		var lamp: AnimatedSprite2D = pair[0]
 		(pair[1] as PointLight2D).visible = lamp.is_visible_in_tree() and lamp.frame >= pair[2]

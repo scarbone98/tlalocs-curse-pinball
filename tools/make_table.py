@@ -51,6 +51,8 @@ and the playfield sprites cut from the hand-drawn sheets in tools/source_art/:
                               heartbeat.png, redrawn at half size)
   Sprites/table/spirit_lamp.png  the right lane's floor lamps (dark, lit)
   Sprites/table/shard.png     a crystal sliver, for the tower breaking
+  Sprites/table/temple_interior.png  the inside of the golden temple, seen through its windows
+  Sprites/table/arena_hole.png  the stone tablet in the warriors' arena (shut, open)
   Sprites/table/roulette_pictures.png, roulette_border.png, roulette_doors.png  the floor
                               roulette: its pictures (cities, then prizes), border and doors
   Sprites/table/claw_swipe.png  a jaguar's claw marks as it swipes (striking, full, fading)
@@ -872,6 +874,62 @@ def spring_sheet():
     return sheet
 
 
+# ---------- the warriors' hole in the arena ----------
+
+HOLE_SIZE = (24, 16)
+
+
+def arena_hole():
+    """A round stone tablet set in the middle of the warriors' arena: shut, with a carved
+    step-fret on it, then slid aside, a dark hole the warriors jump down into."""
+    w, h = HOLE_SIZE
+    ink, rim, stone, stone_l, carve = (20, 24, 36, 255), (84, 90, 100, 255), (112, 118, 128, 255), (148, 154, 160, 255), (70, 74, 84, 255)
+    pit, pit_d = (34, 26, 30, 255), (16, 12, 18, 255)
+    out = Image.new("RGBA", (w * 2, h), T)
+    cx, cy = (w - 1) / 2, (h - 1) / 2
+    for f in range(2):
+        for y in range(h):
+            for x in range(w):
+                r = ((x - cx) / (w / 2)) ** 2 + ((y - cy) / (h / 2)) ** 2
+                if r > 1.0:
+                    continue
+                if r > 0.78:
+                    c = ink
+                elif r > 0.55:
+                    c = rim if f == 0 or y > cy else (60, 64, 74, 255)
+                elif f == 0:
+                    c = stone_l if y < cy - 2 else stone
+                else:
+                    c = pit if y < cy else pit_d
+                out.putpixel((f * w + x, y), c)
+        if f == 0:  # a step-fret carved across the shut tablet
+            for dx, dy in ((-4, 0), (-3, 0), (-2, 0), (-2, -1), (-1, -1), (0, -1), (0, 0), (0, 1), (1, 1), (2, 1), (2, 0), (3, 0), (4, 0)):
+                out.putpixel((int(cx + dx + 0.5), int(cy + dy + 0.5)), carve)
+    return out
+
+
+# ---------- inside the temple ----------
+
+def temple_interior():
+    """What shows through the golden temple's windows: the dark of its inside, lit warm
+    from above (only inside the windows, the holes the temple art encloses; the rest is
+    left clear so the temple, and the ball racing round under it, show as they are)."""
+    import numpy as np
+    from scipy import ndimage
+
+    temple = np.array(Image.open(LAYERS / "temple.png").convert("RGBA"))
+    solid = temple[:, :, 3] > 0
+    holes = ndimage.binary_fill_holes(solid) & ~solid
+    out = Image.new("RGBA", (temple.shape[1], temple.shape[0]), T)
+    glow, dusk, dark = (126, 78, 34, 255), (70, 40, 30, 255), (40, 22, 26, 255)
+    for y, x in zip(*np.nonzero(holes)):
+        above = 0  # how far down from the window's top edge
+        while y - above - 1 >= 0 and holes[y - above - 1, x]:
+            above += 1
+        out.putpixel((int(x), int(y)), glow if above == 0 else (dusk if above < 3 else dark))
+    return out
+
+
 # ---------- the floor roulette ----------
 
 ROULETTE_PICTURE = (48, 30)    # each picture, redrawn smaller from Sprites/billboard.png's 64x40
@@ -1140,6 +1198,8 @@ def main():
     blood_heart().save("Sprites/table/blood_heart.png")
     spirit_lamp().save("Sprites/table/spirit_lamp.png")
     shard().save("Sprites/table/shard.png")
+    temple_interior().save("Sprites/table/temple_interior.png")
+    arena_hole().save("Sprites/table/arena_hole.png")
     reel, reel_border, reel_doors = roulette_art()
     reel.save("Sprites/table/roulette_pictures.png")
     reel_border.save("Sprites/table/roulette_border.png")

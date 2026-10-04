@@ -11,6 +11,7 @@ extends Node2D
 const Geometry := preload("res://Scripts/rails_geometry.gd")
 const TableGeometry := preload("res://Scripts/table_geometry.gd")
 const GEMS_LIT := preload("res://Sprites/table/temple_gems_lit.png")  # tools/make_table.py
+const INTERIOR := preload("res://Sprites/table/temple_interior.png")  # what shows through its windows
 const GEM_GLOW_SECONDS := 0.3   # a gem stays lit this long after the ball passes it
 const GEM_REACH := 0.45         # radians either side of a gem the ball lights it from
 
@@ -42,6 +43,13 @@ var _gem_glow: Array[float] = []
 var _ring_centre := Vector2.ZERO
 
 func _ready() -> void:
+	# the dark inside, seen through the windows instead of the floor under the temple (over
+	# the floor, under the ball racing round and the temple itself)
+	var inside := Sprite2D.new()
+	inside.texture = INTERIOR
+	inside.centered = false
+	inside.scale = features.MAP_SCALE
+	features.add_child(inside)
 	_ring_centre = TableGeometry.TEMPLE_RING_CENTRE * features.MAP_SCALE
 	for gem: Array in TableGeometry.TEMPLE_GEMS:
 		var lit := Sprite2D.new()
