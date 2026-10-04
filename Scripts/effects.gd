@@ -9,6 +9,8 @@ extends Node2D
 ##   dust    stone off a wall the ball slams into
 ##   gold    a shower of gold for a relic or the El Dorado jackpot
 ##   fire    sparks flying up off a torch as it catches
+##   lava    molten drops thrown up as a ball plops into the lava
+##   smoke   a slow grey puff rising off the lava
 
 const VIBRATE_FROM := 6.0  # only the big moments (kickback, the King, the jackpot) buzz the phone
 const VIBRATE_MS_PER_STRENGTH := 6
@@ -21,6 +23,9 @@ const KINDS := {
 	"dust": [6, 0.3, Vector2(60, 140), 0.0, [Color("#b4c4cc"), Color("#748c9a"), Color(0.34, 0.43, 0.47, 0.0)]],
 	"gold": [32, 0.7, Vector2(160, 420), 380.0, [Color("#fffbd6"), Color("#f8d000"), Color(0.75, 0.54, 0.06, 0.0)]],
 	"fire": [14, 0.5, Vector2(60, 180), -260.0, [Color("#fffbd6"), Color("#f8a008"), Color(0.75, 0.34, 0.18, 0.0)]],
+	"lava": [18, 0.6, Vector2(120, 300), 700.0, [Color("#fff0a0"), Color("#f86010"), Color(0.6, 0.08, 0.02, 0.0)]],
+	"poison": [12, 0.7, Vector2(30, 110), -30.0, [Color("#c8ffb0"), Color("#40d040"), Color(0.1, 0.45, 0.1, 0.0)]],
+	"smoke": [10, 1.4, Vector2(10, 40), -45.0, [Color(0.55, 0.52, 0.5, 0.8), Color(0.35, 0.33, 0.33, 0.55), Color(0.2, 0.2, 0.2, 0.0)]],
 }
 
 var _pixel: ImageTexture

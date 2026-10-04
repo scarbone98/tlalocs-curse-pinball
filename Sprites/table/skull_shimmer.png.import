@@ -2,16 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://dlc88ggyifwah"
-path="res://.godot/imported/frog_button.png-7ce2759cd7b058cd3277b416825880b4.ctex"
+uid="uid://di13h85a0pjwl"
+path="res://.godot/imported/skull_shimmer.png-87ab77f65c25d00f8aeb0cddf76ac780.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://Sprites/table/frog_button.png"
-dest_files=["res://.godot/imported/frog_button.png-7ce2759cd7b058cd3277b416825880b4.ctex"]
+source_file="res://Sprites/table/skull_shimmer.png"
+dest_files=["res://.godot/imported/skull_shimmer.png-87ab77f65c25d00f8aeb0cddf76ac780.ctex"]
 
 [params]
 

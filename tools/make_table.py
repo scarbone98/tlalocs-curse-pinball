@@ -40,6 +40,8 @@ and the playfield sprites cut from the hand-drawn sheets in tools/source_art/:
   Sprites/table/warrior.png   the arena's warriors (warrior.png, as drawn): four frames turning
                               round, then the fifth for when one's struck
   Sprites/table/skull_shine.png  the skull's brightest facets, for it to gleam in a light
+  Sprites/table/skull_shimmer.png  a glint sweeping over the skull's dome (6 frames, a row
+                              for each of its two frames), as the spotlight comes and goes
   Sprites/table/skull_top.png, skull_jaw.png  the skull's top (skullupper.png: shut, open)
                               and lower jaw (skulllower.png), drawn either side of the ball
   Sprites/table/tower_drum.png, spikes.png, torch_button.png  as drawn (spinningtower.png,
@@ -54,6 +56,9 @@ and the playfield sprites cut from the hand-drawn sheets in tools/source_art/:
   Sprites/table/shard.png     a crystal sliver, for the tower breaking
   Sprites/table/temple_interior.png  the inside of the golden temple, seen through its windows
   Sprites/table/arena_hole.png  the stone tablet in the warriors' arena (shut, open)
+  Sprites/table/dart_falling.png, dart_stuck.png, dart_shadow.png  the poison dart trap's
+                              darts: falling, stuck in the floor (still, quivering), and
+                              the shadow of one falling
   Sprites/table/lava_glow.png, lava_embers.png  the lava pit (lava.png): its glow, and its
                               embers and edge in 4 frames
   Sprites/table/roulette_pictures.png, roulette_border.png, roulette_doors.png  the floor
@@ -692,7 +697,7 @@ def claw_swipe():
 # frames to draw over them when they're hit, like the torches' stone buttons
 GOLD_BUTTONS = {
     "spike_button": (110, 179, 117, 185),   # beside the idol pit's spikes
-    "frog_button": (70, 266, 79, 274),      # on the left inlane wall's tip: wakes the frogs
+    "dart_button": (70, 266, 79, 274),      # on the left inlane wall's tip: fires the poison darts
     "skull_button": (154, 209, 160, 215),   # at the foot of the skull's lane: brings the jaguars out
 }
 PRESS_SHADOW = (112, 72, 8, 255)
@@ -813,6 +818,36 @@ def skull_shine(top):
     return out
 
 
+SHIMMER_FRAMES = 6
+
+
+def skull_shimmer(top):
+    """A glint running diagonally across the crystal dome, the way light sweeps over the
+    rail emerald's facets: SHIMMER_FRAMES frames across, one row for each of the top's two
+    frames (jaws shut, open). The game plays it once as the spotlight comes onto the skull
+    or leaves it."""
+    fw, h = top.width // 2, top.height
+    out = Image.new("RGBA", (fw * SHIMMER_FRAMES, h * 2), T)
+    for row in range(2):
+        frame = top.crop((row * fw, 0, row * fw + fw, h))
+        box = frame.getbbox()
+        span = (box[2] - box[0]) + (h * 0.5 - box[1]) * 0.6  # across the dome, corner to corner
+        for f in range(SHIMMER_FRAMES):
+            band = box[0] + 1 + (span - 2) * f / (SHIMMER_FRAMES - 1)
+            for y in range(h):
+                if y > h * 0.5:
+                    break  # only the crystal dome, not its teeth
+                for x in range(fw):
+                    if not frame.getpixel((x, y))[3]:
+                        continue
+                    d = abs(x + (y - box[1]) * 0.6 - band)
+                    if d < 1.0:
+                        out.putpixel((f * fw + x, row * h + y), (255, 255, 255, 235))
+                    elif d < 2.2:
+                        out.putpixel((f * fw + x, row * h + y), (170, 230, 255, 140))
+    return out
+
+
 # ---------- the temple's gems, lit ----------
 
 GEM_BLUE = (20, 124, 199)
@@ -897,10 +932,62 @@ def spring_sheet():
     return sheet
 
 
+# ---------- the poison dart trap ----------
+
+# A poison dart seen from the table's view, point down: red feather flights, a cane shaft,
+# a point wet with green poison. Falling, all of it; stuck in the floor, the point's buried
+# and there's a little dark hole round the shaft.
+DART_FALLING = [
+    ".R.R.",
+    "RRrRR",
+    "RRrRR",
+    ".RrR.",
+    "..r..",
+    "..W..",
+    "..W..",
+    "..W..",
+    "..B..",
+    "..W..",
+    "..W..",
+    "..W..",
+    "..g..",
+    "..G..",
+    "..P..",
+]
+DART_STUCK = DART_FALLING[:10] + [".kok."]
+DART_SHADOW = [".kkk.", "kkkkk", ".kkk."]
+
+
+def dart_trap():
+    """The poison dart trap's darts: one falling (point down), one stuck upright in the
+    floor (two frames: still, and quivering a pixel when the ball knocks it), and the
+    shadow a falling one throws on the floor."""
+    key = {"R": (210, 50, 40, 255), "r": (140, 30, 30, 255), "W": (204, 168, 96, 255),
+           "B": (120, 80, 40, 255), "g": (40, 140, 50, 255), "G": (90, 230, 90, 255),
+           "P": (200, 255, 170, 255), "o": (16, 12, 18, 255), "k": (10, 8, 20, 120)}
+
+    def draw(rows, img=None, dx=0, x0=0):
+        if img is None:
+            img = Image.new("RGBA", (len(rows[0]), len(rows)), T)
+        for y, row in enumerate(rows):
+            for x, c in enumerate(row):
+                if c in key and 0 <= x + dx < len(row):
+                    img.putpixel((x0 + x + dx * (y < len(rows) - 3), y), key[c])
+        return img
+
+    falling = draw(DART_FALLING)
+    w, h = len(DART_STUCK[0]), len(DART_STUCK)
+    stuck = Image.new("RGBA", (w * 2, h), T)
+    draw(DART_STUCK, stuck)
+    draw(DART_STUCK, stuck, dx=1, x0=w)  # quivering: its top leans a pixel over
+    shadow = draw(DART_SHADOW)
+    return falling, stuck, shadow
+
+
 # ---------- the lava pit ----------
 
 LAVA_FRAMES = 4
-
+LAVA_TOP = 404  # art pixels: the lava's own glow starts here
 
 def lava_layers():
     """The lava in the drain, from the hand-drawn lava.png (the lava reference layer, at
@@ -916,8 +1003,8 @@ def lava_layers():
     for y in range(h):
         for x in range(w):
             p = lava.getpixel((x, y))
-            if not p[3]:
-                continue
+            if not p[3] or y < LAVA_TOP:
+                continue  # (above it, the glow it threw on the flippers, which showed through them)
             if p[3] < 255:
                 glow.putpixel((x, y), p)
             else:
@@ -1105,7 +1192,7 @@ def idol_spin():
             sw = round(depth * abs(s_))
             tex = inner if c >= 0 else back[::-1]
             face = [shade(tex[min(w - 1, int((i + 0.5) * w / fw))], 0.75 + 0.25 * abs(c)) for i in range(fw)] if fw else []
-            edge = tex[0] if s_ > 0 else tex[-1]
+            edge = inner[0] if s_ > 0 else inner[-1]  # his sides (jade ear-spools and all), whichever way he faces
             side = [shade(edge, 0.62)] * sw
             body = side + face if s_ > 0 else face + side
             total = len(body) + 2
@@ -1322,6 +1409,7 @@ def main():
     skull_top, skull_jaw = skull_pieces()
     skull_top.save("Sprites/table/skull_top.png")
     skull_shine(skull_top).save("Sprites/table/skull_shine.png")
+    skull_shimmer(skull_top).save("Sprites/table/skull_shimmer.png")
     skull_jaw.save("Sprites/table/skull_jaw.png")
     spring_sheet().save("Sprites/table/spring.png")
     gem, gem_shadow = rail_gem()
@@ -1333,6 +1421,10 @@ def main():
     shard().save("Sprites/table/shard.png")
     temple_interior().save("Sprites/table/temple_interior.png")
     arena_hole().save("Sprites/table/arena_hole.png")
+    dart_falling, dart_stuck, dart_shadow = dart_trap()
+    dart_falling.save("Sprites/table/dart_falling.png")
+    dart_stuck.save("Sprites/table/dart_stuck.png")
+    dart_shadow.save("Sprites/table/dart_shadow.png")
     lava_glow, lava_frames, lava_box = lava_layers()
     lava_glow.save("Sprites/table/lava_glow.png")
     lava_frames.save("Sprites/table/lava_embers.png")

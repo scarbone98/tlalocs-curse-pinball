@@ -11,16 +11,16 @@ const TORCH := preload("res://Sprites/table/torch.png")
 const BUTTON := preload("res://Sprites/table/torch_button.png")  # tools/make_table.py
 
 # Scene positions of the torches, in pairs across the lane, top pair first
-const PAIRS := [
-	[Vector2(123.8, 673.2), Vector2(61.9, 724.5)],
-	[Vector2(157.5, 730.6), Vector2(98.4, 784.9)],
-	[Vector2(188.4, 778.9), Vector2(126.6, 833.2)],
+const PAIRS := [  # moved up the lane to make room for the dart trap at its foot
+	[Vector2(105.6, 637.6), Vector2(43.7, 688.9)],
+	[Vector2(131.4, 679.4), Vector2(72.3, 733.7)],
+	[Vector2(154.3, 712.1), Vector2(92.5, 766.4)],
 ]
 # Torches that just burn, for the look of the place: on the side walls, by the outlanes,
 # beside the stone face (scene units)
 const DECOR := [Vector2(40, 870), Vector2(612, 858), Vector2(40, 1135), Vector2(632, 1105), Vector2(165, 105), Vector2(35, 300)]
 # The stone buttons in the lane, one per pair (scene units, from the layout mock-up)
-const BUTTONS := [Vector2(72, 694), Vector2(112.5, 772.8), Vector2(152, 851)]  # top to bottom, spread along the lane
+const BUTTONS := [Vector2(53.8, 658.4), Vector2(86.4, 721.6), Vector2(117.9, 784.2)]  # top to bottom, spread along the lane
 const SEQUENCE_GAP := 1.5  # each button in the run up the lane must follow the last within this
 const BUTTON_RADIUS := 22.0
 const PRESSED_SECONDS := 0.35

@@ -39,6 +39,8 @@ const FloorRoulette := preload("res://Scripts/floor_roulette.gd")
 const Lighting := preload("res://Scripts/lighting.gd")
 const Sacrifices := preload("res://Scripts/sacrifices.gd")
 const SpiritLane := preload("res://Scripts/spirit_lane.gd")
+const DartTrap := preload("res://Scripts/dart_trap.gd")
+const DebugView := preload("res://Scripts/debug_view.gd")  # F3: colliders and rails drawn over the table
 const Effects := preload("res://Scripts/effects.gd")
 const TableLife := preload("res://Scripts/table_life.gd")
 const Music := preload("res://Scripts/music.gd")
@@ -103,6 +105,7 @@ var _face_sprite: AnimatedSprite2D
 var kickback: Node2D
 var spirit: Node2D
 var journey: Node2D
+var dart_trap: Node2D  # Scripts/dart_trap.gd
 var temple: Node2D
 var awakening: Node2D
 var hatchling: Node2D
@@ -157,7 +160,7 @@ func _ready() -> void:
 	skull = CrystalSkull.new()
 	idol_tower = IdolTower.new()
 	spinner = Spinner.new()
-	for mode in [ramps, rails, kickback, spirit, journey, temple, spinner, Torches.new(), Temple.new(), idol_tower, skull, awakening, hatchling, Warriors.new(), Nudge.new(), Palms.new(), Plunger.new(), FloorRoulette.new(), Sacrifices.new(), SpiritLane.new(), Lighting.new()]:
+	for mode in [ramps, rails, kickback, spirit, journey, temple, spinner, Torches.new(), Temple.new(), idol_tower, skull, awakening, hatchling, Warriors.new(), Nudge.new(), Palms.new(), Plunger.new(), FloorRoulette.new(), Sacrifices.new(), SpiritLane.new(), DartTrap.new(), Lighting.new(), DebugView.new()]:
 		mode.features = self
 		add_child(mode)
 	add_child(Effects.new())
@@ -347,7 +350,8 @@ func _follow_with_eyes() -> void:
 			var to := (target.global_position - (_face.global_position + home)) / EYE_FOLLOW
 			look = Vector2(clampf(roundf(to.x), -1.0, 1.0), clampf(roundf(to.y), -1.0, 1.0))
 		eye.position = home + look * MAP_SCALE
-		eye.frame = 1 if GameManager.curse_active or _eyes_red_left > 0.0 else 0
+		var sacrifice: bool = sacrifices != null and sacrifices.active  # blazing while a sacrifice sits in his mouth
+		eye.frame = 1 if GameManager.curse_active or _eyes_red_left > 0.0 or sacrifice else 0
 
 # ---------- rules ----------
 

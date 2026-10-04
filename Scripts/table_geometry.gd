@@ -14,7 +14,7 @@ const PALMS := [
 ## The gold buttons painted in the basemap: their centres (art pixels)
 const GOLD_BUTTONS := {
 	"spike_button": Vector2(113.5, 182.0),
-	"frog_button": Vector2(74.5, 270.0),
+	"dart_button": Vector2(74.5, 270.0),
 	"skull_button": Vector2(157.0, 212.0),
 }
 

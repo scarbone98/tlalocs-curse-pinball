@@ -275,11 +275,7 @@ shape = SubResource("RectangleShape2D_epypp")
 
 [node name="CollisionPolygon2D" type="CollisionPolygon2D" parent="layer_1_colliders"]
 position = Vector2(24, 32)
-polygon = PackedVector2Array(41, 15, 438, 59, 431, 71, 429, 136, 352, 106, 317, 120, 320, 160, 247, 166, 234, 156, 227, 155, 232, 148, 233, 137, 228, 112, 205, 109, 183, 115, 164, 122, 139, 132, 118, 146, 81, 175, 52, 205, 23, 263, 7, 319, 3, 438, 8, 579, 27, 709, -23, 505, -21, 365)
-
-[node name="CollisionPolygon2D4" type="CollisionPolygon2D" parent="layer_1_colliders"]
-position = Vector2(-63, 118)
-polygon = PackedVector2Array(213, 121, 236, 101, 251, 92, 261, 87, 271, 82, 279, 79, 288, 75, 297, 73, 308, 70, 321, 69, 409, 76, 335, 89, 259, 109, 206, 145, 184, 168, 157, 216, 193, 139)
+polygon = PackedVector2Array(41, 15, 438, 59, 431, 71, 429, 136, 352, 106, 317, 120, 320, 160, 312, 163, 268, 158, 252, 161, 235, 164, 218, 170, 201, 176, 184, 182, 167, 191, 150, 200, 134, 210, 117, 222, 100, 238, 83, 266, 66, 274, 38, 290, 18, 313, 7, 348, 3, 438, 8, 579, 27, 709, -23, 505, -21, 365)
 
 [node name="CollisionPolygon2D5" type="CollisionPolygon2D" parent="layer_1_colliders"]
 position = Vector2(-84, 264)

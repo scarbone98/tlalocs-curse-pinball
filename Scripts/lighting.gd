@@ -16,6 +16,9 @@ const TORCH_BLAZE := 0.7
 const FLICKER_RATES := Vector2(3.2, 6.9)  # the two slow waves a flame's light wavers on (radians/s)
 const FLICKER := 0.18            # how much a flame's light wavers
 const FLICKER_SIZE := 0.06       # ...and how much its pool swells and shrinks
+const BUTTON_GLOW := 0.7
+const BUTTON_FLICKER := 0.08       # the gold buttons' glow breathes like a torch's, more subtly
+const BUTTON_FLICKER_SIZE := 0.03
 const FLAME_ABOVE := Vector2(0, -22)  # the flame sits above a torch's centre (Scripts/torches.gd)
 const TEMPLE_AT := Vector2(588, 170)
 # A wide, dim pool of sky light, drifting after the ball (it starts over the arena)
@@ -33,6 +36,10 @@ const LAVA_BREATH_SECONDS := 2.6
 # The crystal skull gleams as the spotlight passes over it, its glints sliding toward the light
 const SKULL_SHINE := preload("res://Sprites/table/skull_shine.png")  # tools/make_table.py
 const SHINE_REACH := 190.0  # how near the spotlight has to be for the skull to catch it
+const SKULL_SHIMMER := preload("res://Sprites/table/skull_shimmer.png")  # tools/make_table.py
+const SHIMMER_FRAMES := 6
+const SHIMMER_FPS := 14.0
+const SHIMMER_REACH := 150.0  # the spotlight coming within this of the skull, or leaving, sets it shimmering
 const LAMP_SIZE := 0.45
 const EYE_SIZE := 0.3
 const EYE_YELLOW := Color(1.0, 0.9, 0.3)
@@ -47,6 +54,9 @@ var _sky_light: PointLight2D
 var _lava_glow: Sprite2D
 var _sacrifice_light: PointLight2D
 var _skull_shine: Sprite2D
+var _skull_shimmer: Sprite2D
+var _spot_on_skull := false
+var _shimmer_time := -1.0  # how far through its shimmer the skull is (negative: not shimmering)
 var _button_lights: Array = []  # [sprite, light]
 var _lamp_lights: Array = []  # [sprite, light, the first frame that counts as lit]
 var _eye_lights: Array[PointLight2D] = []
@@ -89,10 +99,16 @@ func _ready() -> void:
 	_sky_light = _light(SKY_AT, SKY_COLOUR, SKY, SKY_SIZE)
 	_lava()
 	_skull_shine = _shine_on(features.skull._sprite)
+	_skull_shimmer = _shine_on(features.skull._sprite)
+	_skull_shimmer.texture = SKULL_SHIMMER
+	_skull_shimmer.hframes = SHIMMER_FRAMES
+	_skull_shimmer.vframes = 2
+	_skull_shimmer.hide()
 	_sacrifice_light = _light(Vector2.ZERO, Color(1.0, 0.72, 0.4), 0.95, 0.85)  # a warm spot on the sacrifice
 	_whirl_light = _light(features.temple.AT, Color(0.85, 0.45, 1.0), 0.9, 1.4)
-	for sprite: AnimatedSprite2D in [features.idol_tower._button, features.journey._button_sprite, features.kickback.button_sprite]:
-		_button_lights.append([sprite, _light(sprite.position, Color(1.0, 0.85, 0.4), 0.7, 0.6)])
+	for sprite: AnimatedSprite2D in [features.idol_tower._button, features.journey._button_sprite, features.dart_trap.button_sprite]:
+		var glow := _light(sprite.position, Color(1.0, 0.85, 0.4), BUTTON_GLOW, 0.6)
+		_button_lights.append([sprite, glow, glow.texture_scale])
 	# the lamps set in the floor: the lanes', the bonus bars, the relics over Tlaloc, the spirit lane's
 	for lamp: AnimatedSprite2D in features._top_lamps + features._bottom_lamps + features._bars:
 		_lamp(lamp, Color(1.0, 0.85, 0.35), 1)
@@ -198,7 +214,7 @@ func _process(delta: float) -> void:
 	# the sky light drifts after the ball, a dim spot following it about the table
 	var camera := get_viewport().get_camera_2d()
 	var followed: Variant = camera.get("_followed") if camera else null
-	if is_instance_valid(followed):
+	if is_instance_valid(followed) and not followed.get("in_lava"):  # it stays put once the ball's in the lava
 		_sky_light.global_position = _sky_light.global_position.lerp((followed as Node2D).global_position, minf(SKY_FOLLOW * delta, 1.0))
 	_lava_glow.modulate.a = 0.8 + 0.2 * sin(_clock / LAVA_BREATH_SECONDS * TAU)
 	# the skull gleams as the spotlight passes near it
@@ -207,6 +223,20 @@ func _process(delta: float) -> void:
 	_skull_shine.frame = skull.frame
 	_skull_shine.offset = skull.offset + Vector2(clampf(to_light.x / 80.0, -1.0, 1.0), clampf(to_light.y / 80.0, -1.0, 1.0)).round()
 	_skull_shine.modulate.a = clampf(1.3 - to_light.length() / SHINE_REACH, 0.0, 1.0) * (0.65 + 0.2 * sin(_clock * 5.0))
+	# ...and a glint sweeps over it as the spotlight comes onto it, and again as it leaves
+	var on_skull := to_light.length() < SHIMMER_REACH
+	if on_skull != _spot_on_skull:
+		_spot_on_skull = on_skull
+		_shimmer_time = 0.0
+	if _shimmer_time >= 0.0:
+		var step := int(_shimmer_time * SHIMMER_FPS)
+		_shimmer_time += delta
+		_skull_shimmer.visible = step < SHIMMER_FRAMES
+		if step < SHIMMER_FRAMES:
+			_skull_shimmer.frame = skull.frame * SHIMMER_FRAMES + step
+			_skull_shimmer.offset = skull.offset
+		else:
+			_shimmer_time = -1.0
 	var sacrifice: AnimatedSprite2D = features.sacrifices.current()
 	_sacrifice_light.visible = sacrifice.visible and sacrifice.modulate.a > 0.3
 	_sacrifice_light.global_position = sacrifice.global_position
@@ -218,5 +248,11 @@ func _process(delta: float) -> void:
 		_eye_lights[i].global_position = eye.global_position
 		_eye_lights[i].color = EYE_RED if eye.frame == 1 else EYE_YELLOW
 		_eye_lights[i].energy = 0.8 + 0.15 * sin(_clock * 3.0)
-	for pair: Array in _button_lights:
-		(pair[1] as PointLight2D).visible = (pair[0] as AnimatedSprite2D).visible
+	for i in _button_lights.size():
+		var pair: Array = _button_lights[i]
+		var light := pair[1] as PointLight2D
+		light.visible = (pair[0] as AnimatedSprite2D).visible
+		# they breathe like the torches' light, only gentler
+		var waver := sin(_clock * FLICKER_RATES.x * 0.6 + i * 2.3) * 0.5 + sin(_clock * FLICKER_RATES.y * 0.6 + i * 1.1) * 0.5
+		light.energy = BUTTON_GLOW * (1.0 + BUTTON_FLICKER * waver)
+		light.texture_scale = pair[2] * (1.0 + BUTTON_FLICKER_SIZE * waver)

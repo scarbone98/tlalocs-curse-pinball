@@ -97,11 +97,12 @@ func _physics_process(delta: float) -> void:
 	var heart_in: bool = features.sacrifices != null and features.sacrifices.active
 	var open: bool = not heart_in and (_held != null or _waiting())
 	_whirl.visible = open
-	if open and features._face_sprite:
+	var gaping := open or heart_in  # his mouth gapes round a sacrifice too
+	if gaping and features._face_sprite:
 		features._face_sprite.frame = MOUTH_OPEN
 	elif _was_open and features._face_sprite and not GameManager.curse_active:
 		features._face_sprite.frame = MOUTH_SHUT  # nothing waiting any more: he shuts it
-	_was_open = open
+	_was_open = gaping
 	if _held or _rearm > 0.0 or not _waiting() or heart_in:
 		return
 	var balls := get_tree().get_nodes_in_group("ball")

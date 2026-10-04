@@ -1,17 +1,17 @@
 extends Node2D
-## Tlaloc's sacrifice. It waits on the round disc in the middle of the golden temple: the
-## beating heart (8 Bit Evil Returns' heartbeat, Sprites/table/blood_heart.png), and on
-## later turns a golden idol or an emerald instead, turn and turn about. Three laps round
+## Tlaloc's sacrifice. It waits on the round disc in the middle of the golden temple: first
+## a white goat, then a bronze turkey, and last the beating heart (8 Bit Evil Returns'
+## heartbeat, Sprites/table/blood_heart.png), then round again. Three laps round
 ## inside the temple (Scripts/temple.gd) call it down: it fades from the temple and rises
 ## up out of Tlaloc's mouth. Hit it three times to offer it up, each hit knocking the ball
 ## well away, for points and a ball saver (and if his curse is raining, it stops at once).
 ## Left unoffered too long, it sinks back down his throat and returns to the temple.
-## While it sits in his mouth, his mouth takes nothing else.
+## While it sits in his mouth, his mouth gapes, his eyes blaze red, and it takes nothing else.
 
 const HEART := preload("res://Sprites/table/blood_heart.png")  # tools/make_table.py: 8 frames beating
-const IDOL := preload("res://Sprites/table/idol.png")          # tools/make_tiki_idol.py
-const GEM := preload("res://Sprites/table/rail_gem.png")       # tools/make_table.py
-const ORDER := ["heart", "idol", "emerald"]  # one for each curse, round and round
+const GOAT := preload("res://Sprites/table/sacrifice_goat.png")      # tools/make_sacrifice_sprites.py
+const TURKEY := preload("res://Sprites/table/sacrifice_turkey.png")
+const ORDER := ["goat", "turkey", "heart"]  # the heart last, then round again
 const MOUTH := Vector2(339, 840)          # in his mouth (Scripts/temple_hole.gd)
 const TEMPLE_CIRCLE := Vector2(581, 118)  # the round disc in the middle of the golden temple
 const RADIUS := 24.0
@@ -27,7 +27,7 @@ const RETURNS := 8.0     # after one's offered, the next appears on the temple t
 const OFFERED_POINTS := 30000
 const HIT_POINTS := 2000
 const SAVER_SECONDS := 20.0
-const TOASTS := {"heart": "The heart is offered!", "idol": "The golden idol is offered!", "emerald": "The emerald is offered!"}
+const TOASTS := {"heart": "The heart is offered!", "goat": "The goat is offered!", "turkey": "The turkey is offered!"}
 
 var features: Node2D  # TableFeatures
 
@@ -48,8 +48,8 @@ var _burst: CPUParticles2D
 func _ready() -> void:
 	features.sacrifices = self
 	_sprites["heart"] = _sprite(HEART, 8, BEAT_FPS)
-	_sprites["idol"] = _sprite(IDOL, 6, 0.0)
-	_sprites["emerald"] = _sprite(GEM, 4, 6.0)  # light sweeping over its facets
+	_sprites["goat"] = _sprite(GOAT, 6, 3.0)      # its tail flicks, it blinks, it bleats
+	_sprites["turkey"] = _sprite(TURKEY, 6, 3.0)  # its fan quivers, it blinks, it gobbles
 	_body = StaticBody2D.new()
 	_body.position = MOUTH
 	_shape = CollisionShape2D.new()
@@ -184,7 +184,7 @@ func _on_hit(body: Node) -> void:
 	_offer()
 
 func _burst_colours(kind: String) -> Gradient:
-	var colours := {"heart": Color(0.85, 0.05, 0.08), "idol": Color(1.0, 0.82, 0.1), "emerald": Color(0.3, 0.95, 0.55)}
+	var colours := {"heart": Color(0.85, 0.05, 0.08), "goat": Color(0.95, 0.93, 0.86), "turkey": Color(0.62, 0.4, 0.2)}
 	var colour: Color = colours[kind]
 	var fade := Gradient.new()
 	fade.set_color(0, colour)

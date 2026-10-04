@@ -31,6 +31,10 @@ const EMERGE_PER_SECOND := 40.0  # art pixels a second as a head slides out or b
 const BUTTON_AT := Vector2(441.6, 640)  # the gold button at the foot of the skull's lane
 const BUTTON_RADIUS := 18.0
 const OUT_SECONDS := 10.0  # not long, so they aren't forever in the way of shots up the rails
+# Now and then they come out by themselves for a while: usually just one, sometimes both
+const PROWL_EVERY := Vector2(25.0, 50.0)
+const PROWL_SECONDS := 8.0
+const PROWL_BOTH := 0.3
 const BUTTON_POINTS := 1000
 const LURK_POINTS := 100  # a hit on a head still in its slot
 enum { HEAD_WATCHING, HEAD_ROARING, HEAD_BLINKING }
@@ -86,6 +90,8 @@ var _wedges: Array[CollisionPolygon2D] = []
 var _head_frame := [HEAD_WATCHING, HEAD_WATCHING]
 var _shown := [PEEK, PEEK]
 var _relic_lamps: Array[AnimatedSprite2D] = []
+var _prowl_left := [0.0, 0.0]  # out on its own
+var _prowl_wait := 30.0
 var _breath := [0.0, 0.0]
 var _claws: Array[AnimatedSprite2D] = []
 var _out_left := 0.0
@@ -207,6 +213,13 @@ func _physics_process(delta: float) -> void:
 	if _out_left > 0.0:
 		_out_left -= delta
 	_blink_left -= delta
+	_prowl_wait -= delta
+	if _prowl_wait <= 0.0:
+		_prowl_wait = randf_range(PROWL_EVERY.x, PROWL_EVERY.y)
+		if randf() < PROWL_BOTH:
+			_prowl_left = [PROWL_SECONDS, PROWL_SECONDS]
+		else:
+			_prowl_left[randi() % 2] = PROWL_SECONDS
 	for side in 2:
 		var breath := 1.0 if fposmod(_clock / BREATH_SECONDS + side * 0.5, 1.0) < 0.5 else 0.0
 		if breath != _breath[side]:
@@ -218,7 +231,8 @@ func _physics_process(delta: float) -> void:
 		if _sneak_wait[side] <= 0.0:
 			_sneak_wait[side] = randf_range(SNEAK_EVERY.x, SNEAK_EVERY.y)
 			_sneak_left[side] = SNEAK_SECONDS
-		var want := OUT if _out_left > 0.0 else (SNEAK if _sneak_left[side] > 0.0 else PEEK)
+		_prowl_left[side] = maxf(_prowl_left[side] - delta, 0.0)
+		var want := OUT if _out_left > 0.0 or _prowl_left[side] > 0.0 else (SNEAK if _sneak_left[side] > 0.0 else PEEK)
 		var before := roundf(_shown[side])
 		_shown[side] = move_toward(_shown[side], want, EMERGE_PER_SECOND * delta)
 		var out := _head_out(side)

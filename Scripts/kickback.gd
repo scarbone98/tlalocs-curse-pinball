@@ -5,8 +5,6 @@ extends Node2D
 ##  - it guards one outlane at a time; the flippers move it (left flipper, left outlane)
 ##  - saving a ball uses it up; each new ball starts with it charged, guarding the left
 ##    outlane, so the frogs are always there for the first save
-##  - the gold button on the left inlane wall's tip wakes the frogs too, glowing while
-##    one's awake
 ##  - the temple roulette and the market can award one that guards both outlanes, like
 ##    Ruby & Sapphire's Pichu: it doesn't get used up, it lasts until the ball drains
 ## The stone frog statue at the guarded outlane wakes up jade when it's ready and leaps
@@ -50,12 +48,6 @@ var side := 0             # the outlane it guards: 0 left, 1 right
 var both_sides := false   # the roulette's version guards both
 
 var frogs: Array[AnimatedSprite2D] = []  # Scripts/lighting.gd lights an awake one
-var button_sprite: AnimatedSprite2D  # the gold button that wakes them
-var _pressed_left := 0.0
-const BUTTON_AT := Vector2(207, 815)  # the gold button on the left inlane wall's tip
-const BUTTON_RADIUS := 36.0  # it's set into the wall's tip, so it reaches out past the face
-const BUTTON_POINTS := 500
-const PRESSED_SECONDS := 0.35
 var _charge := 0.0
 
 func _ready() -> void:
@@ -63,17 +55,6 @@ func _ready() -> void:
 		frogs.append(features._sprite(FROG, 3, at))
 	for i in KICK_ZONES.size():
 		_add_kick_zone(KICK_ZONES[i], i)
-	button_sprite = features.gold_button("frog_button")
-	var button := Area2D.new()
-	button.position = BUTTON_AT
-	button.monitorable = false
-	var button_shape := CollisionShape2D.new()
-	var circle := CircleShape2D.new()
-	circle.radius = BUTTON_RADIUS
-	button_shape.shape = circle
-	button.add_child(button_shape)
-	button.body_entered.connect(_on_button)
-	add_child(button)
 	var lips := StaticBody2D.new()
 	for lip in OUTLANE_LIPS:
 		var shape := CollisionPolygon2D.new()
@@ -95,21 +76,7 @@ func _add_kick_zone(at: Vector2, index: int) -> void:
 	area.body_entered.connect(_on_kick_zone_entered.bind(index))
 	add_child(area)
 
-# The gold button wakes the frogs (guarding the outlane the flippers last chose)
-func _on_button(body: Node) -> void:
-	if _pressed_left > 0.0 or not features._is_ball_on_playfield(body):
-		return
-	_pressed_left = PRESSED_SECONDS
-	features._award(BUTTON_POINTS, BUTTON_AT)
-	PinballEvents.effect.emit("sparks", BUTTON_AT)
-	if not charged:
-		charged = true
-		_render()
-		AudioSfx.play("charge")
-
 func _physics_process(_delta: float) -> void:
-	_pressed_left = maxf(_pressed_left - _delta, 0.0)
-	features.show_gold_button(button_sprite, _pressed_left, charged)
 	# The flippers move the guard between outlanes, as they move Pikachu
 	if not charged or both_sides:
 		return

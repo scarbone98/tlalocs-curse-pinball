@@ -88,8 +88,14 @@ var _spin := 0.0   # radians per second, clockwise
 ## Set by Scripts/rails.gd while the ball rides a rail: carries it along the track
 var rail_guide := Callable()
 var _impact_cooldown := 0.0
-var _falling_left := 0.0  # falling away into the lava pit
-const FALL_SECONDS := 0.9
+var _falling_left := 0.0  # going under in the lava pit
+var in_lava := false  # it's in the lava (the spotlight stops following it)
+const LAVA_SINK := preload("res://Scripts/lava_sink.gdshader")
+const LAVA_SURFACE_Y := 1228.0  # the lava's top edge in the pit (Sprites/table/lava_glow.png, art row ~406)
+const SINK_DEPTH := 24.0  # scene units below the surface it goes, enough to go right under
+const PLOP_SPEED := 450.0   # faster than this, it plops straight in; slower, it sinks
+const PLOP_SECONDS := 1.3
+const SINK_SECONDS := 1.6
 var _turn := 0.0   # how far the sprite has turned
 static var _ramp_art: Image
 static var _tier_frames := {}  # tier -> SpriteFrames for that row of the spin sheet
@@ -286,21 +292,56 @@ func _on_start_region_body_exited(body: Node) -> void:
 		_charging = false
 		PinballEvents.launch_available.emit(false)
 
-# Into the lava pit: it falls away out of sight (passing through everything) before
-# it counts as drained
+# Into the lava pit: it stops dead in the lava, and either sinks slowly out of sight (a
+# slow ball, smoking) or plops straight in (a fast one, throwing up drops and a puff of
+# smoke), before it counts as drained
 func _on_death_zone_body_entered(body: Node) -> void:
 	if body == self and not _pending_respawn and _falling_left <= 0.0:
-		_falling_left = FALL_SECONDS
+		var plop := linear_velocity.length() > PLOP_SPEED
 		collision_layer = 0
 		collision_mask = 0
+		freeze_mode = RigidBody2D.FREEZE_MODE_KINEMATIC
+		set_deferred("freeze", true)
+		linear_velocity = Vector2.ZERO
+		in_lava = true
+		var at := global_position
+		# it goes under: hidden below the lava's surface as it sinks through it
+		var sink := ShaderMaterial.new()
+		sink.shader = LAVA_SINK
+		sink.set_shader_parameter("surface_y", LAVA_SURFACE_Y)
+		var under := Vector2(at.x, maxf(at.y, LAVA_SURFACE_Y) + SINK_DEPTH)
+		var surface := Vector2(at.x, maxf(at.y, LAVA_SURFACE_Y - 4.0))  # it drops onto the lava first
+		anim.material = sink
+		var down := create_tween()
+		if plop:
+			_falling_left = PLOP_SECONDS
+			PinballEvents.effect.emit("lava", at)
+			PinballEvents.effect.emit("smoke", at)
+			# a splash, a bob in the lava, then it sinks
+			down.tween_property(self, "global_position", surface + Vector2(0, 8), 0.1)
+			down.tween_property(self, "global_position", surface + Vector2(0, 3), 0.2).set_ease(Tween.EASE_OUT)
+			down.tween_property(self, "global_position", under, PLOP_SECONDS - 0.4).set_ease(Tween.EASE_IN).set_trans(Tween.TRANS_SINE)
+			down.parallel().tween_property(anim, "modulate", Color(1.0, 0.55, 0.4), PLOP_SECONDS - 0.4)
+			down.parallel().tween_callback(PinballEvents.effect.emit.bind("smoke", at)).set_delay(0.5)
+		else:
+			_falling_left = SINK_SECONDS
+			PinballEvents.effect.emit("smoke", at)
+			down.tween_property(self, "global_position", surface, SINK_SECONDS * 0.2)
+			down.tween_property(self, "global_position", under, SINK_SECONDS * 0.7).set_ease(Tween.EASE_IN).set_trans(Tween.TRANS_SINE)
+			down.parallel().tween_property(anim, "modulate", Color(1.0, 0.55, 0.4), SINK_SECONDS * 0.7)  # heating as it goes
+			down.parallel().tween_callback(PinballEvents.effect.emit.bind("smoke", at)).set_delay(SINK_SECONDS * 0.5)
 
 func _drained() -> void:
+	in_lava = false
+	anim.modulate = Color.WHITE  # it comes back looking like itself
+	anim.material = null
 	if get_tree().get_nodes_in_group("ball").size() > 1:
 		# Multiball: a ball that drains while others are still up just leaves play
 		remove_from_group("ball")
 		queue_free()
 		return
 	PinballEvents.ball_drained.emit()
+	freeze = false  # held in the lava till now; the respawn runs in the physics step
 	_pending_respawn = true
 	_cooldown_frames = 3
 	collision_layer = 0
