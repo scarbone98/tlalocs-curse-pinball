@@ -9,7 +9,9 @@ extends Node2D
 ## The lines are placed by hand in the editor (node_2d.tscn's RailEdits):
 ##  - orbit_guide: the left orbit, round over the top and down the left lane, either way
 ##  - launch_guide: up out of the launch tube and round the top-right orbit, only that way
-##    (a ball coming round the other way is left to meet the flap over the tube)
+##  - loop_guide: a ball looping the other way (up the torch lane, over the top, through the
+##    lane gate) back down round the top-right orbit, curving off it short of the flap over
+##    the tube and on down the right lane, through its red spinner, only that way
 ## Without them, the lines generated from the walls are used (Scripts/orbit_geometry.gd,
 ## from tools/make_orbit_path.py).
 
@@ -24,7 +26,13 @@ const SETTLE_SECONDS := 0.1  # it slides onto the line this quickly
 const BALL_RADIUS := 19.0
 const LOST_REACH := 60.0     # a ball this far off the line it's riding has been moved off it
 const BAKE_INTERVAL := 2.0
-const LINES := {"orbit_guide": false, "launch_guide": true}  # name -> one way only (from its start)
+const LINES := {"orbit_guide": false, "launch_guide": true, "loop_guide": true}  # name -> one way only (from its start)
+# The loop line's own way off the orbit (when it isn't placed by hand): it leaves the launch
+# line (run backwards) here, and curves down into the right lane, left of the tube's inner
+# wall, on down the middle of the lane through the spinner
+const LOOP_LEAVES_BELOW_Y := 303.0
+const LOOP_INTO_LANE := [Vector2(594, 418), Vector2(600.5, 460), Vector2(609, 500), Vector2(614, 530)]
+const LOOP_TURN_HANDLE := 40.0
 
 class Line:
 	var curve: Curve2D
@@ -53,6 +61,8 @@ func _ready() -> void:
 			for i in placed.curve.point_count:
 				curve.add_point(xf * placed.curve.get_point_position(i), xf.basis_xform(placed.curve.get_point_in(i)),
 					xf.basis_xform(placed.curve.get_point_out(i)))
+		elif name == "loop_guide":
+			_loop_curve(curve)
 		else:
 			for point: Vector2 in (Geometry.PATH if name == "orbit_guide" else Geometry.LAUNCH_PATH):
 				curve.add_point(point)
@@ -63,6 +73,25 @@ func _ready() -> void:
 		if name == "orbit_guide":
 			_curve = curve
 	_steer_call = _steer
+
+# The launch line backwards, from the top down round the orbit, until it's come down to
+# LOOP_LEAVES_BELOW_Y; from there a smooth curve into the right lane
+func _loop_curve(curve: Curve2D) -> void:
+	var back: Array = Geometry.LAUNCH_PATH.duplicate()
+	back.reverse()
+	var last := 0
+	for i in back.size():
+		curve.add_point(back[i])
+		last = i
+		if (back[i] as Vector2).y > LOOP_LEAVES_BELOW_Y:
+			break
+	var heading := ((back[last] as Vector2) - (back[last - 2] as Vector2)).normalized()
+	var into: Vector2 = LOOP_INTO_LANE[0]
+	var down := ((LOOP_INTO_LANE[1] as Vector2) - into).normalized()
+	curve.set_point_out(curve.point_count - 1, heading * LOOP_TURN_HANDLE)
+	curve.add_point(into, -down * LOOP_TURN_HANDLE)
+	for i in range(1, LOOP_INTO_LANE.size()):
+		curve.add_point(LOOP_INTO_LANE[i])
 
 ## True while it's carrying this ball round
 func carrying(ball: Node) -> bool:

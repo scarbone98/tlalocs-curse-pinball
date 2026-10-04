@@ -1092,8 +1092,8 @@ def temple_gems():
 # ---------- the plunger's spring ----------
 
 SPRING_W = 12
-SPRING_TALL = 12  # at rest (art pixels)
-SPRING_SHORT = 4  # pulled all the way down
+SPRING_TALL = 18  # at rest (art pixels)
+SPRING_SHORT = 5  # pulled all the way down: squashed flat
 
 
 def spring_sheet():
@@ -1108,7 +1108,7 @@ def spring_sheet():
     shine, gold_l, gold, gold_d, gold_dd = (255, 252, 214, 255), (255, 232, 120, 255), (248, 200, 0, 255), (196, 132, 12, 255), (122, 76, 8, 255)
     steel = [(246, 250, 255, 255), (206, 216, 228, 255), (156, 170, 186, 255), (108, 122, 140, 255), (70, 80, 98, 255)]  # lit -> shade
     under, back, gap = (52, 60, 76, 255), (84, 94, 112, 255), (30, 34, 46, 255)
-    loops = 3.0
+    loops = 4.0
     frames = []
     w = SPRING_W
     c0, c1 = 3, w - 4  # the coil's inside, across (its ink edges either side)

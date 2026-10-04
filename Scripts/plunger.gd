@@ -5,7 +5,7 @@ extends Node2D
 ## back up as the ball fires (Scripts/ball.gd).
 
 const SPRING := preload("res://Sprites/table/spring.png")  # tools/make_table.py
-const FRAMES := 9           # at rest, then a pixel shorter each frame
+const FRAME_WIDTH := 12     # art pixels: at rest, then a pixel shorter each frame (tools/make_table.py)
 const LANE_X := 685.0       # the middle of the launch lane (scene units)
 const LANE_FLOOR := 1232.0  # the lane's floor, the spring's foot
 const LANE_WIDTH := 46.0
@@ -18,14 +18,16 @@ var _shown := 0.0  # frames pulled down, as drawn
 var _cap: AnimatableBody2D
 var _art_pixel := 0.0  # one art pixel, in scene units down the table
 var _rest_y := 0.0
+var _frames := 1
 
 func _ready() -> void:
 	_spring = Sprite2D.new()
 	_spring.texture = SPRING
-	_spring.hframes = FRAMES
+	_frames = SPRING.get_width() / FRAME_WIDTH
+	_spring.hframes = _frames
 	_spring.scale = features.MAP_SCALE
 	_spring.centered = false
-	var size: Vector2 = Vector2(SPRING.get_width() / FRAMES, SPRING.get_height()) * features.MAP_SCALE
+	var size: Vector2 = Vector2(FRAME_WIDTH, SPRING.get_height()) * features.MAP_SCALE
 	_spring.position = Vector2(LANE_X - size.x * 0.5, LANE_FLOOR - size.y)
 	features.add_child(_spring)
 	# the spring's cap, at rest, is what the ball sits on
@@ -47,8 +49,8 @@ func _physics_process(delta: float) -> void:
 	for node in get_tree().get_nodes_in_group("ball"):
 		if node.has_method("pull"):
 			pulled = maxf(pulled, node.pull())
-	var want := pulled * (FRAMES - 1)
+	var want := pulled * (_frames - 1)
 	# down as it's pulled; back up at once when it's let go
-	_shown = want if want >= _shown else move_toward(_shown, want, (FRAMES - 1) / SNAP_SECONDS * delta)
+	_shown = want if want >= _shown else move_toward(_shown, want, (_frames - 1) / SNAP_SECONDS * delta)
 	_spring.frame = int(roundf(_shown))
 	_cap.position.y = _rest_y + _spring.frame * _art_pixel  # the cap the ball sits on goes with it
