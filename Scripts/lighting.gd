@@ -10,6 +10,11 @@ extends Node2D
 
 const MOOD := Color(0.56, 0.54, 0.68)   # dusk over the table
 const STORM := Color(0.42, 0.45, 0.62)  # darker and bluer while the curse rains
+const RUNES := preload("res://Sprites/table/runes.png")  # tools/make_table.py
+const RUNE_SIZE := 7.0
+const RUNE_FLASH := 0.35         # how bright the glyphs flash when you score: faint
+const RUNE_FADE_SECONDS := 0.35
+const RUNE_FLASH_GAP := 0.12     # at most this often
 const DAY := Color(1.0, 1.0, 1.0)        # by day (GameManager.night off): no dusk over it...
 const DAY_STORM := Color(0.74, 0.76, 0.84)  # ...and the curse just greys the sky
 
@@ -66,6 +71,8 @@ const EYE_RED := Color(1.0, 0.15, 0.1)
 var features: Node2D  # TableFeatures
 
 var _all_lights: Array[PointLight2D] = []
+var _runes: Array[Sprite2D] = []
+var _rune_wait := 0.0
 var _night := true  # what's been applied (GameManager.night can change from the menu)
 var _pools := {}  # size -> its pixel pool
 var _torch_lights: Array[PointLight2D] = []
@@ -113,8 +120,38 @@ func _tile_map() -> void:
 				map.add_child(tile)
 		layer.hide()
 
+# The glyphs carved on the walls flash a colour each, faintly, whenever something scores
+func _build_runes() -> void:
+	var add := CanvasItemMaterial.new()
+	add.blend_mode = CanvasItemMaterial.BLEND_MODE_ADD
+	add.light_mode = CanvasItemMaterial.LIGHT_MODE_UNSHADED
+	for spot: Vector2 in features.TableGeometry.RUNES:
+		var rune := Sprite2D.new()
+		rune.texture = RUNES
+		rune.region_enabled = true
+		rune.region_rect = Rect2(spot, Vector2(RUNE_SIZE, RUNE_SIZE))
+		rune.scale = features.MAP_SCALE
+		rune.position = (spot + Vector2(RUNE_SIZE, RUNE_SIZE) / 2.0) * features.MAP_SCALE
+		rune.material = add
+		rune.modulate.a = 0.0
+		rune.z_index = 1
+		rune.z_as_relative = false
+		features.add_child(rune)
+		_runes.append(rune)
+	PinballEvents.add_score.connect(func(_points: int): _flash_runes())
+
+func _flash_runes() -> void:
+	if _rune_wait > 0.0:
+		return
+	_rune_wait = RUNE_FLASH_GAP
+	for rune in _runes:
+		var colour := Color.from_hsv(randf(), 0.75, 1.0, RUNE_FLASH)
+		rune.modulate = colour
+		create_tween().tween_property(rune, "modulate:a", 0.0, RUNE_FADE_SECONDS)
+
 func _ready() -> void:
 	_tile_map()
+	_build_runes()
 	features._storm_tint.color = mood()
 	for torch: AnimatedSprite2D in features._torches:
 		var light := _light(torch.position + FLAME_ABOVE, TORCH_COLOUR, TORCH_BLAZE, TORCH_SIZE)
@@ -237,6 +274,7 @@ func _light(at: Vector2, colour: Color, energy: float, size: float, soft: bool =
 
 func _process(delta: float) -> void:
 	_clock += delta
+	_rune_wait = maxf(_rune_wait - delta, 0.0)
 	if _night != GameManager.night:
 		_night = GameManager.night
 		features._storm_tint.color = storm() if GameManager.curse_active else mood()

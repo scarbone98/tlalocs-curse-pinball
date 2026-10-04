@@ -28,7 +28,13 @@ const KINDS := {
 	"smoke": [10, 1.4, Vector2(10, 40), -45.0, [Color(0.55, 0.52, 0.5, 0.8), Color(0.35, 0.33, 0.33, 0.55), Color(0.2, 0.2, 0.2, 0.0)]],
 }
 
+# The everyday hits don't burst every time - only now and then, and not too close together
+# (kind -> chance a hit shows one); the big moments (gold, fire, lava...) always do
+const SOMETIMES := {"sparks": 0.35, "dust": 0.3, "spores": 0.4, "poison": 0.6}
+const SOMETIMES_GAP := 0.2  # seconds between two bursts of one of those kinds
+
 var _pixel: ImageTexture
+var _last := {}  # kind -> when it last burst (seconds)
 
 func _ready() -> void:
 	# One table-art pixel (3x3 on screen), so the bursts sit on the pixel grid's scale
@@ -41,6 +47,11 @@ func _ready() -> void:
 func _burst(kind: String, at: Vector2) -> void:
 	if not KINDS.has(kind):
 		return
+	if SOMETIMES.has(kind):
+		var now := Time.get_ticks_msec() / 1000.0
+		if randf() > SOMETIMES[kind] or now - float(_last.get(kind, -10.0)) < SOMETIMES_GAP:
+			return
+		_last[kind] = now
 	var spec: Array = KINDS[kind]
 	var particles := CPUParticles2D.new()
 	particles.texture = _pixel

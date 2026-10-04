@@ -9,7 +9,8 @@ extends Node2D
 ## altogether: the stone tablet in the middle of the arena slides open and one by one they
 ## hop down into the hole beneath it, and the arena stands empty a while before they hop
 ## back out to their places. One stung by a poison dart (Scripts/dart_trap.gd) hops down
-## the hole on its own, and comes back out a while later.
+## the hole on its own, and comes back out a while later. Back from an absence it isn't
+## always all three at once: sometimes one or two, the others hopping out later.
 
 const CENTRE := Vector2(412, 445)     # the ring in the dirt (Sprites/layers/basemap.png)
 const RADIUS := 48.0
@@ -31,6 +32,8 @@ const ARENA_RADIUS := 95.0
 const STEP_EVERY := 0.18
 const FLASH_SECONDS := 0.12
 const STUNG_SECONDS := 12.0  # a warrior stung by a dart stays down the hole this long
+const OUT_COUNTS := [1, 2, 3, 3]  # how many hop back out together after an absence (the rest straggle)
+const STRAGGLE_SECONDS := Vector2(6.0, 18.0)
 const SHEET := preload("res://Sprites/table/warrior.png")  # tools/make_table.py
 const FRAME := Vector2(17, 23)
 const TURN_FRAMES := 4     # front, turning, back, turning
@@ -234,9 +237,24 @@ func _idle(delta: float) -> void:
 func _set_here(here: bool) -> void:
 	for i in _warriors.size():
 		_stung_left[i] = 0.0
+	# coming back, it isn't always all of them: sometimes one or two, the rest straggling
+	# out on their own a while later
+	var staying: Array[int] = []
+	if here:
+		var out_now: int = OUT_COUNTS.pick_random()
+		var order := range(_warriors.size())
+		order.shuffle()
+		for k in range(out_now, order.size()):
+			staying.append(order[k])
+			_stung_left[order[k]] = randf_range(STRAGGLE_SECONDS.x, STRAGGLE_SECONDS.y)
 	_hole.frame = HOLE_OPEN
-	_hopping = _warriors.size()
+	_hopping = _warriors.size() - staying.size()
+	var step := 0
 	for i in _warriors.size():
+		if staying.has(i):
+			continue  # still down the hole for now
+		var stagger := HOP_STAGGER * step
+		step += 1
 		var warrior := _warriors[i]
 		var sprite := _sprites[i]
 		var angle := _angle + TAU * i / _warriors.size()
@@ -244,7 +262,7 @@ func _set_here(here: bool) -> void:
 		for shape in warrior.find_children("*", "CollisionShape2D", true, false):
 			(shape as CollisionShape2D).set_deferred("disabled", true)
 		var hop := create_tween()
-		hop.tween_interval(HOP_STAGGER * i)
+		hop.tween_interval(stagger)
 		if here:
 			hop.tween_callback(func():
 				warrior.global_position = CENTRE

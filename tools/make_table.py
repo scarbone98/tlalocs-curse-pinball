@@ -60,6 +60,7 @@ and the playfield sprites cut from the hand-drawn sheets in tools/source_art/:
   Sprites/table/arena_hole.png  the stone tablet in the warriors' arena (shut, open)
   Sprites/table/front_walls.png  the walls along the table's foot, that a ball in a gutter
                               passes behind (a mask for Scripts/ball_mask.gdshader)
+  Sprites/table/runes.png     the carved glyphs on the walls, alone, for them to flash
   Sprites/table/fire_button.png  the fourth torch button, a flame on it: up, pressed
   Sprites/table/dart_falling.png, dart_stuck.png, dart_shadow.png  the poison dart trap's
                               darts: falling, stuck in the floor (still, quivering), and
@@ -214,6 +215,8 @@ GLYPHS = {
 RIM_INSET = 2             # the step-fret border runs this far in from the table's edge, all the way round
 GLYPH_COUNT = 34          # carved glyphs scattered over the walls
 GLYPH_SPACING = 24        # art pixels between any two details
+RUNE_SPOTS = []           # each carved glyph's top-left corner, for the game to flash them (Scripts/lighting.gd)
+RUNES = Image.new("RGBA", (256, 424), (0, 0, 0, 0))  # ...and their pixels, white, in a layer of their own
 # The slots in the side walls the jaguars hide in (Scripts/journey.gd): the dark pixels
 # of the mock-up inside these boxes
 JAGUAR_SLOTS = [(38, 282, 68, 314), (176, 282, 206, 314)]
@@ -402,7 +405,13 @@ def details(base, walls, keep_clear):
             break
         off_border = RIM_INSET + 10 <= x0 <= 245 - RIM_INSET - 10 and RIM_INSET + 10 <= y0 <= 413 - RIM_INSET - 10
         if off_border and fits(walls, x0 - 1, y0 - 1, 9, 9) and clear(x0 - 1, y0 - 1, 9, 9) and spaced(x0 + 3, y0 + 3):
-            carve(base, GLYPHS[names[placed % len(names)]], x0, y0, styles[placed % len(styles)])
+            glyph = GLYPHS[names[placed % len(names)]]
+            carve(base, glyph, x0, y0, styles[placed % len(styles)])
+            RUNE_SPOTS.append((x0, y0))
+            for gy, row in enumerate(glyph):
+                for gx, ch in enumerate(row):
+                    if ch == "X":
+                        RUNES.putpixel((x0 + gx, y0 + gy), (255, 255, 255, 255))
             taken.append((x0 + 3, y0 + 3))
             placed += 1
     print("details: %d glyphs" % placed)
@@ -1520,6 +1529,9 @@ def write_table_geometry(palms, gems):
               "const GOLD_BUTTONS := {"]
     lines += ['	"%s": Vector2(%s, %s),' % (n, (b[0] + b[2]) / 2, (b[1] + b[3]) / 2) for n, b in GOLD_BUTTONS.items()]
     lines += ["}", "",
+              "## The carved glyphs on the walls: each one's top-left corner in Sprites/table/runes.png",
+              "## (7x7, art pixels); they flash colours as you score (Scripts/lighting.gd)",
+              "const RUNES := ["] + ["\tVector2(%d, %d)," % spot for spot in RUNE_SPOTS] + ["]", "",
               "## The centre of the temple's ring of gems (art pixels)",
               "const TEMPLE_RING_CENTRE := Vector2(%s, %s)" % TEMPLE_RING[0], "",
               "## The temple's ring gems in order round the ring: [centre (art pixels), its strip in",
@@ -1543,6 +1555,7 @@ def main():
     keep_clear = SPRITE_BOXES + [(17, 15, 52, 50), (156, 14, 256, 110), (0, 0, 256, 1)]  # sprites, the stone face, the temple
     border(base, walls)
     details(base, walls, keep_clear)
+    RUNES.save("Sprites/table/runes.png")
     jaguar_slots(base)
     jaguar_scratches(base, walls)
     paw_prints(base, walls)  # up to the jaguars' button
