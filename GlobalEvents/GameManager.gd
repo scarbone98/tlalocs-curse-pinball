@@ -47,6 +47,7 @@ var speed_index := 0
 const PHONE_CANVAS := Vector2i(720, 1280)
 const DESKTOP_CANVAS := Vector2i(720, 648)  # the Game Boy Advance's 10:9, at the table's width
 var desktop_view := false
+var screen_band := 0.0  # screen pixels a band along the top and bottom of the screen takes (Scripts/hud.gd): the camera shows the table between them
 var night := true  # night: the dusk and all its lights; day: daylight, only the torches lit (Scripts/lighting.gd)
 
 var _ball_save_left := 0.0

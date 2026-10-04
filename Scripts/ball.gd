@@ -4,7 +4,7 @@ extends RigidBody2D
 ## launch and it pulls down (the ball resting on it sinks with it) the longer it's held,
 ## then let go and it fires the ball as hard as it was pulled. Scripts/plunger.gd is the
 ## spring.
-@export var launch_speed: float = -1310.0
+@export var launch_speed: float = -1260.0  # a full pull only just carries it round the orbit
 @export var min_launch_power: float = 0.5   # a tap; a weak one rolls back down the lane
 @export var pull_seconds: float = 1.0       # to pull it all the way down
 ## The hand-drawn ball (tools/source_art/pinball_sprite.png) is drawn at 3x, about 1.2x

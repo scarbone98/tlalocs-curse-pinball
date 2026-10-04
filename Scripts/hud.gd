@@ -16,7 +16,7 @@ const BAR_LEFT := 46.0   # the score and balls start right of the pause button
 const SCORE_ROOM := 140.0  # widest the score pill grows before its font shrinks
 const SCORE_FONT_MIN := 11
 # Launch power that drops the ball into a top lane (see ball.gd); marked on the meter
-const SKILL_SHOT_POWER := Vector2(0.883, 0.921)  # launches here drop into a top lane (measured at 0.815-0.85 with a launch_speed of 1420; same speeds at 1310)
+const SKILL_SHOT_POWER := Vector2(0.918, 0.958)  # launches here drop into a top lane (measured at 0.815-0.85 with a launch_speed of 1420; the same speeds at 1260)
 const MIN_LAUNCH_POWER := 0.5
 const METER_LAMPS := 20
 
@@ -86,6 +86,7 @@ func _fit_view(desktop: bool) -> void:
 	var sideways := desktop and DisplayServer.is_touchscreen_available() and view.x > view.y
 	_border.visible = sideways or OS.get_environment("TLALOC_BORDER") == "1"
 	var below := Vector2(0, BORDER.get_height() * BORDER_SCALE if _border.visible else 0)
+	GameManager.screen_band = below.y
 	if desktop:
 		set_anchors_preset(Control.PRESET_TOP_LEFT)
 		position = below

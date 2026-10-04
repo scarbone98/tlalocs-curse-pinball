@@ -33,6 +33,7 @@ const PLUNGER_SHIFT := 48.0
 ## swings right for the launch lane, and for the right rail up into the golden temple (and
 ## while the ball's inside it).
 const RIGHT_X := 720.0     # as far right as the limits allow
+const TABLE_BOTTOM := 1280
 const PHONE_ZOOM := 1.12
 const DESKTOP_FOLLOW := 2.2   # how much faster the desktop view catches up
 const DESKTOP_DRAG := 0.45    # ...and how much smaller the band the ball roams before it moves
@@ -79,6 +80,11 @@ func _process(dt):
 	global_position.x = _view_x(target)
 	if first:
 		reset_smoothing()
+	# with bands along the top and bottom of the screen, it can go that far past the table's
+	# ends, so all of the table shows between them
+	var band := int(ceilf(GameManager.screen_band / zoom.y))
+	limit_top = -band
+	limit_bottom = TABLE_BOTTOM + band
 	_shake *= exp(-SHAKE_DECAY * dt)
 	_jolt *= exp(-NUDGE_SETTLE * dt)
 	offset = _jolt + (Vector2(randf_range(-1.0, 1.0), randf_range(-1.0, 1.0)) * _shake if _shake > 0.3 else Vector2.ZERO)
