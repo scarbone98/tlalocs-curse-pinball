@@ -35,7 +35,9 @@ const OUT_SECONDS := 10.0  # not long, so they aren't forever in the way of shot
 const PROWL_EVERY := Vector2(25.0, 50.0)
 const PROWL_SECONDS := 8.0
 const PROWL_BOTH := 0.3
+const STUNG_SECONDS := 12.0  # a jaguar hit by a poison dart (Scripts/dart_trap.gd) hides in its hole this long
 const BUTTON_POINTS := 1000
+const ROAR_SECONDS := 0.6  # the heads roar at the button's press
 const LURK_POINTS := 100  # a hit on a head still in its slot
 enum { HEAD_WATCHING, HEAD_ROARING, HEAD_BLINKING }
 # Two each side of the temple hole, like an arch over it
@@ -92,6 +94,7 @@ var _shown := [PEEK, PEEK]
 var _relic_lamps: Array[AnimatedSprite2D] = []
 var _prowl_left := [0.0, 0.0]  # out on its own
 var _prowl_wait := 30.0
+var _stung_left := [0.0, 0.0]  # hiding in its hole after a dart
 var _breath := [0.0, 0.0]
 var _claws: Array[AnimatedSprite2D] = []
 var _out_left := 0.0
@@ -194,6 +197,24 @@ func _swipe(side: int, at: Vector2) -> void:
 func _head_out(side: int) -> bool:
 	return _shown[side] >= OUT - 0.5
 
+## The jaguars a dart could hit: out of their holes (side -> where its head is)
+func targets() -> Dictionary:
+	var out := {}
+	for side in 2:
+		if _head_out(side) and _stung_left[side] <= 0.0:
+			out[side] = _serpents[side].global_position
+	return out
+
+## Hit by a poison dart: it ducks back into its hole and stays there a while
+func sting(side: int) -> void:
+	_stung_left[side] = STUNG_SECONDS
+	_prowl_left[side] = 0.0
+	_head_frame[side] = HEAD_ROARING
+	get_tree().create_timer(0.4).timeout.connect(func():
+		_head_frame[side] = HEAD_WATCHING
+		_render_head(side))
+	AudioSfx.play("roar", 0.0, Vector2.ONE * 1.3)
+
 func _on_button(body: Node) -> void:
 	if _button_cooldown > 0.0 or not features._is_ball_on_playfield(body):
 		return
@@ -201,8 +222,16 @@ func _on_button(body: Node) -> void:
 	_pressed_left = PRESSED_SECONDS
 	features._award(BUTTON_POINTS, BUTTON_AT)
 	PinballEvents.effect.emit("sparks", BUTTON_AT)
-	if _out_left <= 0.0:
-		AudioSfx.play("roar")
+	AudioSfx.play("roar", 0.0, Vector2(0.9, 1.1))  # the jaguars answer it
+	for side in 2:
+		if _stung_left[side] > 0.0:
+			continue
+		_head_frame[side] = HEAD_ROARING
+		_render_head(side)
+		get_tree().create_timer(ROAR_SECONDS).timeout.connect(func():
+			if _head_frame[side] == HEAD_ROARING:
+				_head_frame[side] = HEAD_WATCHING
+				_render_head(side))
 	_out_left = OUT_SECONDS
 
 func _physics_process(delta: float) -> void:
@@ -232,7 +261,10 @@ func _physics_process(delta: float) -> void:
 			_sneak_wait[side] = randf_range(SNEAK_EVERY.x, SNEAK_EVERY.y)
 			_sneak_left[side] = SNEAK_SECONDS
 		_prowl_left[side] = maxf(_prowl_left[side] - delta, 0.0)
+		_stung_left[side] = maxf(_stung_left[side] - delta, 0.0)
 		var want := OUT if _out_left > 0.0 or _prowl_left[side] > 0.0 else (SNEAK if _sneak_left[side] > 0.0 else PEEK)
+		if _stung_left[side] > 0.0:
+			want = 0.0  # hiding right down in its hole
 		var before := roundf(_shown[side])
 		_shown[side] = move_toward(_shown[side], want, EMERGE_PER_SECOND * delta)
 		var out := _head_out(side)

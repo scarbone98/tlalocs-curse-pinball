@@ -91,10 +91,10 @@ var _impact_cooldown := 0.0
 var _falling_left := 0.0  # going under in the lava pit
 var in_lava := false  # it's in the lava (the spotlight stops following it)
 const LAVA_SINK := preload("res://Scripts/lava_sink.gdshader")
-const LAVA_SURFACE_Y := 1275.0  # the bright lava at the very bottom of the pit, along the table's foot
+const LAVA_SURFACE_Y := 1280.0  # the lava: the very bottom edge of the table (and the screen)
 const SINK_DEPTH := 40.0  # scene units below the surface it goes: right under, and off the bottom
 const ROLL_SPEED_MIN := 320.0   # it rolls down the pit's slope at least this fast...
-const ROLL_SECONDS_MAX := 0.5   # ...taking no longer than this to reach the lava
+const ROLL_SECONDS_MAX := 0.6   # ...taking no longer than this to reach the lava
 const PLOP_SPEED := 450.0   # faster than this, it plops straight in; slower, it sinks
 const PLOP_SECONDS := 1.3
 const SINK_SECONDS := 1.6
@@ -328,13 +328,13 @@ func _on_death_zone_body_entered(body: Node) -> void:
 			down.tween_property(self, "global_position", surface + Vector2(0, 10), 0.1)
 			down.tween_property(self, "global_position", surface + Vector2(0, 4), 0.2).set_ease(Tween.EASE_OUT)
 			down.tween_property(self, "global_position", under, PLOP_SECONDS - 0.4).set_ease(Tween.EASE_IN).set_trans(Tween.TRANS_SINE)
-			down.parallel().tween_property(anim, "modulate", Color(1.0, 0.55, 0.4), PLOP_SECONDS - 0.4)
+			down.parallel().tween_property(anim, "modulate", Color(1.0, 0.8, 0.7), PLOP_SECONDS - 0.4)
 			down.parallel().tween_callback(PinballEvents.effect.emit.bind("smoke", surface)).set_delay(0.5)
 		else:
 			_falling_left = roll + SINK_SECONDS
 			down.tween_callback(PinballEvents.effect.emit.bind("smoke", surface))
 			down.tween_property(self, "global_position", under, SINK_SECONDS * 0.9).set_ease(Tween.EASE_IN).set_trans(Tween.TRANS_SINE)
-			down.parallel().tween_property(anim, "modulate", Color(1.0, 0.55, 0.4), SINK_SECONDS * 0.9)  # heating as it goes
+			down.parallel().tween_property(anim, "modulate", Color(1.0, 0.8, 0.7), SINK_SECONDS * 0.9)  # heating as it goes
 			down.parallel().tween_callback(PinballEvents.effect.emit.bind("smoke", surface)).set_delay(SINK_SECONDS * 0.5)
 
 func _drained() -> void:

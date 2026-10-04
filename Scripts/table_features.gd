@@ -68,6 +68,9 @@ const SLINGS := [
 const SLING_LIT_SECONDS := 0.15
 const EYE_FOLLOW := 250.0  # scene units of distance for each art pixel the eyes turn
 const EYE_ROLL := 11.0     # radians a second his eyes roll round while he's swallowed the ball
+const EYE_OUT_POINTS := 50000  # a poison dart in his eye shoots it out (Scripts/dart_trap.gd)
+const EYE_OUT_SECONDS := 20.0  # ...and it's gone this long before it pops back in
+const EYE_FLY := Vector2(140, -170)  # the eye flies off this way (mirrored for the left one)
 
 const TOP_LANE_POINTS := 250
 const TOP_LANES_COMPLETE_POINTS := 2000
@@ -107,6 +110,8 @@ var kickback: Node2D
 var spirit: Node2D
 var journey: Node2D
 var dart_trap: Node2D  # Scripts/dart_trap.gd
+var warriors: Node2D   # Scripts/warriors.gd
+var torch_lane: Node2D  # Scripts/torches.gd
 var temple: Node2D
 var awakening: Node2D
 var hatchling: Node2D
@@ -132,6 +137,7 @@ var _shrine_mask: AnimatedSprite2D  # the stone face's left eye; the right one c
 var _shrine_eye_right: AnimatedSprite2D
 var _face_eyes: Array[Sprite2D] = []
 var _eyes_red_left := 0.0
+var _eye_out_left: Array[float] = [0.0, 0.0]  # each eye shot out, gone this much longer
 var _shrine_lamps: Array[AnimatedSprite2D] = []
 var _shrine_flash_left := 0.0
 
@@ -358,6 +364,45 @@ func _follow_with_eyes() -> void:
 		var sacrifice: bool = sacrifices != null and sacrifices.active  # blazing while a sacrifice sits in his mouth
 		eye.frame = 1 if GameManager.curse_active or _eyes_red_left > 0.0 or sacrifice else 0
 
+## Tlaloc's eyes a dart could hit (index -> where)
+func eye_targets() -> Dictionary:
+	var out := {}
+	for i in _face_eyes.size():
+		if _face_eyes[i].visible:
+			out[i] = _face_eyes[i].global_position
+	return out
+
+## A poison dart in his eye: it shoots right out of its socket, spinning away, and pays big
+func shoot_eye(i: int) -> void:
+	var eye := _face_eyes[i]
+	if not eye.visible:
+		return
+	eye.hide()
+	_eye_out_left[i] = EYE_OUT_SECONDS
+	var flying := Sprite2D.new()
+	flying.texture = eye.texture
+	flying.hframes = eye.hframes
+	flying.frame = 1  # blazing as it goes
+	flying.scale = MAP_SCALE
+	flying.global_position = eye.global_position
+	flying.z_index = 4
+	flying.z_as_relative = false
+	add_child(flying)
+	var way := EYE_FLY * Vector2(1.0 if i == 1 else -1.0, 1.0)
+	var start := eye.global_position
+	var arc := create_tween()
+	arc.tween_method(func(t: float):
+		flying.global_position = start + Vector2(way.x * t, way.y * t + 520.0 * t * t)  # up, over and down
+		flying.rotation = t * TAU * 2.0, 0.0, 1.0, 0.8)
+	arc.tween_callback(func():
+		PinballEvents.effect.emit("sparks", flying.global_position)
+		flying.queue_free())
+	_award(EYE_OUT_POINTS, start + Vector2(0, -40))
+	PinballEvents.toast.emit("Tlaloc's eye!")
+	PinballEvents.effect.emit("gold", start)
+	PinballEvents.rumble.emit(8.0)
+	AudioSfx.play("roar", 0.0, Vector2.ONE * 0.6)
+
 # ---------- rules ----------
 
 ## True while a mode is running (catch, Awakening, travel, a hatchling, El Dorado): the
@@ -380,6 +425,13 @@ func _physics_process(delta: float) -> void:
 		if _rest_left == 0.0:
 			_render_shrine()
 	_eyes_red_left = maxf(_eyes_red_left - delta, 0.0)
+	for i in _eye_out_left.size():
+		if _eye_out_left[i] > 0.0:
+			_eye_out_left[i] -= delta
+			if _eye_out_left[i] <= 0.0 and i < _face_eyes.size():
+				_face_eyes[i].show()  # it pops back in
+				PinballEvents.effect.emit("sparks", _face_eyes[i].global_position)
+				AudioSfx.play("tiki", 0.0, Vector2.ONE * 1.4)
 	_follow_with_eyes()
 	_shrine_eye_right.frame = _shrine_mask.frame
 	if _shrine_flash_left > 0.0:

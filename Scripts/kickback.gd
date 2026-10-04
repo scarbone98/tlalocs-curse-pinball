@@ -155,6 +155,7 @@ func _leap(index: int, ball: RigidBody2D) -> void:
 	var under := ball.global_position + Vector2(0, LEAP_UNDER)  # right under the ball
 	var top := home.lerp(CARRY_PATHS[index][0], LEAP_REACH)
 	frog.frame = LEAP
+	AudioSfx.play("frog")
 	frog.z_index = 2  # over the ball as it shoves it
 	frog.z_as_relative = false
 	var jump := create_tween().set_process_mode(Tween.TWEEN_PROCESS_PHYSICS)

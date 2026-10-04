@@ -280,6 +280,48 @@ def jaguar_slots(base):
                     base.putpixel((x, y), p)
 
 
+# Claw marks raked into the floor in front of each wall jaguar: three scratches each,
+# dark grooves with a lit lip below, mirrored for the right-hand one (art pixels)
+SCRATCHES_AT = [(62, 304, 1), (187, 304, -1)]  # where each set starts, and which way it rakes
+SCRATCH_LENGTH = 10
+SCRATCH_GAP = 3
+
+
+def jaguar_scratches(base, walls):
+    for x0, y0, way in SCRATCHES_AT:
+        for k in range(3):
+            for t in range(SCRATCH_LENGTH - abs(k - 1)):  # the middle claw rakes longest
+                x = x0 + way * (t + k)
+                y = y0 + k * SCRATCH_GAP - round(t * 0.6)
+                for (px, py), f in (((x, y), 0.45), ((x, y + 1), 1.2)):
+                    if walls[py][px]:
+                        continue  # only the floor
+                    r, g, b, a = base.getpixel((px, py))
+                    base.putpixel((px, py), (min(255, int(r * f)), min(255, int(g * f)), min(255, int(b * f)), a))
+
+
+# A jaguar's paw prints pressed into the floor, a trail leading up to the gold button
+# that wakes them (art pixels: each print's top-left corner)
+PAW = [
+    "o.o.o",
+    ".....",
+    ".ooo.",
+    "ooooo",
+    ".ooo.",
+]
+PAW_PRINTS = [(137, 231), (145, 219)]
+
+
+def paw_prints(base, walls):
+    for x0, y0 in PAW_PRINTS:
+        for y, row in enumerate(PAW):
+            for x, c in enumerate(row):
+                px, py = x0 + x, y0 + y
+                if c == "o" and not walls[py][px]:
+                    r, g, b, a = base.getpixel((px, py))
+                    base.putpixel((px, py), (int(r * 0.55), int(g * 0.55), int(b * 0.55), a))
+
+
 def details(base, walls, keep_clear):
     """Glyphs on clear brick wall, spaced apart, off the border, and away from keep_clear
     (art-pixel boxes the scripts put sprites over)."""
@@ -1438,7 +1480,9 @@ def main():
     border(base, walls)
     details(base, walls, keep_clear)
     jaguar_slots(base)
+    jaguar_scratches(base, walls)
     beige_apron(base, walls)
+    paw_prints(base, walls)  # up to the jaguars' button
     palm = {p[:3] for p in Image.open(SRC / "leaves.png").convert("RGBA").get_flattened_data() if p[3]}
     for y in range(base.height):
         for x in range(base.width):

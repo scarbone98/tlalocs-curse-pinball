@@ -20,7 +20,7 @@ const PAIRS := [  # moved up the lane to make room for the dart trap at its foot
 # beside the stone face (scene units)
 const DECOR := [Vector2(40, 870), Vector2(612, 858), Vector2(40, 1135), Vector2(632, 1105), Vector2(165, 105), Vector2(35, 300)]
 # The stone buttons in the lane, one per pair (scene units, from the layout mock-up)
-const BUTTONS := [Vector2(53.8, 658.4), Vector2(86.4, 721.6), Vector2(117.9, 784.2)]  # top to bottom, spread along the lane
+const BUTTONS := [Vector2(71.0, 658.4), Vector2(86.4, 721.6), Vector2(117.9, 784.2)]  # top to bottom, spread along the lane
 const SEQUENCE_GAP := 1.5  # each button in the run up the lane must follow the last within this
 const BUTTON_RADIUS := 22.0
 const PRESSED_SECONDS := 0.35
@@ -49,7 +49,13 @@ var _since_press := 0.0
 var _ablaze_left := 0.0
 var _rest_left := 0.0
 
+## Every torch burning (all three pairs lit, or the blaze after): the dart trap's darts
+## come down flaming (Scripts/dart_trap.gd)
+func all_lit() -> bool:
+	return _ablaze_left > 0.0 or not _lit.has(false)
+
 func _ready() -> void:
+	features.torch_lane = self
 	var frames := SpriteFrames.new()
 	for anim in [[&"blaze", 0], [&"ember", 6]]:
 		frames.add_animation(anim[0])

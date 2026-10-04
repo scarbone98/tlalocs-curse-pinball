@@ -8,7 +8,8 @@ extends Node2D
 ## them together, up and down the arena or from side to side, and back to their places. Every so often they're gone
 ## altogether: the stone tablet in the middle of the arena slides open and one by one they
 ## hop down into the hole beneath it, and the arena stands empty a while before they hop
-## back out to their places.
+## back out to their places. One stung by a poison dart (Scripts/dart_trap.gd) hops down
+## the hole on its own, and comes back out a while later.
 
 const CENTRE := Vector2(412, 445)     # the ring in the dirt (Sprites/layers/basemap.png)
 const RADIUS := 48.0
@@ -29,6 +30,7 @@ const HOP_STAGGER := 0.2
 const ARENA_RADIUS := 95.0
 const STEP_EVERY := 0.18
 const FLASH_SECONDS := 0.12
+const STUNG_SECONDS := 12.0  # a warrior stung by a dart stays down the hole this long
 const SHEET := preload("res://Sprites/table/warrior.png")  # tools/make_table.py
 const FRAME := Vector2(17, 23)
 const TURN_FRAMES := 4     # front, turning, back, turning
@@ -55,11 +57,14 @@ var _away_wait := 60.0
 var _away_left := 0.0
 var _hole: AnimatedSprite2D
 var _hopping := 0  # warriors mid-hop
+var _stung_left: Array[float] = []  # each one down the hole on its own after a dart, this much longer
+var _solo: Array[bool] = []  # each one hopping on its own (the formation leaves it be)
 var _rest_left := 0.0
 var _linger := 0.0
 var _clock := 0.0
 
 func _ready() -> void:
+	features.warriors = self
 	var patch := features.get_node_or_null(^"../mushrooms")
 	if patch == null:
 		return
@@ -73,6 +78,8 @@ func _ready() -> void:
 		_flash_left.append(0.0)
 		_glance_wait.append(randf_range(GLANCE_EVERY.x, GLANCE_EVERY.y))
 		_glance_left.append(0.0)
+		_stung_left.append(0.0)
+		_solo.append(false)
 		(warrior as Area2D).body_entered.connect(_on_touch.bind(_sprites.size() - 1))
 	_hole = features._sprite(HOLE, 2, CENTRE)  # under the warriors (they're drawn after the table's features)
 	_place()
@@ -88,10 +95,61 @@ func _frames() -> SpriteFrames:
 		frames.add_frame("default", atlas)
 	return frames
 
+func _spot(i: int) -> Vector2:
+	var angle := _angle + TAU * i / _warriors.size()
+	return CENTRE + _offset + Vector2(cos(angle), sin(angle)) * RADIUS
+
 func _place() -> void:
 	for i in _warriors.size():
-		var angle := _angle + TAU * i / _warriors.size()
-		_warriors[i].global_position = CENTRE + _offset + Vector2(cos(angle), sin(angle)) * RADIUS
+		if not _solo[i]:
+			_warriors[i].global_position = _spot(i)
+
+## The warriors a dart could hit: standing in the arena (index -> where)
+func targets() -> Dictionary:
+	var out := {}
+	if _hopping > 0 or _away_left > 0.0:
+		return out
+	for i in _warriors.size():
+		if _warriors[i].visible and not _solo[i] and _stung_left[i] <= 0.0:
+			out[i] = _warriors[i].global_position
+	return out
+
+## Stung by a poison dart: it hops down the hole in the middle on its own, for a while
+func sting(i: int) -> void:
+	if _solo[i] or _stung_left[i] > 0.0 or not _warriors[i].visible:
+		return
+	_stung_left[i] = STUNG_SECONDS
+	_hop_solo(i, false)
+
+# One warrior hops down into the hole, or back out of it to its place
+func _hop_solo(i: int, out_of_hole: bool) -> void:
+	var warrior := _warriors[i]
+	var sprite := _sprites[i]
+	_solo[i] = true
+	_hole.frame = HOLE_OPEN
+	for shape in warrior.find_children("*", "CollisionShape2D", true, false):
+		(shape as CollisionShape2D).set_deferred("disabled", true)
+	var from := warrior.global_position
+	if out_of_hole:
+		warrior.global_position = CENTRE
+		warrior.show()
+	var hop := create_tween()
+	hop.tween_method(func(t: float):
+		var to := _spot(i) if out_of_hole else CENTRE
+		var start := CENTRE if out_of_hole else from
+		warrior.global_position = start.lerp(to, t)
+		sprite.offset.y = -sin(t * PI) * HOP_HEIGHT, 0.0, 1.0, HOP_SECONDS)
+	hop.tween_callback(func():
+		sprite.offset.y = 0.0
+		_solo[i] = false
+		if out_of_hole:
+			for shape in warrior.find_children("*", "CollisionShape2D", true, false):
+				(shape as CollisionShape2D).set_deferred("disabled", false)
+		else:
+			warrior.hide()  # down the hole
+		if _hopping == 0 and not _solo.has(true):
+			_hole.frame = HOLE_SHUT)
+	AudioSfx.play("tiki", 0.0, Vector2.ONE * 0.9)
 
 func _on_touch(body: Node, index: int) -> void:
 	if body.is_in_group("ball"):
@@ -100,6 +158,11 @@ func _on_touch(body: Node, index: int) -> void:
 
 func _physics_process(delta: float) -> void:
 	_clock += delta
+	for i in _warriors.size():
+		if _stung_left[i] > 0.0:
+			_stung_left[i] -= delta
+			if _stung_left[i] <= 0.0 and _away_left <= 0.0 and _hopping == 0:
+				_hop_solo(i, true)  # over it: back out to its place
 	for i in _sprites.size():
 		if _flash_left[i] > 0.0:
 			_flash_left[i] -= delta
@@ -169,6 +232,8 @@ func _idle(delta: float) -> void:
 # The tablet slides open and the warriors hop down into the hole one by one (the ball then
 # passes through where they stood), or hop back out of it to their places round the ring
 func _set_here(here: bool) -> void:
+	for i in _warriors.size():
+		_stung_left[i] = 0.0
 	_hole.frame = HOLE_OPEN
 	_hopping = _warriors.size()
 	for i in _warriors.size():

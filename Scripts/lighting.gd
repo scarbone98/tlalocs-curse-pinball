@@ -42,7 +42,8 @@ const SHIMMER_FPS := 14.0
 const SHIMMER_REACH := 150.0  # the spotlight coming within this of the skull, or leaving, sets it shimmering
 const LAMP_SIZE := 0.45
 const EYE_SIZE := 0.3
-const IDOL_SPOT_SIZE := 0.5  # a small spotlight on the golden idol
+const IDOL_SPOT_SIZE := 1.15  # a spotlight on the golden idol, taking in its spinning tower
+const IDOL_SPOT_BELOW := 46.0  # scene units below the idol its middle falls: on the tower
 const IDOL_GLOW := 1.0
 const EYE_YELLOW := Color(1.0, 0.9, 0.3)
 const EYE_RED := Color(1.0, 0.15, 0.1)
@@ -246,7 +247,7 @@ func _process(delta: float) -> void:
 	_sacrifice_light.global_position = sacrifice.global_position
 	var idol: Sprite2D = features.idol_tower._idol
 	_idol_light.visible = idol.visible and not features.idol_tower._claimed
-	_idol_light.global_position = idol.global_position + Vector2(0, -4)
+	_idol_light.global_position = features.idol_tower.position + Vector2(idol.position.x, minf(idol.position.y + IDOL_SPOT_BELOW, features.idol_tower.IDOL_ON_FLOOR.y * features.MAP_SCALE.y))
 	_idol_light.energy = IDOL_GLOW * (1.0 + 0.08 * sin(_clock * 2.6))  # it gleams, gently
 	for pair: Array in _lamp_lights:
 		var lamp: AnimatedSprite2D = pair[0]
@@ -254,6 +255,7 @@ func _process(delta: float) -> void:
 	for i in _eye_lights.size():
 		var eye: Sprite2D = features._face_eyes[i]
 		_eye_lights[i].global_position = eye.global_position
+		_eye_lights[i].visible = eye.visible  # not while it's been shot out
 		_eye_lights[i].color = EYE_RED if eye.frame == 1 else EYE_YELLOW
 		_eye_lights[i].energy = 0.8 + 0.15 * sin(_clock * 3.0)
 	for i in _button_lights.size():
