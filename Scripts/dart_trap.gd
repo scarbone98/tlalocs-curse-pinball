@@ -7,7 +7,8 @@ extends Node2D
 ## warrior stung by one hops down the hole in the arena for a while, a jaguar ducks back
 ## into its hole, and one in Tlaloc's eye shoots it clean out of his head, for a lot. With
 ## all the torches lit the darts come down flaming: worth more, and they spark when hit.
-## After a while the pegs flicker and pop back out in a puff, and the button lights again.
+## The button stays lit while the darts are out; after a while the pegs flicker and pop
+## back out in a puff, and a little later the button works again.
 
 const FALLING := preload("res://Sprites/table/dart_falling.png")  # tools/make_table.py
 const STUCK := preload("res://Sprites/table/dart_stuck.png")      # still, quivering
@@ -316,4 +317,4 @@ func _physics_process(delta: float) -> void:
 			sprite.visible = entry.left > FLICKER_SECONDS or int(entry.left * 8.0) % 2 == 0
 		if entry.left <= 0.0:
 			_remove(entry)
-	features.show_gold_button(button_sprite, _pressed_left, ready_to_fire())
+	features.show_gold_button(button_sprite, _pressed_left, _to_drop > 0 or not _darts.is_empty())  # lit while the darts are out

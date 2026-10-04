@@ -282,7 +282,7 @@ def jaguar_slots(base):
 
 # Claw marks raked into the floor in front of each wall jaguar: three scratches each,
 # dark grooves with a lit lip below, mirrored for the right-hand one (art pixels)
-SCRATCHES_AT = [(62, 304, 1), (187, 304, -1)]  # where each set starts, and which way it rakes
+SCRATCHES_AT = [(53, 304, 1), (187, 304, -1)]  # where each set starts (as far out from its slot), and which way it rakes
 SCRATCH_LENGTH = 10
 SCRATCH_GAP = 3
 
@@ -293,33 +293,37 @@ def jaguar_scratches(base, walls):
             for t in range(SCRATCH_LENGTH - abs(k - 1)):  # the middle claw rakes longest
                 x = x0 + way * (t + k)
                 y = y0 + k * SCRATCH_GAP - round(t * 0.6)
-                for (px, py), f in (((x, y), 0.45), ((x, y + 1), 1.2)):
+                for (px, py), f in (((x, y), 0.72), ((x, y + 1), 1.08)):  # faint, worn in
                     if walls[py][px]:
                         continue  # only the floor
                     r, g, b, a = base.getpixel((px, py))
                     base.putpixel((px, py), (min(255, int(r * f)), min(255, int(g * f)), min(255, int(b * f)), a))
 
 
-# A jaguar's paw prints pressed into the floor, a trail leading up to the gold button
-# that wakes them (art pixels: each print's top-left corner)
+# A jaguar's paw print stamped in the gold button that wakes them, fitted to its 6x6 disc
+# of gold: four toes in an arc over the pad (from the box's corner)
 PAW = [
-    "o.o.o",
-    ".....",
-    ".ooo.",
-    "ooooo",
-    ".ooo.",
+    ".o..o.",
+    "o....o",
+    "..oo..",
+    ".oooo.",
+    ".oooo.",
 ]
-PAW_PRINTS = [(137, 231), (145, 219)]
+PAW_INK = (110, 60, 0, 255)
 
 
-def paw_prints(base, walls):
-    for x0, y0 in PAW_PRINTS:
-        for y, row in enumerate(PAW):
-            for x, c in enumerate(row):
-                px, py = x0 + x, y0 + y
-                if c == "o" and not walls[py][px]:
-                    r, g, b, a = base.getpixel((px, py))
-                    base.putpixel((px, py), (int(r * 0.55), int(g * 0.55), int(b * 0.55), a))
+PAW_GOLD = (248, 208, 0, 255)  # the button's gold, over its pale shine so the paw reads
+
+
+def paw_on_button(base, box):
+    x0, y0 = box[0], box[1]
+    for y, row in enumerate(PAW):
+        for x, c in enumerate(row):
+            p = base.getpixel((x0 + x, y0 + y))
+            if c == "o":
+                base.putpixel((x0 + x, y0 + y), PAW_INK)
+            elif p[0] > 230 and p[1] > 230:  # the shine
+                base.putpixel((x0 + x, y0 + y), PAW_GOLD)
 
 
 def details(base, walls, keep_clear):
@@ -1482,7 +1486,7 @@ def main():
     jaguar_slots(base)
     jaguar_scratches(base, walls)
     beige_apron(base, walls)
-    paw_prints(base, walls)  # up to the jaguars' button
+    paw_on_button(base, GOLD_BUTTONS["skull_button"])  # the jaguars' button
     palm = {p[:3] for p in Image.open(SRC / "leaves.png").convert("RGBA").get_flattened_data() if p[3]}
     for y in range(base.height):
         for x in range(base.width):
