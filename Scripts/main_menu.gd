@@ -17,16 +17,16 @@ const SCENE_SECONDS := 3.0
 const HOW_TO_PLAY := [
 	"Flippers: tap the left or right side of the screen, or Left / Right.",
 	"Launch: tap Launch (or Space). Bump the table with Shift / Up, or swipe.",
-	"Shoot up the lane under the right rail to light its three spirit lamps and call a spirit. Hit the warriors to break its glyphs, then hit it 3 times to catch it.",
-	"When Tlaloc's curse breaks, a heart rises in his mouth: hit it 3 times to offer it and stop the rain.",
+	"Loop up the lane under the right rail, past the red spinner under the palm, to light its three spirit lamps: the crystal skull opens, and a shot into it calls a spirit. Hit the warriors to break its glyphs, then hit it 3 times to catch it.",
+	"A sacrifice waits on the golden temple: loop round inside the temple 3 times and it rises out of Tlaloc's mouth. Hit it 3 times to offer it (it stops his rain, too).",
 	"Left rail lights Awaken arrows: with 3, the crystal skull opens its jaws; feed it to awaken a spirit.",
 	"Hit the idol's spinning tower 3 times (top left) to sink it into its pit, then hit the golden idol to claim it.",
 	"Roll over the stone buttons between the torches to light them; light all six for a ball saver.",
-	"Hit the golden button on the left inlane wall to wake the jaguars in the walls.",
-	"While they're out, fill both jaguars' pips to Travel: a ramp picks the way, then shoot Tlaloc's mouth to go.",
-	"The bottom lanes light the roulette: shoot Tlaloc's mouth to spin it for prizes.",
+	"Hit the gold button at the foot of the skull's lane to wake the jaguars in the walls. The gold button on the left inlane wall rains poison darts down into the floor: pegs for the ball to rattle off, for a while.",
+	"While they're out, each hit on a jaguar stacks a head on the totem; three open the road. The right rail heads to the next city, the left skips one, then Tlaloc's mouth opens to take you.",
+	"The bottom lanes light the roulette: Tlaloc's mouth opens, and a shot in spins it for prizes.",
 	"Catches light bonus lamps; 3 lamps (or all four relics) open El Dorado in Tlaloc's mouth.",
-	"The blue flippers' lane pays jade beads and charges the frog kickback. Spend beads at the crystal skull.",
+	"The blue flippers' lane pays more each pass and charges the frog kickback.",
 	"Hit Tlaloc's face to stir him. Wake him and the storm brings a second ball.",
 ]
 
@@ -36,6 +36,12 @@ var _picture_atlas: AtlasTexture
 var _clock := 0.0
 var _scene_index := 0
 var _buttons: VBoxContainer
+var _column: VBoxContainer
+var _layout: HBoxContainer  # the column, and beside it (in a wide window) the buttons
+var _side: VBoxContainer    # where the buttons go in a wide window
+var _best: Label
+var _title: Label
+var _picture_frame: Control
 var _how_to: PanelContainer
 var _codex: CodexScreen
 
@@ -70,9 +76,44 @@ func _unhandled_input(event: InputEvent) -> void:
 	elif _paused_game:
 		close()
 
+# Shrinks the menu to fit a screen smaller than it, centred on it; checked every frame it's
+# open, so it settles whatever order things load and lay out in
+func _fit_column() -> void:
+	if _layout == null:
+		return
+	_arrange()
+	var view := get_viewport_rect().size
+	var need := _layout.get_combined_minimum_size().max(_layout.size)
+	var k := minf(1.0, minf(view.y * 0.96 / maxf(need.y, 1.0), view.x * 0.96 / maxf(need.x, 1.0)))
+	_layout.scale = Vector2(k, k)
+	if k >= 1.0:
+		_layout.pivot_offset = _layout.size / 2.0
+		return
+	# shrink it about the point that lands its middle in the middle of the screen (bigger than
+	# the screen, its container pins its corner to the corner)
+	var at := _layout.position
+	_layout.pivot_offset = (view / 2.0 - at - need * k / 2.0) / (1.0 - k)
+
+# A wide window (the desktop view, a phone held sideways) has the buttons beside the
+# title and picture rather than under them, so it hardly needs shrinking; a tall one has
+# them all in one column
+func _arrange() -> void:
+	var view := get_viewport_rect().size
+	var wide := view.x > view.y
+	var want: Node = _side if wide else _column
+	if _buttons.get_parent() != want:
+		_buttons.reparent(want, false)
+		if not wide:
+			_column.move_child(_buttons, _picture_frame.get_index() + 1)  # under the picture
+		if _best:
+			_best.reparent(want, false)
+	_side.visible = wide
+	_title.custom_minimum_size.x = 580 if wide else 640  # its two words still break onto two lines
+
 func _process(delta: float) -> void:
 	if not visible:
 		return
+	_fit_column()
 	_clock += delta
 	# Tlaloc's eyes smoulder, and the frame moves on through the journey
 	_mask_atlas.region = Rect2(Vector2(1 if int(_clock * 2.0) % 2 == 0 else 3, 0) * MASK_SIZE, MASK_SIZE)
@@ -92,10 +133,20 @@ func _build() -> void:
 	var center := CenterContainer.new()
 	center.set_anchors_preset(Control.PRESET_FULL_RECT)
 	add_child(center)
+	_layout = HBoxContainer.new()
+	_layout.add_theme_constant_override("separation", 56)
+	_layout.alignment = BoxContainer.ALIGNMENT_CENTER
+	center.add_child(_layout)
 	var column := VBoxContainer.new()
 	column.alignment = BoxContainer.ALIGNMENT_CENTER
 	column.add_theme_constant_override("separation", 18)
-	center.add_child(column)
+	_layout.add_child(column)
+	_side = VBoxContainer.new()
+	_side.alignment = BoxContainer.ALIGNMENT_CENTER
+	_side.add_theme_constant_override("separation", 18)
+	_side.visible = false
+	_layout.add_child(_side)
+	_column = column  # in the shorter desktop view it shrinks to fit (_fit_column, every frame)
 
 	_mask_atlas = AtlasTexture.new()
 	_mask_atlas.atlas = MASK
@@ -103,6 +154,7 @@ func _build() -> void:
 	column.add_child(_pixel_picture(_mask_atlas, MASK_SIZE * 8.0))
 	var title := _label("Tlaloc's Curse", "TitleLabel", 80)
 	title.custom_minimum_size.x = 640  # wider than the buttons, so it breaks between the words
+	_title = title
 	column.add_child(title)
 	column.add_child(_label("The journey to El Dorado", "HintLabel", 34))
 
@@ -114,6 +166,7 @@ func _build() -> void:
 	_picture_atlas.region = Rect2(Vector2.ZERO, PICTURE)
 	frame.add_child(_pixel_picture(_picture_atlas, PICTURE * 5.0))
 	column.add_child(frame)
+	_picture_frame = frame
 
 	_buttons = VBoxContainer.new()
 	_buttons.add_theme_constant_override("separation", 14)
@@ -129,6 +182,14 @@ func _build() -> void:
 	speed.pressed.connect(func():
 		GameManager.cycle_speed()
 		speed.text = "Speed: " + GameManager.speed_name())
+	var view := _button("View: " + ("Desktop" if GameManager.desktop_view else "Phone"), func(): pass)
+	view.pressed.connect(func():
+		GameManager.toggle_view()
+		view.text = "View: " + ("Desktop" if GameManager.desktop_view else "Phone"))
+	var time := _button("Time: " + ("Night" if GameManager.night else "Day"), func(): pass)
+	time.pressed.connect(func():
+		GameManager.toggle_night()
+		time.text = "Time: " + ("Night" if GameManager.night else "Day"))
 	if _paused_game:
 		_button("Restart", func():
 			get_tree().paused = false
@@ -137,7 +198,8 @@ func _build() -> void:
 
 	var best := HighScore.load_best()
 	if best > 0:
-		column.add_child(_label("Best  %d" % best, "ScoreLabel", 44))
+		_best = _label("Best  %d" % best, "ScoreLabel", 44)
+		column.add_child(_best)
 
 	_how_to = PanelContainer.new()
 	_how_to.visible = false

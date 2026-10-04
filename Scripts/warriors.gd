@@ -3,17 +3,50 @@ extends Node2D
 ## round the ring drawn in the dirt. Each one flashes the moment the ball touches it. Now
 ## and then, and whenever a ball has been rattling about the arena for a moment, they set
 ## off marching round the ring together, turning as they go, and keep going for ten
-## seconds, so a ball can't settle into one spot between them.
+## seconds, so a ball can't settle into one spot between them. Which way they go round,
+## clockwise or against it, is a toss-up each time; or instead they patrol, the three of
+## of them, up and down the arena or from side to side (the top one going the other way to
+## the other two, so they cross), and back to their places. Every so often they're gone
+## altogether: the stone tablet in the middle of the arena slides open and one by one they
+## hop down into the hole beneath it, and the arena stands empty a while before they hop
+## back out to their places. One stung by a poison dart (Scripts/dart_trap.gd) hops down
+## the hole on its own, and comes back out a while later. Back from an absence it isn't
+## always all three at once: sometimes one or two, the others hopping out later.
 
 const CENTRE := Vector2(412, 445)     # the ring in the dirt (Sprites/layers/basemap.png)
 const RADIUS := 48.0
 const MARCH_SECONDS := 10.0
 const TURNS_PER_SECOND := 0.35
+enum { CIRCLE, UP_DOWN, LEFT_RIGHT }  # how they march
+const PATROL_RATE := 0.3  # patrols a second: a march's ten seconds is three of them, ending back home
+const PATROL_REACH := {UP_DOWN: Vector2(0, 30), LEFT_RIGHT: Vector2(26, 0)}  # how far either way (scene units)
 const MARCH_EVERY := Vector2(20.0, 35.0)
-const LINGER_SECONDS := 1.5           # a ball this long inside the arena sets them marching
+const LINGER_SECONDS := 0.8           # a ball this long inside the arena sets them marching
+const AWAY_EVERY := Vector2(45.0, 80.0)
+const AWAY_SECONDS := 15.0
+const HOLE := preload("res://Sprites/table/arena_hole.png")  # tools/make_table.py: sun up, turning, edge-on (open), turning, underside up
+const HOLE_FRAMES := 9
+const HOLE_FLIP_SECONDS := 0.0   # (a warrior waits this long on the cover before going through it)
+const SPIN_HALF_TURNS := Vector2i(3, 5)  # a warrior going through spins the cover round this many half turns...
+const SPIN_SECONDS := 1.1                # ...slowing to rest over this long
+const Flutter := preload("res://Scripts/flutter.gd")
+const FEATHERS := preload("res://Sprites/table/feathers.png")  # tools/make_table.py
+const FEATHERS_PER_HIT := 5
+const SINK_DEPTH := 76.0         # scene units a warrior sinks to be right down the hole
+const SINK_SECONDS := 0.22
+const HOLE_RIM := 15.0           # below the hole's middle, the near rim it sinks behind
+const CLIP_SHADER := preload("res://Scripts/clip_below.gdshader")
+const HOP_SECONDS := 0.45
+const HOP_HEIGHT := 8.0   # art pixels up at the top of a hop
+const HOP_STAGGER := 0.2
 const ARENA_RADIUS := 95.0
 const STEP_EVERY := 0.18
 const FLASH_SECONDS := 0.12
+const RECOIL := 9.0          # scene units a warrior is knocked back, away from the ball that hit it...
+const RECOIL_RETURN := 60.0  # ...and how fast it steps back to its place
+const STUNG_SECONDS := 12.0  # a warrior stung by a dart stays down the hole this long
+const OUT_COUNTS := [1, 2, 3, 3]  # how many hop back out together after an absence (the rest straggle)
+const STRAGGLE_SECONDS := Vector2(6.0, 18.0)
 const SHEET := preload("res://Sprites/table/warrior.png")  # tools/make_table.py
 const FRAME := Vector2(17, 23)
 const TURN_FRAMES := 4     # front, turning, back, turning
@@ -33,11 +66,26 @@ var _glance_wait: Array[float] = []
 var _glance_left: Array[float] = []
 var _angle := -PI / 2.0
 var _march_left := 0.0
+var _march_way := 1.0  # 1 clockwise, -1 the other way (and which way a patrol sets off)
+var _pattern := CIRCLE
+var _offset := Vector2.ZERO  # how far a patrol has taken them off their places
+var _top := 0  # on a patrol, the one at the top goes the other way to the other two
+var _away_wait := 60.0
+var _away_left := 0.0
+var _hole: AnimatedSprite2D
+var _hopping := 0  # warriors mid-hop
+var _recoil: Array[Vector2] = []  # each one knocked back off its place by a hit
+var _home: Array[Vector2] = []    # where each one's sprite sits on its warrior
+var _stung_left: Array[float] = []  # each one down the hole on its own after a dart, this much longer
+var _solo: Array[bool] = []  # each one hopping on its own (the formation leaves it be)
+var _sink: Array[float] = []  # how far down the hole each one's sunk
+var _hole_phase := 0.0  # how far round the cover's spun, in frames (it ping-pongs through its sheet)
 var _rest_left := 0.0
 var _linger := 0.0
 var _clock := 0.0
 
 func _ready() -> void:
+	features.warriors = self
 	var patch := features.get_node_or_null(^"../mushrooms")
 	if patch == null:
 		return
@@ -51,9 +99,53 @@ func _ready() -> void:
 		_flash_left.append(0.0)
 		_glance_wait.append(randf_range(GLANCE_EVERY.x, GLANCE_EVERY.y))
 		_glance_left.append(0.0)
+		_stung_left.append(0.0)
+		_recoil.append(Vector2.ZERO)
+		_home.append(sprite.position)
+		_solo.append(false)
+		_sink.append(0.0)
+		var clip := ShaderMaterial.new()
+		clip.shader = CLIP_SHADER
+		sprite.material = clip
 		(warrior as Area2D).body_entered.connect(_on_touch.bind(_sprites.size() - 1))
+	_hole = features._sprite(HOLE, HOLE_FRAMES, CENTRE)  # under the warriors (they're drawn after the table's features)
 	_place()
 	_rest_left = randf_range(MARCH_EVERY.x, MARCH_EVERY.y)
+	_away_wait = randf_range(AWAY_EVERY.x, AWAY_EVERY.y)
+
+var _hole_tween: Tween
+
+# The cover's a spinner, like the frog's blue one: a warrior going through it, down or up,
+# sets it spinning round on its middle, a few turns and slowing, till it comes to rest
+# flat (sun side up or underside up, whichever it ends on). The hole's only open while it
+# spins.
+func _flip_hole(_open: bool) -> void:
+	pass  # (it spins as each warrior goes through: _spin_hole)
+
+func _spin_hole() -> void:
+	if _hole_tween:
+		_hole_tween.kill()
+	var from := _hole_phase
+	var half_turns := randi_range(SPIN_HALF_TURNS.x, SPIN_HALF_TURNS.y)
+	_hole_tween = create_tween()
+	_hole_tween.tween_method(func(v: float):
+		_hole_phase = v
+		_hole.frame = int(round(pingpong(v, HOLE_FRAMES - 1))),
+		from, roundf(from / (HOLE_FRAMES - 1)) * (HOLE_FRAMES - 1) + half_turns * (HOLE_FRAMES - 1), SPIN_SECONDS) 		.set_ease(Tween.EASE_OUT).set_trans(Tween.TRANS_CUBIC)
+	AudioSfx.play("tiki", 0.0, Vector2.ONE * 1.1)
+
+# Down into the hole, or up out of it, sinking behind its near rim as the jaguars slide
+# into their slots: the warrior stands on the hole's middle the while
+func _sink_tween(i: int, down: bool) -> Tween:
+	var sprite := _sprites[i]
+	_spin_hole()  # through the spinner it goes, setting it turning
+	(sprite.material as ShaderMaterial).set_shader_parameter("clip_y", CENTRE.y + HOLE_RIM)
+	var sink := create_tween()
+	sink.tween_method(func(v: float): _sink[i] = v, 0.0 if down else SINK_DEPTH, SINK_DEPTH if down else 0.0, SINK_SECONDS) \
+		.set_ease(Tween.EASE_IN if down else Tween.EASE_OUT).set_trans(Tween.TRANS_QUAD)
+	if not down:
+		sink.tween_callback(func(): (sprite.material as ShaderMaterial).set_shader_parameter("clip_y", 1.0e6))
+	return sink
 
 func _frames() -> SpriteFrames:
 	var frames := SpriteFrames.new()
@@ -64,18 +156,97 @@ func _frames() -> SpriteFrames:
 		frames.add_frame("default", atlas)
 	return frames
 
+func _spot(i: int) -> Vector2:
+	var angle := _angle + TAU * i / _warriors.size()
+	var offset := -_offset if i == _top else _offset  # the top one goes the other way
+	return CENTRE + offset + Vector2(cos(angle), sin(angle)) * RADIUS
+
 func _place() -> void:
 	for i in _warriors.size():
-		var angle := _angle + TAU * i / _warriors.size()
-		_warriors[i].global_position = CENTRE + Vector2(cos(angle), sin(angle)) * RADIUS
+		if not _solo[i]:
+			_warriors[i].global_position = _spot(i)
+
+
+## The warriors a dart could hit: standing in the arena (index -> where)
+func targets() -> Dictionary:
+	var out := {}
+	if _hopping > 0 or _away_left > 0.0:
+		return out
+	for i in _warriors.size():
+		if _warriors[i].visible and not _solo[i] and _stung_left[i] <= 0.0:
+			out[i] = _warriors[i].global_position
+	return out
+
+## Stung by a poison dart: it hops down the hole in the middle on its own, for a while
+func sting(i: int) -> void:
+	if _solo[i] or _stung_left[i] > 0.0 or not _warriors[i].visible:
+		return
+	_stung_left[i] = STUNG_SECONDS
+	_hop_solo(i, false)
+
+# One warrior hops down into the hole, or back out of it to its place
+func _hop_solo(i: int, out_of_hole: bool) -> void:
+	var warrior := _warriors[i]
+	var sprite := _sprites[i]
+	_solo[i] = true
+	_flip_hole(true)
+	for shape in warrior.find_children("*", "CollisionShape2D", true, false):
+		(shape as CollisionShape2D).set_deferred("disabled", true)
+	var from := warrior.global_position
+	var hop := create_tween()
+	if out_of_hole:
+		warrior.global_position = CENTRE
+		_sink[i] = SINK_DEPTH
+		warrior.show()
+		hop.tween_interval(HOLE_FLIP_SECONDS)
+		hop.tween_callback(func(): _sink_tween(i, false))
+		hop.tween_interval(SINK_SECONDS)
+	hop.tween_method(func(t: float):
+		var to := _spot(i) if out_of_hole else CENTRE
+		var start := CENTRE if out_of_hole else from
+		warrior.global_position = start.lerp(to, t)
+		sprite.offset.y = -sin(t * PI) * HOP_HEIGHT, 0.0, 1.0, HOP_SECONDS)
+	hop.tween_callback(func():
+		sprite.offset.y = 0.0
+		if out_of_hole:
+			_solo[i] = false
+			for shape in warrior.find_children("*", "CollisionShape2D", true, false):
+				(shape as CollisionShape2D).set_deferred("disabled", false)
+		else:
+			_sink_tween(i, true))
+	if not out_of_hole:
+		hop.tween_interval(SINK_SECONDS)
+		hop.tween_callback(func():
+			_solo[i] = false
+			warrior.hide()  # down the hole
+			_sink[i] = 0.0)
+	hop.tween_callback(func():
+		if _hopping == 0 and not _solo.has(true):
+			_flip_hole(false))
+	AudioSfx.play("tiki", 0.0, Vector2.ONE * 0.9)
 
 func _on_touch(body: Node, index: int) -> void:
 	if body.is_in_group("ball"):
+		# it's knocked back a little, away from the ball, and steps back after
+		var away := ((_warriors[index] as Node2D).global_position - (body as Node2D).global_position).normalized()
+		# feathers knocked off its headdress, fluttering down
+		Flutter.burst(features, FEATHERS, (_warriors[index] as Node2D).global_position + Vector2(0, -34),
+			FEATHERS_PER_HIT, features.MAP_SCALE, Vector2(10, 6), away * 110.0 + Vector2(0, -70))
+		_recoil[index] = away * RECOIL
 		_flash_left[index] = FLASH_SECONDS
 		_sprites[index].frame = FLASHING
 
 func _physics_process(delta: float) -> void:
 	_clock += delta
+	for i in _sprites.size():
+		if _recoil[i] != Vector2.ZERO:
+			_recoil[i] = _recoil[i].move_toward(Vector2.ZERO, RECOIL_RETURN * delta)
+		_sprites[i].position = _home[i] + _recoil[i] + Vector2(0, _sink[i])
+	for i in _warriors.size():
+		if _stung_left[i] > 0.0:
+			_stung_left[i] -= delta
+			if _stung_left[i] <= 0.0 and _away_left <= 0.0 and _hopping == 0:
+				_hop_solo(i, true)  # over it: back out to its place
 	for i in _sprites.size():
 		if _flash_left[i] > 0.0:
 			_flash_left[i] -= delta
@@ -83,14 +254,45 @@ func _physics_process(delta: float) -> void:
 				_sprites[i].frame = STANDING
 	if _march_left > 0.0:
 		_march_left -= delta
-		_angle += TAU * TURNS_PER_SECOND * delta
+		var turn := 0
+		if _pattern == CIRCLE:
+			_angle += TAU * TURNS_PER_SECOND * delta * _march_way
+			turn = int(_clock * TURN_FPS) % TURN_FRAMES
+		else:
+			# out one way, back through their places, out the other, and home again
+			var phase := (MARCH_SECONDS - _march_left) * PATROL_RATE * TAU
+			_offset = PATROL_REACH[_pattern] * sin(phase) * _march_way
+			var heading := cos(phase) * _march_way  # which way they're going now
+			if _pattern == UP_DOWN:
+				turn = 0 if heading > 0.0 else 2  # facing down the table, or turned away up it
+			else:
+				turn = 1 if heading > 0.0 else 3  # turned to the side they're heading
+		if _march_left <= 0.0:
+			_offset = Vector2.ZERO
+			turn = 0
 		_place()
 		var up := int(_clock / STEP_EVERY) % 2 == 1 and _march_left > 0.0
-		var turn := int(_clock * TURN_FPS) % TURN_FRAMES if _march_left > 0.0 else 0
 		for i in _sprites.size():
 			_sprites[i].offset.y = -1.0 if up else 0.0  # they bob a pixel as they march
 			if _flash_left[i] <= 0.0:
-				_sprites[i].frame = turn
+				var facing := turn
+				if i == _top and _pattern != CIRCLE and _march_left > 0.0:
+					facing = (turn + 2) % TURN_FRAMES  # heading the other way: front for back, side for side
+				_sprites[i].frame = facing
+		return
+	# now and then they leave the arena empty for a while
+	if _hopping > 0:
+		return
+	if _away_left > 0.0:
+		_away_left -= delta
+		if _away_left <= 0.0:
+			_set_here(true)
+		return
+	_away_wait -= delta
+	if _away_wait <= 0.0:
+		_away_wait = randf_range(AWAY_EVERY.x, AWAY_EVERY.y)
+		_away_left = AWAY_SECONDS
+		_set_here(false)
 		return
 	_idle(delta)
 	_rest_left -= delta
@@ -114,8 +316,74 @@ func _idle(delta: float) -> void:
 		if _flash_left[i] <= 0.0:
 			_sprites[i].frame = GLANCING if _glance_left[i] > 0.0 else STANDING
 
+# The tablet slides open and the warriors hop down into the hole one by one (the ball then
+# passes through where they stood), or hop back out of it to their places round the ring
+func _set_here(here: bool) -> void:
+	for i in _warriors.size():
+		_stung_left[i] = 0.0
+	# coming back, it isn't always all of them: sometimes one or two, the rest straggling
+	# out on their own a while later
+	var staying: Array[int] = []
+	if here:
+		var out_now: int = OUT_COUNTS.pick_random()
+		var order := range(_warriors.size())
+		order.shuffle()
+		for k in range(out_now, order.size()):
+			staying.append(order[k])
+			_stung_left[order[k]] = randf_range(STRAGGLE_SECONDS.x, STRAGGLE_SECONDS.y)
+	_flip_hole(true)
+	_hopping = _warriors.size() - staying.size()
+	var step := 0
+	for i in _warriors.size():
+		if staying.has(i):
+			continue  # still down the hole for now
+		var stagger := HOP_STAGGER * step
+		step += 1
+		var warrior := _warriors[i]
+		var sprite := _sprites[i]
+		var angle := _angle + TAU * i / _warriors.size()
+		var spot := CENTRE + Vector2(cos(angle), sin(angle)) * RADIUS
+		for shape in warrior.find_children("*", "CollisionShape2D", true, false):
+			(shape as CollisionShape2D).set_deferred("disabled", true)
+		var hop := create_tween()
+		hop.tween_interval(stagger)
+		if here:
+			hop.tween_callback(func():
+				warrior.global_position = CENTRE
+				_sink[i] = SINK_DEPTH
+				warrior.show())
+			hop.tween_interval(HOLE_FLIP_SECONDS)
+			hop.tween_callback(func(): _sink_tween(i, false))  # up out of the hole...
+			hop.tween_interval(SINK_SECONDS)
+		hop.tween_method(func(t: float):  # ...and hop
+			warrior.global_position = (spot.lerp(CENTRE, t) if not here else CENTRE.lerp(spot, t))
+			sprite.offset.y = -sin(t * PI) * HOP_HEIGHT, 0.0, 1.0, HOP_SECONDS)
+		hop.tween_callback(func():
+			sprite.offset.y = 0.0
+			if here:
+				for shape in warrior.find_children("*", "CollisionShape2D", true, false):
+					(shape as CollisionShape2D).set_deferred("disabled", false)
+			else:
+				_sink_tween(i, true))  # hop in, and down it goes
+		if not here:
+			hop.tween_interval(SINK_SECONDS)
+			hop.tween_callback(func():
+				warrior.hide()  # down the hole
+				_sink[i] = 0.0)
+		hop.tween_callback(func():
+			_hopping -= 1
+			if _hopping == 0:
+				_flip_hole(false))
+		AudioSfx.play("tiki", 0.0, Vector2.ONE * (0.8 + 0.1 * i))
+
 func _march() -> void:
 	_march_left = MARCH_SECONDS
+	_march_way = 1.0 if randf() < 0.5 else -1.0
+	_pattern = [CIRCLE, UP_DOWN, LEFT_RIGHT].pick_random()
+	# the one highest up the arena now patrols against the other two
+	for i in _warriors.size():
+		if _spot(i).y < _spot(_top).y:
+			_top = i
 	_linger = 0.0
 	_rest_left = randf_range(MARCH_EVERY.x, MARCH_EVERY.y)
 	AudioSfx.play("roar", 0.0, Vector2.ONE * 0.7)

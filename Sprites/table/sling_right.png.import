@@ -2,16 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://bpdqa26uvne4f"
-path="res://.godot/imported/jaguar_button.png-9eed60d470e5b4d59f4b80bf8cb5a661.ctex"
+uid="uid://diiwfseu6gncj"
+path="res://.godot/imported/sling_right.png-3c3c305222c4d4d6639b5c2e34deefee.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://Sprites/table/jaguar_button.png"
-dest_files=["res://.godot/imported/jaguar_button.png-9eed60d470e5b4d59f4b80bf8cb5a661.ctex"]
+source_file="res://Sprites/table/sling_right.png"
+dest_files=["res://.godot/imported/sling_right.png-3c3c305222c4d4d6639b5c2e34deefee.ctex"]
 
 [params]
 

@@ -220,7 +220,6 @@ func _on_king_hit(body: Node) -> void:
 		AudioSfx.play("catch")
 		_finish(true, "EL DORADO!")
 	else:
-		PinballEvents.toast.emit("Gilded King %d/%d" % [_hits, HITS_TO_WIN])
 		_show_progress()
 
 func _show_progress() -> void:

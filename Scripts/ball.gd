@@ -4,7 +4,7 @@ extends RigidBody2D
 ## launch and it pulls down (the ball resting on it sinks with it) the longer it's held,
 ## then let go and it fires the ball as hard as it was pulled. Scripts/plunger.gd is the
 ## spring.
-@export var launch_speed: float = -1420.0
+@export var launch_speed: float = -1360.0  # a full pull whips it right round the orbit and back down
 @export var min_launch_power: float = 0.5   # a tap; a weak one rolls back down the lane
 @export var pull_seconds: float = 1.0       # to pull it all the way down
 ## The hand-drawn ball (tools/source_art/pinball_sprite.png) is drawn at 3x, about 1.2x
@@ -27,15 +27,19 @@ const MAX_DRAWN_SPIN := TAU * 3.0
 ##  - no friction or drag. Gravity weakens as the ball falls faster, so falls float:
 ##    12/256 px/frame^2 (726 here) while it's slow, 8/256 (484) once it falls faster
 ##    than 1.25 px/frame (322), and 4/256 (242) past 2.5 px/frame (645)
-##  - walls hand back about a quarter of the speed going into them (bounce 0.26)
+##  - walls hand back less than a fifth of the speed going into them (bounce 0.18), a
+##    touch deader than the GBA's 0.26 so the ball doesn't rattle about so much
 ##  - one limit on the ball's whole speed, not one per axis, higher down around the
-##    flippers so the flipper zone plays faster. The GBA's are 5.25 and 6.25 px/frame
-##    (1355 and 1613 here), raised about a fifth so the table's ramps, laid out for the
-##    Game Boy game's faster ball, still make as often as before.
+##    flippers so the flipper zone plays faster: about the GBA's 5.25 and 6.25 px/frame
+##    (1355 and 1613 here). The rails carry the ball along their tracks, so they don't
+##    need the extra speed the old wall ramps did.
 ##    The plunger lane is left out, so a launch always makes it round the orbit.
-@export var bounce: float = 0.26
-@export var max_speed: float = 1650.0
-@export var max_speed_low: float = 1900.0
+@export var bounce: float = 0.18
+@export var max_speed: float = 1400.0
+@export var max_speed_low: float = 1600.0
+const LAUNCH_TUNED_FROM_Y := 1158.7  # where the ball sat on the spring when the launch (and skill shot) was tuned
+const LAUNCH_CLIMB_GRAVITY := 726.0  # the gravity on a ball going up (GRAVITY_BANDS)
+const STRUCK_SPEED := 160.0  # going into a surface this fast is a hit (a button's press), not a graze or a roll
 const GRAVITY_BANDS := [[645.0, 242.0], [322.0, 484.0], [-INF, 726.0]]  # falling faster than -> gravity
 const PLUNGER_LANE_X := 655.0
 ## The side ramps are water channels (collision layer 2, switched on by the gates). Like
@@ -44,7 +48,7 @@ const PLUNGER_LANE_X := 655.0
 ## Ball search, like a real machine's: a ball that stays inside a small circle this long
 ## (say, pinned between a bumper and a wall) gets knocked back toward the middle of the
 ## table. The flipper area is left alone so a cradled ball stays put.
-@export var stuck_seconds: float = 1.5
+@export var stuck_seconds: float = 0.9
 @export var stuck_radius: float = 40.0
 @export var unstick_speed: float = 700.0
 const UNSTICK_TOWARD := Vector2(340, 760)
@@ -87,6 +91,18 @@ var _spin := 0.0   # radians per second, clockwise
 ## Set by Scripts/rails.gd while the ball rides a rail: carries it along the track
 var rail_guide := Callable()
 var _impact_cooldown := 0.0
+var _falling_left := 0.0  # going under in the lava pit
+var in_lava := false
+var rescued := false  # being whirled up out of the lava by a ball saver (Scripts/temple_hole.gd)
+var _masked := true  # hidden behind the front walls (not while it rides a rail)  # it's in the lava (the spotlight stops following it)
+const BALL_MASK := preload("res://Scripts/ball_mask.gdshader")  # hidden behind the front walls, and under the lava
+const FRONT_WALLS := preload("res://Sprites/table/front_walls.png")  # tools/make_table.py
+const LAVA_SURFACE_Y := 1280.0  # the lava: the very bottom edge of the table (and the screen)
+const SINK_DEPTH := 40.0  # scene units below the surface it goes: right under, and off the bottom
+const LAVA_SPAN := Vector2(298.0, 375.0)  # where its middle can go under: inside the lava's banks (lava_glow.png)
+const ROLL_SPEED_MIN := 320.0   # it rolls down the pit's slope at least this fast...
+const ROLL_SECONDS_MAX := 0.6   # ...taking no longer than this to reach the lava
+const SINK_SECONDS := 1.6
 var _turn := 0.0   # how far the sprite has turned
 static var _ramp_art: Image
 static var _tier_frames := {}  # tier -> SpriteFrames for that row of the spin sheet
@@ -129,6 +145,10 @@ func _ready() -> void:
 	if anim:
 		anim.stop()
 		draw_scale = anim.scale
+		var mask := ShaderMaterial.new()
+		mask.shader = BALL_MASK
+		mask.set_shader_parameter("front_walls", FRONT_WALLS)
+		anim.material = mask
 		set_tier(0)
 
 func _physics_process(delta: float) -> void:
@@ -139,10 +159,19 @@ func _physics_process(delta: float) -> void:
 		_turn = fposmod(_turn - _spin * delta, TAU)
 		anim.frame = int(_turn / TAU * SPIN_FRAMES) % SPIN_FRAMES
 
+	if anim and anim.material:
+		var on_rail := rail_guide.is_valid() or (collision_mask & RAMP_LAYER_BIT) != 0
+		if on_rail == _masked:
+			_masked = not on_rail
+			(anim.material as ShaderMaterial).set_shader_parameter("occlude", _masked)  # up on a rail it's over everything
 	if freeze:
 		# held by the temple or the kickback
 		_moved_v = Vector2.ZERO
 	_impact_cooldown = maxf(_impact_cooldown - delta, 0.0)
+	if _falling_left > 0.0:
+		_falling_left -= delta
+		if _falling_left <= 0.0:
+			_drained()
 	_watch_for_stuck(delta)
 	_watch_ramp_exit(delta)
 
@@ -240,7 +269,13 @@ func _current_power() -> float:
 func _launch(power: float = 1.0) -> void:
 	if not can_launch:
 		return
-	linear_velocity = Vector2(0.0, launch_speed * power)
+	# launched from higher up the lane (a taller spring) it goes as a launch from where the
+	# launches were tuned would be going by the time it got here: the skill shot stays put
+	var speed := absf(launch_speed * power)
+	var lift := LAUNCH_TUNED_FROM_Y - global_position.y
+	if lift > 0.0:
+		speed = sqrt(maxf(speed * speed - 2.0 * LAUNCH_CLIMB_GRAVITY * lift, 0.0))
+	linear_velocity = Vector2(0.0, -speed)
 	AudioSfx.play("launch")
 	PinballEvents.ball_launched.emit()
 
@@ -279,18 +314,62 @@ func _on_start_region_body_exited(body: Node) -> void:
 		_charging = false
 		PinballEvents.launch_available.emit(false)
 
+# Into the lava pit: it stops dead in the lava, and either sinks slowly out of sight (a
+# slow ball, smoking) or plops straight in (a fast one, throwing up drops and a puff of
+# smoke), before it counts as drained
 func _on_death_zone_body_entered(body: Node) -> void:
-	if body == self and not _pending_respawn:
-		if get_tree().get_nodes_in_group("ball").size() > 1:
-			# Multiball: a ball that drains while others are still up just leaves play
-			remove_from_group("ball")
-			queue_free()
+	if body == self and not _pending_respawn and _falling_left <= 0.0:
+		# with a ball saver running, Tlaloc's smoke whirls it up out of the lava into his mouth
+		# instead (the last ball in play, on the main table; a multiball's others just go)
+		if GameManager.ball_save_left() > 0.0 and get_tree().get_nodes_in_group("ball").size() == 1 				and stage_origin == Vector2.ZERO and PinballEvents.lava_rescue.get_connections().size() > 0:
+			if not rescued:
+				rescued = true
+				PinballEvents.lava_rescue.emit(self)
 			return
-		PinballEvents.ball_drained.emit()
-		_pending_respawn = true
-		_cooldown_frames = 3
+		var speed := linear_velocity.length()
 		collision_layer = 0
 		collision_mask = 0
+		freeze_mode = RigidBody2D.FREEZE_MODE_KINEMATIC
+		set_deferred("freeze", true)
+		linear_velocity = Vector2.ZERO
+		in_lava = true
+		var at := global_position
+		# it rolls on down the pit's slope to the lava at the bottom, then goes under: hidden
+		# below the lava's surface as it sinks through it, down off the bottom of the table
+		(anim.material as ShaderMaterial).set_shader_parameter("surface_y", LAVA_SURFACE_Y)
+		# it rolls on into the lava itself, not straight down through the pit's walls (a ball
+		# coming in off a gutter catches the drain at its side)
+		var surface := Vector2(clampf(at.x, LAVA_SPAN.x, LAVA_SPAN.y), maxf(at.y, LAVA_SURFACE_Y))
+		var under := surface + Vector2(0, SINK_DEPTH)
+		var roll := clampf(at.distance_to(surface) / maxf(speed, ROLL_SPEED_MIN), 0.05, ROLL_SECONDS_MAX)
+		var down := create_tween()
+		down.tween_property(self, "global_position", surface, roll).set_ease(Tween.EASE_IN).set_trans(Tween.TRANS_QUAD)
+		# however hard it came in, it settles into the lava and slowly goes under, smoke
+		# streaming up off it as it sinks
+		_falling_left = roll + SINK_SECONDS
+		down.tween_callback(func():
+			PinballEvents.effect.emit("lava", surface)
+			PinballEvents.effect.emit("smoke_trail", surface))
+		down.tween_property(self, "global_position", surface + Vector2(0, 5), 0.25).set_ease(Tween.EASE_OUT)
+		down.tween_property(self, "global_position", under, SINK_SECONDS - 0.25).set_ease(Tween.EASE_IN).set_trans(Tween.TRANS_SINE)
+		down.parallel().tween_property(anim, "modulate", Color(1.0, 0.8, 0.7), SINK_SECONDS - 0.25)  # heating as it goes
+
+func _drained() -> void:
+	in_lava = false
+	rail_guide = Callable()  # no rail or orbit carries it any more
+	anim.modulate = Color.WHITE  # it comes back looking like itself
+	(anim.material as ShaderMaterial).set_shader_parameter("surface_y", 1.0e6)
+	if get_tree().get_nodes_in_group("ball").size() > 1:
+		# Multiball: a ball that drains while others are still up just leaves play
+		remove_from_group("ball")
+		queue_free()
+		return
+	PinballEvents.ball_drained.emit()
+	freeze = false  # held in the lava till now; the respawn runs in the physics step
+	_pending_respawn = true
+	_cooldown_frames = 3
+	collision_layer = 0
+	collision_mask = 0
 
 func _integrate_forces(state: PhysicsDirectBodyState2D) -> void:
 	if _pending_respawn:
@@ -331,6 +410,8 @@ func _update_spin(state: PhysicsDirectBodyState2D, v: Vector2) -> void:
 	_spin = clampf(normal.cross(v) / _drawn_radius(), -MAX_DRAWN_SPIN, MAX_DRAWN_SPIN)
 	# how fast it was going into the surface it just met
 	var into := -_moved_v.dot(normal)
+	if into > STRUCK_SPEED:
+		PinballEvents.ball_struck.emit(self, global_position - normal * 19.0, into)  # a real knock into it
 	if into > IMPACT_SPEED and _impact_cooldown <= 0.0:
 		_impact_cooldown = IMPACT_COOLDOWN
 		_on_impact.call_deferred(global_position - normal * 19.0, (into - IMPACT_SPEED) * IMPACT_RUMBLE_PER_SPEED + 1.0)

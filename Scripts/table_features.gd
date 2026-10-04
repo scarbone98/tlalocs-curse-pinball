@@ -18,6 +18,7 @@ const STONE_EYE := preload("res://Sprites/table/stone_eye.png")
 const RAIN_LAMP := preload("res://Sprites/table/rain_lamp.png")
 const FACE_EYE := preload("res://Sprites/table/face_eye.png")
 const SLING_LIT := [preload("res://Sprites/table/sling_left_lit.png"), preload("res://Sprites/table/sling_right_lit.png")]
+const SLING_UNLIT := [preload("res://Sprites/table/sling_left.png"), preload("res://Sprites/table/sling_right.png")]  # at rest, over the basemap's lit ones
 const RampShots := preload("res://Scripts/ramp_shots.gd")
 const Kickback := preload("res://Scripts/kickback.gd")
 const SpiritCapture := preload("res://Scripts/spirit_capture.gd")
@@ -37,8 +38,11 @@ const Plunger := preload("res://Scripts/plunger.gd")
 const TableGeometry := preload("res://Scripts/table_geometry.gd")
 const FloorRoulette := preload("res://Scripts/floor_roulette.gd")
 const Lighting := preload("res://Scripts/lighting.gd")
-const HeartOffering := preload("res://Scripts/heart_offering.gd")
+const Sacrifices := preload("res://Scripts/sacrifices.gd")
 const SpiritLane := preload("res://Scripts/spirit_lane.gd")
+const DartTrap := preload("res://Scripts/dart_trap.gd")
+const DebugView := preload("res://Scripts/debug_view.gd")
+const OrbitGuide := preload("res://Scripts/orbit_guide.gd")  # F3: colliders and rails drawn over the table
 const Effects := preload("res://Scripts/effects.gd")
 const TableLife := preload("res://Scripts/table_life.gd")
 const Music := preload("res://Scripts/music.gd")
@@ -56,7 +60,7 @@ const SHRINE_EYES_ART := [Vector2(31.5, 31.5), Vector2(39.5, 31.5)]
 const SHRINE_LAMPS_ART := [Vector2(25, 55), Vector2(45, 55), Vector2(31, 58), Vector2(39, 58)]
 # The centre face's eyes (the hand-drawn yelloweye.png and redeye.png over eyeless.png)
 # follow the ball, a table-art pixel at most, from their sockets
-const FACE_EYES_ART := [Vector2(-6, -6), Vector2(7, -6)]
+const FACE_EYES_ART := [Vector2(-6, -6), Vector2(6, -6)]  # where the eyes sit in Sprites/tlaloc.png (tools/make_table.py)
 # The slingshots light up (bumperleftlightup.png, bumperrightlightup.png) as they kick:
 # where each lit sprite sits, in table-art pixels, and the kicker it belongs to
 const SLINGS := [
@@ -65,6 +69,10 @@ const SLINGS := [
 ]
 const SLING_LIT_SECONDS := 0.15
 const EYE_FOLLOW := 250.0  # scene units of distance for each art pixel the eyes turn
+const EYE_ROLL := 11.0     # radians a second his eyes roll round while he's swallowed the ball
+const EYE_OUT_POINTS := 50000  # a poison dart in his eye shoots it out (Scripts/dart_trap.gd)
+const EYE_OUT_SECONDS := 20.0  # ...and it's gone this long before it pops back in
+const EYE_FLY := Vector2(140, -170)  # the eye flies off this way (mirrored for the left one)
 
 const TOP_LANE_POINTS := 250
 const TOP_LANES_COMPLETE_POINTS := 2000
@@ -103,6 +111,12 @@ var _face_sprite: AnimatedSprite2D
 var kickback: Node2D
 var spirit: Node2D
 var journey: Node2D
+var dart_trap: Node2D  # Scripts/dart_trap.gd
+var warriors: Node2D   # Scripts/warriors.gd
+var torch_lane: Node2D  # Scripts/torches.gd
+var _lane_gate: StaticBody2D
+var _looping := {}  # ball -> it's being let on through the lane gate
+var orbit_guide: Node2D  # Scripts/orbit_guide.gd
 var temple: Node2D
 var awakening: Node2D
 var hatchling: Node2D
@@ -113,7 +127,7 @@ var idol_tower: Node2D
 var spinner: Node2D
 var el_dorado: Node2D
 var roulette: Node2D  # Scripts/floor_roulette.gd sets itself here
-var heart: Node2D  # Scripts/heart_offering.gd
+var sacrifices: Node2D  # Scripts/sacrifices.gd
 var spirit_lane: Node2D  # Scripts/spirit_lane.gd
 
 var _face_hits := 0
@@ -128,6 +142,7 @@ var _shrine_mask: AnimatedSprite2D  # the stone face's left eye; the right one c
 var _shrine_eye_right: AnimatedSprite2D
 var _face_eyes: Array[Sprite2D] = []
 var _eyes_red_left := 0.0
+var _eye_out_left: Array[float] = [0.0, 0.0]  # each eye shot out, gone this much longer
 var _shrine_lamps: Array[AnimatedSprite2D] = []
 var _shrine_flash_left := 0.0
 
@@ -157,7 +172,7 @@ func _ready() -> void:
 	skull = CrystalSkull.new()
 	idol_tower = IdolTower.new()
 	spinner = Spinner.new()
-	for mode in [ramps, rails, kickback, spirit, journey, temple, spinner, Torches.new(), Temple.new(), idol_tower, skull, awakening, hatchling, Warriors.new(), Nudge.new(), Palms.new(), Plunger.new(), FloorRoulette.new(), HeartOffering.new(), SpiritLane.new(), Lighting.new()]:
+	for mode in [ramps, rails, kickback, spirit, journey, temple, spinner, Torches.new(), Temple.new(), idol_tower, skull, awakening, hatchling, Warriors.new(), Nudge.new(), Palms.new(), Plunger.new(), FloorRoulette.new(), Sacrifices.new(), SpiritLane.new(), DartTrap.new(), OrbitGuide.new(), Lighting.new(), DebugView.new()]:
 		mode.features = self
 		add_child(mode)
 	add_child(Effects.new())
@@ -241,9 +256,18 @@ func _build_bonus_bars() -> void:
 # The launch lane runs up the right side and round the top-right orbit into the top of
 # the table. Without a gate a ball in play could run the orbit backwards and drop all
 # the way back into the launch lane, so, like Pokemon Pinball's, a one-way gate where
-# the orbit meets the table lets launched balls out but turns balls in play away.
+# the orbit meets the table lets launched balls out but turns balls in play away - all
+# but one looping round fast (up the torch lane and over the top), which it lets on round
+# the orbit. A one-way flap across the top of the launch tube then turns that one down the
+# right lane (the spirit lane, beside the tube) instead: nothing gets back into the tube.
 const LANE_GATE_X := 480.0
 const LANE_GATE_SPAN := Vector2(215, 305)  # across the orbit, ends buried in its walls
+# The flap: from the tube's outer wall down to the tip of its inner wall (scene units).
+# Launched balls come up through it; one coming round the orbit is steered off it, down
+# into the right lane
+const TUBE_FLAP := [Vector2(667, 391), Vector2(612, 416)]
+const LOOP_THROUGH_SPEED := 600.0  # a ball heading right through the gate this fast is looping: it's let on
+const LOOP_THROUGH_REACH := Vector2(140, 60)  # how far before the gate (x) and either side of its middle (y) it's let on
 
 func _build_lane_gate() -> void:
 	var gate := StaticBody2D.new()
@@ -259,6 +283,46 @@ func _build_lane_gate() -> void:
 	shape.position = Vector2(LANE_GATE_X, (LANE_GATE_SPAN.x + LANE_GATE_SPAN.y) / 2.0)
 	gate.add_child(shape)
 	add_child(gate)
+	_lane_gate = gate
+	# the flap across the top of the launch tube
+	var flap := StaticBody2D.new()
+	var flap_shape := CollisionShape2D.new()
+	var flap_line := SegmentShape2D.new()
+	var a: Vector2 = TUBE_FLAP[1]
+	var b: Vector2 = TUBE_FLAP[0]
+	var across := (b - a).length()
+	flap_line.a = Vector2(-across / 2.0, 0)
+	flap_line.b = Vector2(across / 2.0, 0)
+	flap_shape.shape = flap_line
+	flap_shape.one_way_collision = true
+	# along it from its low end to its high end, its local +y (the way it stops balls) points
+	# down into the tube: balls coming up out of it pass
+	flap_shape.rotation = (b - a).angle()
+	flap_shape.position = (a + b) / 2.0
+	flap.add_child(flap_shape)
+	add_child(flap)
+
+# A ball coming fast along the top heading right, looping, goes on through the lane gate
+func _let_loops_through() -> void:
+	if _lane_gate == null:
+		return
+	var middle_y := (LANE_GATE_SPAN.x + LANE_GATE_SPAN.y) / 2.0
+	for ball: RigidBody2D in _looping.keys():
+		var gone := not is_instance_valid(ball)
+		if gone or ball.global_position.x > LANE_GATE_X + 40.0 or ball.global_position.x < LANE_GATE_X - LOOP_THROUGH_REACH.x - 20.0:
+			if not gone:
+				ball.remove_collision_exception_with(_lane_gate)
+			_looping.erase(ball)
+	for node in get_tree().get_nodes_in_group("ball"):
+		var ball := node as RigidBody2D
+		if _looping.has(ball):
+			continue
+		var at := ball.global_position
+		var near := at.x > LANE_GATE_X - LOOP_THROUGH_REACH.x and at.x < LANE_GATE_X \
+			and absf(at.y - middle_y) < LOOP_THROUGH_REACH.y
+		if near and ball.linear_velocity.x > LOOP_THROUGH_SPEED:
+			_looping[ball] = true
+			ball.add_collision_exception_with(_lane_gate)
 
 func _build_shrine() -> void:
 	_shrine_mask = _sprite(STONE_EYE, 4, SHRINE_EYES_ART[0] * MAP_SCALE)
@@ -308,6 +372,7 @@ func _build_storm() -> void:
 
 func _build_slings() -> void:
 	for i in SLINGS.size():
+		_sprite(SLING_UNLIT[i], 1, SLINGS[i][0] * MAP_SCALE)  # dim at rest; it lights only as it kicks
 		var lit: AnimatedSprite2D = _sprite(SLING_LIT[i], 1, SLINGS[i][0] * MAP_SCALE)
 		lit.hide()
 		var kicker := get_node_or_null(SLINGS[i][1]) as Area2D
@@ -343,11 +408,56 @@ func _follow_with_eyes() -> void:
 		var eye := _face_eyes[i]
 		var home: Vector2 = FACE_EYES_ART[i] * MAP_SCALE
 		var look := Vector2.ZERO
-		if is_instance_valid(target):
+		if temple and temple.swallowed:
+			# he's swallowed the ball: his eyes roll round and round, each its own way
+			var roll := Time.get_ticks_msec() / 1000.0 * EYE_ROLL * (1.0 if i == 0 else -1.0)
+			look = (Vector2(cos(roll), sin(roll)) * 1.4).round()
+		elif is_instance_valid(target):
 			var to := (target.global_position - (_face.global_position + home)) / EYE_FOLLOW
 			look = Vector2(clampf(roundf(to.x), -1.0, 1.0), clampf(roundf(to.y), -1.0, 1.0))
 		eye.position = home + look * MAP_SCALE
-		eye.frame = 1 if GameManager.curse_active or _eyes_red_left > 0.0 else 0
+		var sacrifice: bool = sacrifices != null and sacrifices.active  # blazing while a sacrifice sits in his mouth
+		eye.frame = 1 if GameManager.curse_active or _eyes_red_left > 0.0 or sacrifice else 0
+		eye.offset.y = -1.0 if eye.frame == 1 else 0.0  # (the red ones sit a pixel higher)
+
+## Tlaloc's eyes a dart could hit (index -> where)
+func eye_targets() -> Dictionary:
+	var out := {}
+	for i in _face_eyes.size():
+		if _face_eyes[i].visible:
+			out[i] = _face_eyes[i].global_position
+	return out
+
+## A poison dart in his eye: it shoots right out of its socket, spinning away, and pays big
+func shoot_eye(i: int) -> void:
+	var eye := _face_eyes[i]
+	if not eye.visible:
+		return
+	eye.hide()
+	_eye_out_left[i] = EYE_OUT_SECONDS
+	var flying := Sprite2D.new()
+	flying.texture = eye.texture
+	flying.hframes = eye.hframes
+	flying.frame = 1  # blazing as it goes
+	flying.scale = MAP_SCALE
+	flying.global_position = eye.global_position
+	flying.z_index = 4
+	flying.z_as_relative = false
+	add_child(flying)
+	var way := EYE_FLY * Vector2(1.0 if i == 1 else -1.0, 1.0)
+	var start := eye.global_position
+	var arc := create_tween()
+	arc.tween_method(func(t: float):
+		flying.global_position = start + Vector2(way.x * t, way.y * t + 520.0 * t * t)  # up, over and down
+		flying.rotation = t * TAU * 2.0, 0.0, 1.0, 0.8)
+	arc.tween_callback(func():
+		PinballEvents.effect.emit("sparks", flying.global_position)
+		flying.queue_free())
+	_award(EYE_OUT_POINTS, start + Vector2(0, -40))
+	PinballEvents.toast.emit("Tlaloc's eye!")
+	PinballEvents.effect.emit("gold", start)
+	PinballEvents.rumble.emit(8.0)
+	AudioSfx.play("roar", 0.0, Vector2.ONE * 0.6)
 
 # ---------- rules ----------
 
@@ -363,6 +473,7 @@ func _is_ball_on_playfield(body: Node) -> bool:
 	return ball != null and ball.is_in_group("ball") and (ball.collision_mask & 2) == 0
 
 func _physics_process(delta: float) -> void:
+	_let_loops_through()
 	# Timers run on game time so they stay correct on slow frames
 	_skill_shot_left = maxf(_skill_shot_left - delta, 0.0)
 	_face_cooldown = maxf(_face_cooldown - delta, 0.0)
@@ -371,6 +482,13 @@ func _physics_process(delta: float) -> void:
 		if _rest_left == 0.0:
 			_render_shrine()
 	_eyes_red_left = maxf(_eyes_red_left - delta, 0.0)
+	for i in _eye_out_left.size():
+		if _eye_out_left[i] > 0.0:
+			_eye_out_left[i] -= delta
+			if _eye_out_left[i] <= 0.0 and i < _face_eyes.size():
+				_face_eyes[i].show()  # it pops back in
+				PinballEvents.effect.emit("sparks", _face_eyes[i].global_position)
+				AudioSfx.play("tiki", 0.0, Vector2.ONE * 1.4)
 	_follow_with_eyes()
 	_shrine_eye_right.frame = _shrine_mask.frame
 	if _shrine_flash_left > 0.0:
@@ -389,7 +507,6 @@ func _physics_process(delta: float) -> void:
 			_tier -= 1
 			_tier_left = UPGRADE_SECONDS
 			_apply_tier()
-			PinballEvents.toast.emit("%s Ball x%d" % BALL_TIERS[_tier])
 			AudioSfx.play("downgrade")
 	for area in _lane_cooldowns:
 		_lane_cooldowns[area] = maxf(_lane_cooldowns[area] - delta, 0.0)
@@ -410,7 +527,6 @@ func _on_top_lane(index: int) -> void:
 	if _skill_shot_left > 0.0:
 		_skill_shot_left = 0.0
 		_award(SKILL_SHOT_POINTS, _top_lamps[index].global_position + Vector2(0, -40))
-		PinballEvents.toast.emit("Skill shot!")
 	_award(TOP_LANE_POINTS, _top_lamps[index].global_position)
 	_top_lit[index] = true
 	_render_top_lanes()
@@ -429,7 +545,6 @@ func _upgrade_ball() -> void:
 	_tier_left = UPGRADE_SECONDS
 	if _tier == BALL_TIERS.size() - 1:
 		_award(TOP_TIER_POINTS, _top_lamps[1].global_position + Vector2(0, -40))
-		PinballEvents.toast.emit("Gold Ball renewed!")
 		return
 	_tier += 1
 	_apply_tier()
@@ -475,7 +590,6 @@ func stir_tlaloc() -> void:
 	if _face_hits >= _face_hits_needed():
 		_start_curse()
 	else:
-		PinballEvents.toast.emit("Tlaloc stirs %d/%d" % [_face_hits, _face_hits_needed()])
 		_render_shrine()
 
 func _face_hits_needed() -> int:
@@ -491,11 +605,11 @@ func _start_curse() -> void:
 	GameManager.set_curse_active(true)
 	PinballEvents.toast.emit("Tlaloc's Curse!")
 	_rain.emitting = true
-	create_tween().tween_property(_storm_tint, "color", Lighting.STORM, 0.8)
+	create_tween().tween_property(_storm_tint, "color", Lighting.storm(), 0.8)
 	for torch in _torches:
 		torch.speed_scale = 2.0
-	if _face_sprite:
-		_face_sprite.frame = 1
+	# (his mouth is the temple hole's to open, only when it has something to swallow: his
+	# eyes blaze red for the curse - Scripts/temple_hole.gd)
 	_strike_lightning()
 	_curse_timer.start(CURSE_SECONDS)
 	get_tree().create_timer(MULTIBALL_DELAY).timeout.connect(_release_extra_ball)
@@ -522,13 +636,10 @@ func _end_curse() -> void:
 	GameManager.set_curse_active(false)
 	_rest_left = CURSE_REST_SECONDS
 	_render_shrine()
-	PinballEvents.toast.emit("The rain passes")
 	_rain.emitting = false
-	create_tween().tween_property(_storm_tint, "color", Lighting.MOOD, 1.2)
+	create_tween().tween_property(_storm_tint, "color", Lighting.mood(), 1.2)
 	for torch in _torches:
 		torch.speed_scale = 1.0
-	if _face_sprite:
-		_face_sprite.frame = 0
 
 func _strike_lightning() -> void:
 	if not GameManager.curse_active:
@@ -594,22 +705,19 @@ func _celebrate(lamps: Array[AnimatedSprite2D], restore: Callable) -> void:
 	tween.tween_callback(restore)
 
 func _flash_face_eyes() -> void:
-	if _face_sprite == null:
-		return
-	_face_sprite.frame = 1
-	_eyes_red_left = 0.45
-	if not GameManager.curse_active:
-		get_tree().create_timer(0.45).timeout.connect(func():
-			if not GameManager.curse_active:
-				_face_sprite.frame = 0)
+	_eyes_red_left = 0.45  # (just his eyes: his mouth only opens to swallow something)
 
 # ---------- score popups ----------
 
+const POPUP_MIN_POINTS := 5000  # smaller awards add to the score without a number floating up
+
 func _spawn_popup(points: int, at: Vector2) -> void:
+	if points < POPUP_MIN_POINTS:
+		return  # the small stuff just adds to the score
 	var label := Label.new()
 	label.text = "+%d" % (points * GameManager.score_factor())
 	label.add_theme_font_override("font", TempleTheme.BODY_FONT)
-	label.add_theme_font_size_override("font_size", TempleTheme.snap(30))
+	label.add_theme_font_size_override("font_size", TempleTheme.snap(24))
 	label.add_theme_color_override("font_color", TempleTheme.GOLD)
 	label.add_theme_color_override("font_outline_color", TempleTheme.SHADOW)
 	label.add_theme_constant_override("outline_size", 8)

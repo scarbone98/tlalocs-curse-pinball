@@ -11,7 +11,7 @@ extends Node2D
 ## runs two minutes and comes with a long ball saver; each catch lights a bonus lamp.
 
 const SPIRITS := preload("res://Sprites/table/spirits.png")  # tools/make_spirit_sprites.py
-const SPIRIT_SIZE := Vector2(18, 14)
+const SPIRIT_SIZE := Vector2(26, 22)
 const WHIRL := preload("res://Sprites/table/whirl.png")  # the hand-drawn magicWhirl.png
 const WHIRL_SECONDS := 0.7
 const TILE := preload("res://Sprites/table/glyph_tile.png")  # tools/make_rs_sprites.py
@@ -79,6 +79,8 @@ func _ready() -> void:
 	_spirit = AnimatedSprite2D.new()
 	_spirit.scale = features.MAP_SCALE
 	_spirit.position = SPAWN_AT
+	_spirit.z_index = 2  # over Tlaloc's face and his mouth's whirl
+	_spirit.z_as_relative = false
 	features.add_child(_spirit)
 	_spirit.hide()
 	for row in TILE_ROWS:
@@ -151,7 +153,6 @@ func _physics_process(delta: float) -> void:
 		_shown_seconds = ceili(_time_left)
 		_show_progress()
 	if _time_left <= 0.0:
-		PinballEvents.toast.emit("The spirit slipped away")
 		_dismiss()
 		return
 
@@ -206,7 +207,6 @@ func _lightning() -> void:
 			tile.hide()
 			PinballEvents.effect.emit("dust", tile.position)
 	features._award(LIGHTNING_POINTS, SPAWN_AT)
-	PinballEvents.toast.emit("Lightning strike!")
 	PinballEvents.effect.emit("gold", SPAWN_AT)
 	PinballEvents.rumble.emit(6.0)
 	AudioSfx.play("upgrade")
@@ -245,7 +245,6 @@ func _on_body_entered(body: Node) -> void:
 	features._award(HIT_POINTS, SPAWN_AT)
 
 	if _hits < HITS_TO_CATCH:
-		PinballEvents.toast.emit("Spirit %d/%d" % [_hits, HITS_TO_CATCH])
 		return
 	caught += 1
 	var spirit: Dictionary = SpiritCodex.SPECIES[species]

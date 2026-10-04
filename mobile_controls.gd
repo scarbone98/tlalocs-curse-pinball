@@ -5,11 +5,13 @@ class_name MobilePaddleInput
 @export var right_action: StringName = &"right_flipper"
 @export var allow_drag_side_switch: bool = true  # dragging across center swaps paddle
 
-var _touch_side: Dictionary = {}  # touch index -> "left" | "right"
+var _touch_side: Dictionary = {}  # touch index -> "left" | "right" | "plunger"
+var _can_launch := false  # a ball's waiting on the plunger: the right side pulls it back
 
 func _ready() -> void:
 	set_process_unhandled_input(true)
 	_ensure_actions()
+	PinballEvents.launch_available.connect(func(available: bool): _can_launch = available)
 
 func _unhandled_input(event: InputEvent) -> void:
 	if event is InputEventScreenTouch:
@@ -17,16 +19,23 @@ func _unhandled_input(event: InputEvent) -> void:
 		if event.pressed and _is_on_button(event.position):
 			return
 		if event.pressed:
+			if side == "right" and _can_launch:
+				_touch_side[event.index] = "plunger"  # held, it draws the plunger back
+				PinballEvents.launch_pressed.emit()
+				return
 			_touch_side[event.index] = side
 			Input.action_press(left_action if side == "left" else right_action)
 		else:
 			if _touch_side.has(event.index):
 				var s: String = _touch_side[event.index]
-				Input.action_release(left_action if s == "left" else right_action)
+				if s == "plunger":
+					PinballEvents.launch_released.emit()  # let go: it launches
+				else:
+					Input.action_release(left_action if s == "left" else right_action)
 				_touch_side.erase(event.index)
 
 	elif event is InputEventScreenDrag and allow_drag_side_switch:
-		if _touch_side.has(event.index):
+		if _touch_side.has(event.index) and _touch_side[event.index] != "plunger":
 			var new_side := _side_for_pos(event.position)
 			var cur_side: String = _touch_side[event.index]
 			if new_side != cur_side:

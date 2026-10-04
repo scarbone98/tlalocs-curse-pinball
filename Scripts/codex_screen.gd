@@ -6,8 +6,8 @@ class_name CodexScreen
 
 const SPIRITS := preload("res://Sprites/table/spirits.png")
 const DIVINE := preload("res://Sprites/table/spirits_awakened.png")
-const SPIRIT_SIZE := Vector2(18, 14)
-const DIVINE_SIZE := Vector2(22, 18)
+const SPIRIT_SIZE := Vector2(26, 22)
+const DIVINE_SIZE := Vector2(30, 26)
 const ICON_SCALE := 4.0
 const CITIES := ["Tenochtitlan", "Teotihuacan", "Chichen Itza", "Palenque"]
 

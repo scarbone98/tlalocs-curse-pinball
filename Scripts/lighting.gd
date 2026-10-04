@@ -4,45 +4,91 @@ extends Node2D
 ## throws a warm, flickering pool of light while it burns (none on embers), the
 ## golden temple glows, Tlaloc's whirl casts violet while his mouth is open, and a lit gold
 ## button glows. A wide, dim sky light falls over the arena, lamps set in the floor glow
-## while they're lit, Tlaloc's eyes glow (red in his storm), and the drain glows red with
-## lava sparks spitting up out of it. The pools are pixel art too: two flat rings, in
+## while they're lit, Tlaloc's eyes glow (red in his storm), and the lava in the drain
+## (the hand-drawn lava layer) glows and flickers. The pools are pixel art too: two flat rings, in
 ## texels the size of the table's pixels, and a flame's pool swells and shrinks as it flickers.
 
 const MOOD := Color(0.56, 0.54, 0.68)   # dusk over the table
 const STORM := Color(0.42, 0.45, 0.62)  # darker and bluer while the curse rains
+const RUNES := preload("res://Sprites/table/runes.png")  # tools/make_table.py
+const RUNE_SIZE := 7.0
+const RUNE_FLASH := 0.35         # how bright the glyphs flash when you score: faint
+const RUNE_FADE_SECONDS := 0.35
+const RUNE_FLASH_GAP := 0.12     # at most this often
+const DAY := Color(1.0, 1.0, 1.0)        # by day (GameManager.night off): no dusk over it...
+const DAY_STORM := Color(0.74, 0.76, 0.84)  # ...and the curse just greys the sky
+
+static func mood() -> Color:
+	return MOOD if GameManager.night else DAY
+
+static func storm() -> Color:
+	return STORM if GameManager.night else DAY_STORM
 const TORCH_COLOUR := Color(1.0, 0.62, 0.3)
 const TORCH_SIZE := 1.3
 const TORCH_BLAZE := 0.7
 const FLICKER_RATES := Vector2(3.2, 6.9)  # the two slow waves a flame's light wavers on (radians/s)
 const FLICKER := 0.18            # how much a flame's light wavers
 const FLICKER_SIZE := 0.06       # ...and how much its pool swells and shrinks
+const BUTTON_GLOW := 0.7
+const BUTTON_FLICKER := 0.08       # the gold buttons' glow breathes like a torch's, more subtly
+const BUTTON_FLICKER_SIZE := 0.03
 const FLAME_ABOVE := Vector2(0, -22)  # the flame sits above a torch's centre (Scripts/torches.gd)
 const TEMPLE_AT := Vector2(588, 170)
-# A wide, dim pool of sky light over the arena, the idol's tower and the skull
+# A wide, dim pool of sky light, drifting after the ball (it starts over the arena)
 const SKY_AT := Vector2(390, 450)
 const SKY_COLOUR := Color(0.75, 0.82, 1.0)
 const SKY := 0.38
 const SKY_SIZE := 4.4
-# A red glow welling up out of the drain between the flippers, slowly pulsing
-const GUTTER_AT := Vector2(339, 1262)
-const GUTTER_COLOUR := Color(1.0, 0.18, 0.12)
-const GUTTER := 0.9
-const GUTTER_SIZE := 2.2
-const GUTTER_PULSE_SECONDS := 2.6
-const GUTTER_SWELL := 0.08  # the lava's pool swells and shrinks with its pulse
-const GUTTER_WIDTH := 130.0  # the sparks spit up across this much of the drain
+const SKY_FOLLOW := 9.0  # how quickly it drifts after the ball: just a little lag
+# The lava in the drain (tools/make_table.py, from the hand-drawn lava.png): its glow
+# breathing slowly, its embers and edge flickering
+const LAVA_GLOW := preload("res://Sprites/table/lava_glow.png")
+const LAVA_EMBERS := preload("res://Sprites/table/lava_embers.png")
+const LAVA_EMBERS_AT := Vector2(121, 406.5)  # the middle of the embers' box (art pixels)
+const LAVA_BREATH_SECONDS := 2.6
+# The crystal skull gleams as the spotlight passes over it, its glints sliding toward the light
+const SKULL_SHINE := preload("res://Sprites/table/skull_shine.png")  # tools/make_table.py
+const SHINE_REACH := 190.0  # how near the spotlight has to be for the skull to catch it
+const SKULL_SHIMMER := preload("res://Sprites/table/skull_shimmer.png")  # tools/make_table.py
+const SHIMMER_FRAMES := 6
+const SHIMMER_FPS := 14.0
+const SHIMMER_REACH := 150.0  # the spotlight coming within this of the skull, or leaving, sets it shimmering
 const LAMP_SIZE := 0.45
 const EYE_SIZE := 0.3
+const IDOL_SPOT_SIZE := 1.7  # a big soft spotlight on the golden idol, taking in its spinning tower
+const IDOL_SPOT_BELOW := 46.0  # scene units below the idol its middle falls: on the tower
+const IDOL_GLOW := 1.0
+const SKULL_SPOT_SIZE := 1.45  # a big soft spotlight on the crystal skull while its jaws are open
+const SKULL_GLOW := 0.9
+const WHIRL_GLOW := 0.9
+const WHIRL_BREATH_SECONDS := 2.2  # the whirl's glow breathes a little quicker than the spots
+const SPOT_BREATH_SECONDS := 3.2  # the idol's and skull's spots breathe this slowly...
+const SPOT_BREATH := 0.18         # ...brightening and dimming this much
+const SPOT_BREATH_SIZE := 0.08    # ...and swelling and shrinking this much
 const EYE_YELLOW := Color(1.0, 0.9, 0.3)
 const EYE_RED := Color(1.0, 0.15, 0.1)
 
 var features: Node2D  # TableFeatures
 
+var _all_lights: Array[PointLight2D] = []
+var _runes: Array[Sprite2D] = []
+var _rune_wait := 0.0
+var _night := true  # what's been applied (GameManager.night can change from the menu)
 var _pools := {}  # size -> its pixel pool
 var _torch_lights: Array[PointLight2D] = []
 var _whirl_light: PointLight2D
-var _gutter_light: PointLight2D
-var _gutter_size := 1.0
+var _whirl_scale := 1.0
+var _sky_light: PointLight2D
+var _lava_glow: Sprite2D
+var _sacrifice_light: PointLight2D
+var _idol_light: PointLight2D
+var _skull_light: PointLight2D
+var _idol_spot_scale := 1.0
+var _skull_spot_scale := 1.0
+var _skull_shine: Sprite2D
+var _skull_shimmer: Sprite2D
+var _spot_on_skull := false
+var _shimmer_time := -1.0  # how far through its shimmer the skull is (negative: not shimmering)
 var _button_lights: Array = []  # [sprite, light]
 var _lamp_lights: Array = []  # [sprite, light, the first frame that counts as lit]
 var _eye_lights: Array[PointLight2D] = []
@@ -74,20 +120,62 @@ func _tile_map() -> void:
 				map.add_child(tile)
 		layer.hide()
 
+# The glyphs carved on the walls flash a colour each, faintly, whenever something scores
+func _build_runes() -> void:
+	var add := CanvasItemMaterial.new()
+	add.blend_mode = CanvasItemMaterial.BLEND_MODE_ADD
+	add.light_mode = CanvasItemMaterial.LIGHT_MODE_UNSHADED
+	for spot: Vector2 in features.TableGeometry.RUNES:
+		var rune := Sprite2D.new()
+		rune.texture = RUNES
+		rune.region_enabled = true
+		rune.region_rect = Rect2(spot, Vector2(RUNE_SIZE, RUNE_SIZE))
+		rune.scale = features.MAP_SCALE
+		rune.position = (spot + Vector2(RUNE_SIZE, RUNE_SIZE) / 2.0) * features.MAP_SCALE
+		rune.material = add
+		rune.modulate.a = 0.0
+		rune.z_index = 1
+		rune.z_as_relative = false
+		features.add_child(rune)
+		_runes.append(rune)
+	PinballEvents.add_score.connect(func(_points: int): _flash_runes())
+
+func _flash_runes() -> void:
+	if _rune_wait > 0.0:
+		return
+	_rune_wait = RUNE_FLASH_GAP
+	for rune in _runes:
+		var colour := Color.from_hsv(randf(), 0.75, 1.0, RUNE_FLASH)
+		rune.modulate = colour
+		create_tween().tween_property(rune, "modulate:a", 0.0, RUNE_FADE_SECONDS)
+
 func _ready() -> void:
 	_tile_map()
-	features._storm_tint.color = MOOD
+	_build_runes()
+	features._storm_tint.color = mood()
 	for torch: AnimatedSprite2D in features._torches:
 		var light := _light(torch.position + FLAME_ABOVE, TORCH_COLOUR, TORCH_BLAZE, TORCH_SIZE)
 		_torch_lights.append(light)
 		_torch_sizes.append(light.texture_scale)
 	_light(TEMPLE_AT, Color(1.0, 0.8, 0.4), 0.55, 2.6)
-	_light(SKY_AT, SKY_COLOUR, SKY, SKY_SIZE)
-	_gutter_light = _light(GUTTER_AT, GUTTER_COLOUR, GUTTER, GUTTER_SIZE)
-	_gutter_size = _gutter_light.texture_scale
-	_whirl_light = _light(features.temple.AT, Color(0.85, 0.45, 1.0), 0.9, 1.4)
-	for sprite: AnimatedSprite2D in [features.idol_tower._button, features.journey._button_sprite]:
-		_button_lights.append([sprite, _light(sprite.position, Color(1.0, 0.85, 0.4), 0.7, 0.6)])
+	_sky_light = _light(SKY_AT, SKY_COLOUR, SKY, SKY_SIZE)
+	_lava()
+	_skull_shine = _shine_on(features.skull._sprite)
+	_skull_shimmer = _shine_on(features.skull._sprite)
+	_skull_shimmer.texture = SKULL_SHIMMER
+	_skull_shimmer.hframes = SHIMMER_FRAMES
+	_skull_shimmer.vframes = 2
+	_skull_shimmer.hide()
+	_sacrifice_light = _light(Vector2.ZERO, Color(1.0, 0.72, 0.4), 0.95, 0.85)  # a warm spot on the sacrifice
+	_idol_light = _light(Vector2.ZERO, Color(1.0, 0.86, 0.45), IDOL_GLOW, IDOL_SPOT_SIZE, true)  # a spot on the golden idol
+	_skull_light = _light(features.skull._sprite.global_position, Color(0.6, 0.85, 1.0), SKULL_GLOW, SKULL_SPOT_SIZE, true)  # ...and on the skull, open
+	_idol_spot_scale = _idol_light.texture_scale
+	_skull_spot_scale = _skull_light.texture_scale
+	_whirl_light = _light(features.temple.AT, Color(0.85, 0.45, 1.0), WHIRL_GLOW, 1.4)
+	_whirl_scale = _whirl_light.texture_scale
+	for sprite: AnimatedSprite2D in [features.idol_tower._button, features.journey._button_sprite, features.dart_trap.button_sprite]:
+		var glow := _light(sprite.position, Color(1.0, 0.85, 0.4), BUTTON_GLOW, 0.6)
+		_button_lights.append([sprite, glow, glow.texture_scale])
 	# the lamps set in the floor: the lanes', the bonus bars, the relics over Tlaloc, the spirit lane's
 	for lamp: AnimatedSprite2D in features._top_lamps + features._bottom_lamps + features._bars:
 		_lamp(lamp, Color(1.0, 0.85, 0.35), 1)
@@ -95,51 +183,66 @@ func _ready() -> void:
 		_lamp(lamp, Color(1.0, 0.8, 0.3), 4)
 	for lamp: AnimatedSprite2D in features.spirit_lane._lamps:
 		_lamp(lamp, Color(0.4, 0.9, 1.0), 1)
+	_lamp(features.rails._gem, Color(0.3, 1.0, 0.55), 0)  # the rail emerald glows green while it's there
+	for frog: AnimatedSprite2D in features.kickback.frogs:
+		_lamp(frog, Color(0.4, 1.0, 0.6), 1)  # awake (or leaping): its jade glows
 	for eye: Sprite2D in features._face_eyes:
 		_eye_lights.append(_light(eye.global_position, EYE_YELLOW, 0.8, EYE_SIZE))
-	_gutter_sparks()
 
 func _lamp(sprite: AnimatedSprite2D, colour: Color, lit_from: int) -> void:
 	_lamp_lights.append([sprite, _light(sprite.global_position, colour, 0.75, LAMP_SIZE), lit_from])
 
-# Lava down in the drain: sparks spit up out of it and wink out
-func _gutter_sparks() -> void:
-	var spark := Image.create(1, 1, false, Image.FORMAT_RGBA8)
-	spark.fill(Color.WHITE)
-	var sparks := CPUParticles2D.new()
-	sparks.texture = ImageTexture.create_from_image(spark)
-	sparks.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
-	sparks.amount = 16
-	sparks.lifetime = 1.0
-	sparks.position = GUTTER_AT
-	sparks.emission_shape = CPUParticles2D.EMISSION_SHAPE_RECTANGLE
-	sparks.emission_rect_extents = Vector2(GUTTER_WIDTH * 0.5, 4)
-	sparks.direction = Vector2(0, -1)
-	sparks.spread = 25.0
-	sparks.initial_velocity_min = 60.0
-	sparks.initial_velocity_max = 150.0
-	sparks.gravity = Vector2(0, 140)
-	sparks.scale_amount_min = ART_PIXEL
-	sparks.scale_amount_max = ART_PIXEL
-	var heat := Gradient.new()
-	heat.offsets = PackedFloat32Array([0.0, 0.35, 0.7, 1.0])
-	heat.colors = PackedColorArray([Color(1.0, 0.95, 0.5), Color(1.0, 0.55, 0.1), Color(0.9, 0.15, 0.05), Color(0.6, 0.05, 0.0, 0.0)])
-	sparks.color_ramp = heat
-	sparks.z_index = 2
-	sparks.z_as_relative = false
-	features.add_child(sparks)
+# A layer of glints over the skull, added on top of it, that the spotlight brings out
+func _shine_on(skull: AnimatedSprite2D) -> Sprite2D:
+	var shine := Sprite2D.new()
+	shine.texture = SKULL_SHINE
+	shine.hframes = 2
+	var add := CanvasItemMaterial.new()
+	add.blend_mode = CanvasItemMaterial.BLEND_MODE_ADD
+	add.light_mode = CanvasItemMaterial.LIGHT_MODE_UNSHADED
+	shine.material = add
+	shine.z_index = skull.z_index
+	shine.z_as_relative = false
+	shine.modulate.a = 0.0
+	skull.add_child(shine)
+	shine.scale = Vector2.ONE  # it rides on the skull, which is already at the table's scale
+	return shine
 
-# A light's pool, drawn in the table's own chunky pixels: a few flat rings, brightest in
+# The lava in the drain: drawn as it glows, not dimmed by the dusk
+func _lava() -> void:
+	var unshaded := CanvasItemMaterial.new()
+	unshaded.light_mode = CanvasItemMaterial.LIGHT_MODE_UNSHADED
+	_lava_glow = Sprite2D.new()
+	_lava_glow.texture = LAVA_GLOW
+	_lava_glow.centered = false
+	_lava_glow.scale = features.MAP_SCALE
+	_lava_glow.material = unshaded
+	_lava_glow.z_index = 3  # over the flippers' undersides, which it lights
+	_lava_glow.z_as_relative = false
+	features.add_child(_lava_glow)
+	var embers: AnimatedSprite2D = features._sprite(LAVA_EMBERS, 4, LAVA_EMBERS_AT * features.MAP_SCALE, 6.0)
+	embers.material = unshaded
+	embers.z_index = 3
+	embers.z_as_relative = false
+	embers.play()
+
+# A light's pool, drawn in the table's own chunky pixels: two flat rings, brightest in
 # the middle, one texel to an art pixel (so it's built to each light's size)
 const BAND_EDGES := [0.5, 1.0]
 const BAND_ALPHA := [1.0, 0.42]
+# ...and a softer pool, fading out over more bands, for the spotlights on the idol and skull
+const SOFT_EDGES := [0.3, 0.5, 0.7, 0.86, 1.0]
+const SOFT_ALPHA := [0.95, 0.72, 0.5, 0.3, 0.14]
 const POOL_PIXELS := 128.0  # a light of size 1 lights a circle this many scene units across
 const ART_PIXEL := 2.9      # scene units to an art pixel (MAP_SCALE, about)
 const POOL_BLOCK := 3       # screen texels each art-pixel texel is drawn as
 
-func _pixel_pool(size: float) -> ImageTexture:
-	if _pools.has(size):
-		return _pools[size]
+func _pixel_pool(size: float, soft: bool = false) -> ImageTexture:
+	var key := Vector2(size, 1.0 if soft else 0.0)
+	if _pools.has(key):
+		return _pools[key]
+	var edges: Array = SOFT_EDGES if soft else BAND_EDGES
+	var alphas: Array = SOFT_ALPHA if soft else BAND_ALPHA
 	var texels := maxi(4, int(roundf(POOL_PIXELS * size / ART_PIXEL)))
 	var image := Image.create(texels, texels, false, Image.FORMAT_RGBA8)
 	var middle := texels / 2.0
@@ -147,19 +250,20 @@ func _pixel_pool(size: float) -> ImageTexture:
 		for x in texels:
 			var r := Vector2(x + 0.5 - middle, y + 0.5 - middle).length() / middle
 			var alpha := 0.0
-			for band in BAND_EDGES.size():
-				if r < BAND_EDGES[band]:
-					alpha = BAND_ALPHA[band]
+			for band in edges.size():
+				if r < edges[band]:
+					alpha = alphas[band]
 					break
 			image.set_pixel(x, y, Color(1, 1, 1, alpha))
 	# blown up blockily here, so the renderer's smoothing can't soften a texel's edges
 	image.resize(texels * POOL_BLOCK, texels * POOL_BLOCK, Image.INTERPOLATE_NEAREST)
-	_pools[size] = ImageTexture.create_from_image(image)
-	return _pools[size]
+	_pools[key] = ImageTexture.create_from_image(image)
+	return _pools[key]
 
-func _light(at: Vector2, colour: Color, energy: float, size: float) -> PointLight2D:
+func _light(at: Vector2, colour: Color, energy: float, size: float, soft: bool = false) -> PointLight2D:
 	var light := PointLight2D.new()
-	light.texture = _pixel_pool(size)
+	_all_lights.append(light)
+	light.texture = _pixel_pool(size, soft)
 	light.texture_scale = ART_PIXEL / POOL_BLOCK
 	light.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 	light.color = colour
@@ -170,6 +274,13 @@ func _light(at: Vector2, colour: Color, energy: float, size: float) -> PointLigh
 
 func _process(delta: float) -> void:
 	_clock += delta
+	_rune_wait = maxf(_rune_wait - delta, 0.0)
+	if _night != GameManager.night:
+		_night = GameManager.night
+		features._storm_tint.color = storm() if GameManager.curse_active else mood()
+		if _night:
+			for light in _all_lights:
+				light.visible = true  # the ones that come and go hide themselves again below
 	for i in _torch_lights.size():
 		var torch: AnimatedSprite2D = features._torches[i]
 		# a torch only throws light while it's burning, not smouldering on embers
@@ -181,16 +292,74 @@ func _process(delta: float) -> void:
 		_torch_lights[i].energy = TORCH_BLAZE * (1.0 + FLICKER * waver)
 		_torch_lights[i].texture_scale = _torch_sizes[i] * (1.0 + FLICKER_SIZE * waver)
 	_whirl_light.visible = features.temple._whirl.visible
-	var pulse := sin(_clock / GUTTER_PULSE_SECONDS * TAU)
-	_gutter_light.energy = GUTTER * (0.8 + 0.2 * pulse)
-	_gutter_light.texture_scale = _gutter_size * (1.0 + GUTTER_SWELL * pulse)
+	var whirl_breath := sin(_clock * TAU / WHIRL_BREATH_SECONDS)  # the magic whirl's glow breathes too
+	_whirl_light.energy = WHIRL_GLOW * (1.0 + SPOT_BREATH * whirl_breath)
+	_whirl_light.texture_scale = _whirl_scale * (1.0 + SPOT_BREATH_SIZE * whirl_breath)
+	# the sky light drifts after the ball, a dim spot following it about the table
+	var camera := get_viewport().get_camera_2d()
+	var followed: Variant = camera.get("_followed") if camera else null
+	if is_instance_valid(followed) and not followed.get("in_lava"):  # it stays put once the ball's in the lava
+		_sky_light.global_position = _sky_light.global_position.lerp((followed as Node2D).global_position, minf(SKY_FOLLOW * delta, 1.0))
+	_lava_glow.modulate.a = 0.8 + 0.2 * sin(_clock / LAVA_BREATH_SECONDS * TAU)
+	# the skull gleams as the spotlight passes near it
+	var skull: AnimatedSprite2D = features.skull._sprite
+	var to_light := _sky_light.global_position - skull.global_position
+	_skull_shine.frame = skull.frame
+	_skull_shine.offset = skull.offset + Vector2(clampf(to_light.x / 80.0, -1.0, 1.0), clampf(to_light.y / 80.0, -1.0, 1.0)).round()
+	_skull_shine.modulate.a = clampf(1.3 - to_light.length() / SHINE_REACH, 0.0, 1.0) * (0.65 + 0.2 * sin(_clock * 5.0))
+	# ...and a glint sweeps over it as the spotlight comes onto it, and again as it leaves
+	var on_skull := to_light.length() < SHIMMER_REACH
+	if on_skull != _spot_on_skull:
+		_spot_on_skull = on_skull
+		_shimmer_time = 0.0
+	if _shimmer_time >= 0.0:
+		var step := int(_shimmer_time * SHIMMER_FPS)
+		_shimmer_time += delta
+		_skull_shimmer.visible = step < SHIMMER_FRAMES
+		if step < SHIMMER_FRAMES:
+			_skull_shimmer.frame = skull.frame * SHIMMER_FRAMES + step
+			_skull_shimmer.offset = skull.offset
+		else:
+			_shimmer_time = -1.0
+	var sacrifice: AnimatedSprite2D = features.sacrifices.current()
+	_sacrifice_light.visible = sacrifice.visible and sacrifice.modulate.a > 0.3
+	_sacrifice_light.global_position = sacrifice.global_position
+	var idol: Sprite2D = features.idol_tower._idol
+	_idol_light.visible = idol.visible and not features.idol_tower._claimed
+	_idol_light.global_position = features.idol_tower.position + Vector2(idol.position.x, minf(idol.position.y + IDOL_SPOT_BELOW, features.idol_tower.IDOL_ON_FLOOR.y * features.MAP_SCALE.y))
+	# the spots breathe: slowly swelling and brightening, then easing back
+	var breath := sin(_clock * TAU / SPOT_BREATH_SECONDS)
+	_idol_light.energy = IDOL_GLOW * (1.0 + SPOT_BREATH * breath)
+	_idol_light.texture_scale = _idol_spot_scale * (1.0 + SPOT_BREATH_SIZE * breath)
+	_skull_light.visible = features.skull.lit()  # while its jaws are open
+	_skull_light.global_position = features.skull._sprite.global_position
+	var skull_breath := sin(_clock * TAU / SPOT_BREATH_SECONDS + PI)  # out of step with the idol's
+	_skull_light.energy = SKULL_GLOW * (1.0 + SPOT_BREATH * skull_breath)
+	_skull_light.texture_scale = _skull_spot_scale * (1.0 + SPOT_BREATH_SIZE * skull_breath)
 	for pair: Array in _lamp_lights:
 		var lamp: AnimatedSprite2D = pair[0]
 		(pair[1] as PointLight2D).visible = lamp.is_visible_in_tree() and lamp.frame >= pair[2]
 	for i in _eye_lights.size():
 		var eye: Sprite2D = features._face_eyes[i]
 		_eye_lights[i].global_position = eye.global_position
+		_eye_lights[i].visible = eye.visible  # not while it's been shot out
 		_eye_lights[i].color = EYE_RED if eye.frame == 1 else EYE_YELLOW
 		_eye_lights[i].energy = 0.8 + 0.15 * sin(_clock * 3.0)
-	for pair: Array in _button_lights:
-		(pair[1] as PointLight2D).visible = (pair[0] as AnimatedSprite2D).visible
+	for i in _button_lights.size():
+		var pair: Array = _button_lights[i]
+		var light := pair[1] as PointLight2D
+		var button := pair[0] as AnimatedSprite2D
+		light.visible = button.get_meta("lit") if button.has_meta("lit") else button.visible
+		# they breathe like the torches' light, only gentler
+		var waver := sin(_clock * FLICKER_RATES.x * 0.6 + i * 2.3) * 0.5 + sin(_clock * FLICKER_RATES.y * 0.6 + i * 1.1) * 0.5
+		light.energy = BUTTON_GLOW * (1.0 + BUTTON_FLICKER * waver)
+		light.texture_scale = pair[2] * (1.0 + BUTTON_FLICKER_SIZE * waver)
+	if not _night:
+		# by day the sun's up: only the torches throw any light
+		for light in _all_lights:
+			if not _torch_lights.has(light):
+				light.visible = false
+		_skull_shine.visible = false
+		_skull_shimmer.visible = false
+	else:
+		_skull_shine.visible = true

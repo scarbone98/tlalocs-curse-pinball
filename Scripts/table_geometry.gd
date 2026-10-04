@@ -14,8 +14,34 @@ const PALMS := [
 ## The gold buttons painted in the basemap: their centres (art pixels)
 const GOLD_BUTTONS := {
 	"spike_button": Vector2(113.5, 182.0),
-	"jaguar_button": Vector2(74.5, 270.0),
+	"dart_button": Vector2(74.5, 270.0),
+	"skull_button": Vector2(157.0, 212.0),
 }
+
+## The carved glyphs on the walls: each one's top-left corner in Sprites/table/runes.png
+## (7x7, art pixels); they flash colours as you score (Scripts/lighting.gd)
+const RUNES := [
+	Vector2(213, 273),
+	Vector2(51, 399),
+	Vector2(12, 345),
+	Vector2(60, 21),
+	Vector2(36, 57),
+	Vector2(219, 309),
+	Vector2(225, 255),
+	Vector2(123, 21),
+	Vector2(30, 291),
+	Vector2(93, 21),
+	Vector2(204, 291),
+	Vector2(198, 399),
+	Vector2(222, 345),
+	Vector2(228, 399),
+	Vector2(228, 219),
+	Vector2(18, 399),
+	Vector2(18, 309),
+	Vector2(69, 39),
+	Vector2(219, 381),
+	Vector2(18, 75),
+]
 
 ## The centre of the temple's ring of gems (art pixels)
 const TEMPLE_RING_CENTRE := Vector2(208.0, 50.0)

@@ -58,7 +58,6 @@ func light() -> void:
 	if lit or active or SpiritCodex.awakenable().is_empty():
 		return
 	lit = true
-	PinballEvents.toast.emit("Awakening lit in the den!")
 
 ## Starts the Awakening for one of the caught spirits. False if none is waiting to awaken.
 func start() -> bool:
@@ -88,7 +87,6 @@ func _physics_process(delta: float) -> void:
 		_shown_seconds = ceili(_time_left)
 		_show_progress()
 	if _time_left <= 0.0:
-		PinballEvents.toast.emit("The %s sleeps on" % SpiritCodex.SPECIES[_species].name)
 		_end()
 
 func _place_offering() -> void:
@@ -111,12 +109,10 @@ func _on_offering(body: Node) -> void:
 	_offering.set_deferred("monitoring", false)
 	_offering.hide()
 	if _collected < OFFERINGS:
-		PinballEvents.toast.emit("Offering %d/%d" % [_collected, OFFERINGS])
 		_show_progress()
 		_place_offering.call_deferred()
 		return
-	finishing = true
-	PinballEvents.toast.emit("Shoot Tlaloc's mouth!")
+	finishing = true  # Tlaloc's mouth opens on its whirl: that says where to shoot
 	_show_progress()
 
 ## The temple caught the ball with all three offerings found: the spirit awakens
@@ -144,6 +140,6 @@ func _end() -> void:
 
 func _show_progress() -> void:
 	var left := maxi(ceili(_time_left), 0)
-	var goal := "shoot Tlaloc's mouth!" if finishing else "offerings %d/%d" % [_collected, OFFERINGS]
+	var goal := "the portal is open" if finishing else "offerings %d/%d" % [_collected, OFFERINGS]
 	PinballEvents.objective_changed.emit("Awaken the %s: %s   %d:%02d" % [
 		SpiritCodex.SPECIES[_species].name, goal, left / 60, left % 60])

@@ -16,7 +16,7 @@ extends AnimatableBody2D
 ## Pokemon Pinball's kick grows straight from nothing at the pivot to 12.6 px/frame
 ## at the tip, which is past the ball's speed limit, so tip shots leave at full speed.
 @export var kick_base: float = 0.0
-@export var kick_gain: float = 3.3
+@export var kick_gain: float = 2.9
 @export var contact_margin: float = 6.0
 
 var _target: float
@@ -31,6 +31,8 @@ func _ready() -> void:
 	_target = rotation
 	_measure_shape()
 	_sprite = get_node_or_null(^"Sprite2D") as Sprite2D
+	if _sprite:
+		_sprite.z_index = 2  # the ball (z 1) passes under the flipper
 	var ball := get_tree().get_first_node_in_group("ball") as RigidBody2D
 	if ball:
 		var shape := ball.get_node_or_null("CollisionShape2D") as CollisionShape2D
@@ -77,20 +79,6 @@ func _physics_process(delta: float) -> void:
 	if pressed and turned != 0.0:
 		for ball in get_tree().get_nodes_in_group("ball"):  # multiball: every ball in play
 			_kick_ball(ball as RigidBody2D, turned / delta)
-	_layer_over_ball()
-
-# The ball (z 1) is drawn in front of the flipper once it's lower down the table than the
-# flipper's middle, and behind it while it's higher up, so the flipper reads as standing up
-# off the table: the nearest ball decides
-func _layer_over_ball() -> void:
-	if _sprite == null:
-		return
-	var nearest: Node2D = null
-	for node in get_tree().get_nodes_in_group("ball"):
-		var ball := node as Node2D
-		if nearest == null or ball.global_position.distance_squared_to(_sprite.global_position) 				< nearest.global_position.distance_squared_to(_sprite.global_position):
-			nearest = ball
-	_sprite.z_index = 2 if nearest and nearest.global_position.y < _sprite.global_position.y else 0
 
 func _kick_ball(ball: RigidBody2D, omega: float) -> void:
 	if ball == null or ball.collision_mask == 0 or _tip_local == Vector2.ZERO:

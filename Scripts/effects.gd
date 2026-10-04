@@ -9,6 +9,9 @@ extends Node2D
 ##   dust    stone off a wall the ball slams into
 ##   gold    a shower of gold for a relic or the El Dorado jackpot
 ##   fire    sparks flying up off a torch as it catches
+##   lava    molten drops thrown up as a ball plops into the lava
+##   smoke   a slow grey puff rising off the lava
+##   smoke_trail  wisps of smoke streaming up off a ball sinking into the lava, a while
 
 const VIBRATE_FROM := 6.0  # only the big moments (kickback, the King, the jackpot) buzz the phone
 const VIBRATE_MS_PER_STRENGTH := 6
@@ -21,9 +24,18 @@ const KINDS := {
 	"dust": [6, 0.3, Vector2(60, 140), 0.0, [Color("#b4c4cc"), Color("#748c9a"), Color(0.34, 0.43, 0.47, 0.0)]],
 	"gold": [32, 0.7, Vector2(160, 420), 380.0, [Color("#fffbd6"), Color("#f8d000"), Color(0.75, 0.54, 0.06, 0.0)]],
 	"fire": [14, 0.5, Vector2(60, 180), -260.0, [Color("#fffbd6"), Color("#f8a008"), Color(0.75, 0.34, 0.18, 0.0)]],
+	"lava": [18, 0.6, Vector2(120, 300), 700.0, [Color("#fff0a0"), Color("#f86010"), Color(0.6, 0.08, 0.02, 0.0)]],
+	"poison": [12, 0.7, Vector2(30, 110), -30.0, [Color("#c8ffb0"), Color("#40d040"), Color(0.1, 0.45, 0.1, 0.0)]],
+	"smoke": [10, 1.4, Vector2(10, 40), -45.0, [Color(0.55, 0.52, 0.5, 0.8), Color(0.35, 0.33, 0.33, 0.55), Color(0.2, 0.2, 0.2, 0.0)]],
 }
 
+# The everyday hits don't burst every time - only now and then, and not too close together
+# (kind -> chance a hit shows one); the big moments (gold, fire, lava...) always do
+const SOMETIMES := {"sparks": 0.35, "dust": 0.3, "spores": 0.4, "poison": 0.6}
+const SOMETIMES_GAP := 0.2  # seconds between two bursts of one of those kinds
+
 var _pixel: ImageTexture
+var _last := {}  # kind -> when it last burst (seconds)
 
 func _ready() -> void:
 	# One table-art pixel (3x3 on screen), so the bursts sit on the pixel grid's scale
@@ -34,8 +46,16 @@ func _ready() -> void:
 	PinballEvents.rumble.connect(_buzz)
 
 func _burst(kind: String, at: Vector2) -> void:
+	if kind == "smoke_trail":
+		_smoke_trail(at)
+		return
 	if not KINDS.has(kind):
 		return
+	if SOMETIMES.has(kind):
+		var now := Time.get_ticks_msec() / 1000.0
+		if randf() > SOMETIMES[kind] or now - float(_last.get(kind, -10.0)) < SOMETIMES_GAP:
+			return
+		_last[kind] = now
 	var spec: Array = KINDS[kind]
 	var particles := CPUParticles2D.new()
 	particles.texture = _pixel
@@ -65,3 +85,13 @@ func _burst(kind: String, at: Vector2) -> void:
 func _buzz(strength: float) -> void:
 	if strength >= VIBRATE_FROM:
 		Input.vibrate_handheld(int(strength * VIBRATE_MS_PER_STRENGTH))
+
+const SmokeStreamers := preload("res://Scripts/smoke_streamers.gd")
+const TRAIL_SECONDS := 2.0   # smoke streams up off the lava this long
+
+# Ribbons of smoke streaming up off the lava where a ball's going under
+func _smoke_trail(at: Vector2) -> void:
+	var smoke := SmokeStreamers.new()
+	smoke.seconds = TRAIL_SECONDS
+	smoke.position = (at / SmokeStreamers.PX).floor() * SmokeStreamers.PX  # on the art-pixel grid
+	add_child(smoke)

@@ -28,17 +28,24 @@ and the playfield sprites cut from the hand-drawn sheets in tools/source_art/:
                               silver, emerald and gold, all hand-drawn)
   paddle_left.png, paddle_right.png
   Sprites/table/torch.png     6 burning frames, then the same 6 as embers
-  Sprites/table/blue_flipper.png  15 frames of the flipper plate turning, in blue
+  Sprites/table/blue_flipper.png  15 frames of the flipper plate turning, carved in blue stone
+                              with a jade frog inlaid (the left lane's spinners)
+  Sprites/table/red_flipper.png  ...and in red stone with a gold spirit spiral (the right lane's)
   Sprites/table/wall_jaguar.png  the jaguar heads set in the side walls, facing into the
                               table from the left: watching, roaring, blinking
   Sprites/table/whirl.png     3 frames of the spirit whirl
-  Sprites/face_sockets.png    the centre face without its eyes (eyeless.png: calm, struck)
-  Sprites/table/face_eye.png  its eyes (yelloweye.png, redeye.png), drawn over the sockets
+  Sprites/face_sockets.png    the centre face without its eyes (from the hand-drawn
+                              Sprites/tlaloc.png: mouth shut, mouth open)
+  Sprites/table/face_eye.png  its eyes, yellow and red, lifted off Sprites/tlaloc.png and
+                              drawn over the sockets (Scripts/table_features.gd moves them)
                               so they can follow the ball
   Sprites/table/sling_left_lit.png, sling_right_lit.png  the slingshots lit up as they kick
                               (bumperleftlightup.png, bumperrightlightup.png)
   Sprites/table/warrior.png   the arena's warriors (warrior.png, as drawn): four frames turning
                               round, then the fifth for when one's struck
+  Sprites/table/skull_shine.png  the skull's brightest facets, for it to gleam in a light
+  Sprites/table/skull_shimmer.png  a glint sweeping over the skull's dome (6 frames, a row
+                              for each of its two frames), as the spotlight comes and goes
   Sprites/table/skull_top.png, skull_jaw.png  the skull's top (skullupper.png: shut, open)
                               and lower jaw (skulllower.png), drawn either side of the ball
   Sprites/table/tower_drum.png, spikes.png, torch_button.png  as drawn (spinningtower.png,
@@ -51,6 +58,17 @@ and the playfield sprites cut from the hand-drawn sheets in tools/source_art/:
                               heartbeat.png, redrawn at half size)
   Sprites/table/spirit_lamp.png  the right lane's floor lamps (dark, lit)
   Sprites/table/shard.png     a crystal sliver, for the tower breaking
+  Sprites/table/temple_interior.png  the inside of the golden temple, seen through its windows
+  Sprites/table/arena_hole.png  the stone tablet in the warriors' arena, flipping: shut ... open
+  Sprites/table/front_walls.png  the walls along the table's foot, that a ball in a gutter
+                              passes behind (a mask for Scripts/ball_mask.gdshader)
+  Sprites/table/runes.png     the carved glyphs on the walls, alone, for them to flash
+  Sprites/table/fire_button.png  the fourth torch button, a flame on it: up, pressed
+  Sprites/table/dart_falling.png, dart_stuck.png, dart_shadow.png  the poison dart trap's
+                              darts: falling, stuck in the floor (still, quivering), and
+                              the shadow of one falling
+  Sprites/table/lava_glow.png, lava_embers.png  the lava pit (lava.png): its glow, and its
+                              embers and edge in 4 frames
   Sprites/table/roulette_pictures.png, roulette_border.png, roulette_doors.png  the floor
                               roulette: its pictures (cities, then prizes), border and doors
   Sprites/table/claw_swipe.png  a jaguar's claw marks as it swipes (striking, full, fading)
@@ -63,6 +81,7 @@ MAP_SCALE (720/256 by 1280/424) puts it all on one pixel grid.
 
 Run from the repo root:  python3 tools/make_table.py
 """
+import math
 import colorsys
 import random
 from pathlib import Path
@@ -199,6 +218,8 @@ GLYPHS = {
 RIM_INSET = 2             # the step-fret border runs this far in from the table's edge, all the way round
 GLYPH_COUNT = 34          # carved glyphs scattered over the walls
 GLYPH_SPACING = 24        # art pixels between any two details
+RUNE_SPOTS = []           # each carved glyph's top-left corner, for the game to flash them (Scripts/lighting.gd)
+RUNES = Image.new("RGBA", (256, 424), (0, 0, 0, 0))  # ...and their pixels, white, in a layer of their own
 # The slots in the side walls the jaguars hide in (Scripts/journey.gd): the dark pixels
 # of the mock-up inside these boxes
 JAGUAR_SLOTS = [(38, 282, 68, 314), (176, 282, 206, 314)]
@@ -268,6 +289,128 @@ def jaguar_slots(base):
                     base.putpixel((x, y), p)
 
 
+# Claw marks raked into the floor in front of each wall jaguar: three scratches each,
+# dark grooves with a lit lip below, mirrored for the right-hand one (art pixels)
+SCRATCHES_AT = [(53, 304, 1), (187, 304, -1)]  # where each set starts (as far out from its slot), and which way it rakes
+SCRATCH_LENGTH = 10
+SCRATCH_GAP = 3
+
+
+def jaguar_scratches(base, walls):
+    for x0, y0, way in SCRATCHES_AT:
+        for k in range(3):
+            for t in range(SCRATCH_LENGTH - abs(k - 1)):  # the middle claw rakes longest
+                x = x0 + way * (t + k)
+                y = y0 + k * SCRATCH_GAP - round(t * 0.6)
+                for (px, py), f in (((x, y), 0.72), ((x, y + 1), 1.08)):  # faint, worn in
+                    if walls[py][px]:
+                        continue  # only the floor
+                    r, g, b, a = base.getpixel((px, py))
+                    base.putpixel((px, py), (min(255, int(r * f)), min(255, int(g * f)), min(255, int(b * f)), a))
+
+
+# A jaguar's paw prints pressed faintly into the floor, a trail leading up to the gold
+# button that wakes them (art pixels: each print's top-left corner), worn in like the
+# claw marks
+PAW = [
+    "o.o.o",
+    ".....",
+    ".ooo.",
+    "ooooo",
+    ".ooo.",
+]
+PAW_PRINTS = [(137, 231), (145, 219)]
+
+
+def paw_prints(base, walls):
+    for x0, y0 in PAW_PRINTS:
+        for y, row in enumerate(PAW):
+            for x, c in enumerate(row):
+                px, py = x0 + x, y0 + y
+                if c == "o" and not walls[py][px]:
+                    r, g, b, a = base.getpixel((px, py))
+                    base.putpixel((px, py), (int(r * 0.72), int(g * 0.72), int(b * 0.72), a))
+
+
+# The fourth torch button, up past the left lane's top palm: the stone torch button with
+# a flame rune carved in its top face in place of its dots (up, then pressed)
+FIRE_GLYPH = [
+    "..o..",
+    "..oo.",
+    ".o.o.",
+    ".o..o",
+    "o...o",
+    ".ooo.",
+]
+FIRE_GLYPH_AT = (7, 4)  # in each 20x20 frame, on the slab's top face
+FACE_ROWS = range(3, 11)
+
+
+def fire_button():
+    from collections import Counter
+    sheet = Image.open("Sprites/table/torch_button.png").convert("RGBA")
+    fw = sheet.height
+    for f in range(sheet.width // fw):
+        x0 = f * fw
+        face_px = [sheet.getpixel((x0 + x, y)) for y in FACE_ROWS for x in range(fw) if sheet.getpixel((x0 + x, y))[3]]
+        face = Counter(p[:3] for p in face_px).most_common(1)[0][0]
+        lum = sum(face)
+        dots = {p[:3] for p in face_px if 0.6 * lum < sum(p[:3]) < 0.92 * lum}
+        carve = tuple(int(c * 0.62) for c in face)  # cut deep
+        lip = tuple(min(255, int(c * 1.24)) for c in face)
+        # smooth away its dots, then carve the flame in their place
+        for y in FACE_ROWS:
+            for x in range(fw):
+                px = sheet.getpixel((x0 + x, y))
+                if px[3] and px[:3] in dots:
+                    sheet.putpixel((x0 + x, y), face + (255,))
+        oy = FIRE_GLYPH_AT[1] + f  # pressed, the face is a pixel lower
+        for y, row in enumerate(FIRE_GLYPH):
+            for x, c in enumerate(row):
+                if c != "o":
+                    continue
+                gx, gy = x0 + FIRE_GLYPH_AT[0] + x, oy + y
+                sheet.putpixel((gx, gy), carve + (255,))
+                below = (gx, gy + 1)
+                if y + 1 >= len(FIRE_GLYPH) or FIRE_GLYPH[y + 1][x] != "o":
+                    if sheet.getpixel(below)[:3] == face:
+                        sheet.putpixel(below, lip + (255,))  # the groove's lit lip
+    return sheet
+
+
+# A skull over crossed bones carved in the inlane wall's stone just above the dart trap's
+# gold button: poison (art pixels: its top-left corner)
+DART_RUNE = ["..XXX..", ".XXXXX.", ".X.X.X.", "..XXX..", "X.X.X.X", ".X...X.", "X.....X"]
+DART_RUNE_AT = (65, 256)  # just above the button, to its left
+
+FRONT_WALLS_FROM = 330  # art rows: the walls along the table's foot, in front of the gutters
+
+
+def dart_rune_lit():
+    """The skull and crossbones over the dart button, glowing poison green while the darts
+    are out (Scripts/dart_trap.gd): laid over the carving"""
+    glow, core = (60, 230, 110, 255), (190, 255, 200, 255)
+    w, h = len(DART_RUNE[0]), len(DART_RUNE)
+    img = Image.new("RGBA", (w, h), T)
+    for y, row in enumerate(DART_RUNE):
+        for x, ch in enumerate(row):
+            if ch == "X":
+                inner = all(0 <= y + dy < h and 0 <= x + dx < w and DART_RUNE[y + dy][x + dx] == "X" for dx, dy in ((1, 0), (-1, 0), (0, 1), (0, -1)))
+                img.putpixel((x, y), core if inner else glow)
+    return img
+
+
+def front_walls(walls):
+    """Where the walls along the table's foot stand in front of the floor behind them: a
+    ball rolling down a gutter under them (Scripts/ball.gd) is hidden there."""
+    out = Image.new("RGBA", (256, 424), T)
+    for y in range(FRONT_WALLS_FROM, 424):
+        for x in range(256):
+            if walls[y][x]:
+                out.putpixel((x, y), (255, 255, 255, 255))
+    return out
+
+
 def details(base, walls, keep_clear):
     """Glyphs on clear brick wall, spaced apart, off the border, and away from keep_clear
     (art-pixel boxes the scripts put sprites over)."""
@@ -284,7 +427,13 @@ def details(base, walls, keep_clear):
             break
         off_border = RIM_INSET + 10 <= x0 <= 245 - RIM_INSET - 10 and RIM_INSET + 10 <= y0 <= 413 - RIM_INSET - 10
         if off_border and fits(walls, x0 - 1, y0 - 1, 9, 9) and clear(x0 - 1, y0 - 1, 9, 9) and spaced(x0 + 3, y0 + 3):
-            carve(base, GLYPHS[names[placed % len(names)]], x0, y0, styles[placed % len(styles)])
+            glyph = GLYPHS[names[placed % len(names)]]
+            carve(base, glyph, x0, y0, styles[placed % len(styles)])
+            RUNE_SPOTS.append((x0, y0))
+            for gy, row in enumerate(glyph):
+                for gx, ch in enumerate(row):
+                    if ch == "X":
+                        RUNES.putpixel((x0 + gx, y0 + gy), (255, 255, 255, 255))
             taken.append((x0 + 3, y0 + 3))
             placed += 1
     print("details: %d glyphs" % placed)
@@ -424,14 +573,19 @@ PATH_SUPERSAMPLE = 4
 PATH_SPACING = 6.0  # art pixels between points
 PATH_SMOOTHING = 9  # art pixels either side averaged in
 RAIL_PATHS = {  # name: [the mouth (art pixels, or an opening), ..., the end]
-    # the left one starts from the foot of the chute under the rail's end
-    "left_lanes": [(74.7, 232.5), "left_entry", "left_exit"],
-    "left_temple": [(74.7, 232.5), "left_entry", "left_pipe"],
+    "left_lanes": ["left_entry", "left_exit"],
+    "left_temple": ["left_entry", "left_pipe"],
     "right": ["right_entry", "right_top"],
 }
-# Straight lead-ins before a path's mouth (art pixels): the right rail's mouth is barely
-# wider than the ball, so a ball is taken on below it, on the line up into it
-RAIL_LEADS = {"right": (174.9, 251.7)}
+# Straight lead-ins before a path's mouth (art pixels), on the line of the track up into it:
+# the right rail's mouth is barely wider than the ball, so a ball is taken on below it; the
+# left one's wires end raggedly, one pair well short of the other, so its line starts from
+# just past them, running straight up between them rather than wandering in from the floor
+RAIL_LEADS = {"right": (174.9, 251.7), "left_lanes": (63.9, 220.3), "left_temple": (63.9, 220.3)}
+# ...and below where the trace settles onto the left track's middle (art row), the left
+# rail's line runs dead straight down to its lead-in: the trace wanders between the ragged
+# wire ends there
+RAIL_STRAIGHT_BELOW = {"left_lanes": 182.0, "left_temple": 182.0}
 
 
 def rail_paths(blob):
@@ -503,6 +657,9 @@ def rail_paths(blob):
         for a, b in zip(stops, stops[1:]):
             leg = middle(a, b)
             points += leg if not points else leg[1:]
+        if name in RAIL_STRAIGHT_BELOW:
+            join = next(i for i, q in enumerate(points) if q[1] <= RAIL_STRAIGHT_BELOW[name])
+            points = points[join:]
         if name in RAIL_LEADS:
             lead, mouth = RAIL_LEADS[name], points[0]
             steps = max(2, int(((mouth[0] - lead[0]) ** 2 + (mouth[1] - lead[1]) ** 2) ** 0.5 * ss))
@@ -562,8 +719,8 @@ def ramp_zone(blob):
 # ---------- sprites cut from the hand-drawn sheets ----------
 
 def ball_tiers():
-    """The four ball upgrades, all hand-drawn with the same 16 roll frames: iron (x1),
-    silver (x2, the original pinball_sprite.png), emerald (x3) and gold (x4)."""
+    """The four ball upgrades, all hand-drawn with the same 16 roll frames: iron (x1), silver
+    (x2, the original pinball_sprite.png), emerald (x3) and gold (x4)."""
     rows = ["iron_ball.png", "pinball_sprite.png", "emerald_ball.png", "golden_ball.png"]
     sheets = [Image.open(SRC / name).convert("RGBA") for name in rows]
     w, h = sheets[0].size
@@ -598,19 +755,87 @@ def torch_sheet():
     return out
 
 
-def blue_flipper():
-    """The hand-drawn flipper plate (flipper.png), turned from red to blue."""
+# The spinners' plates, carved in stone: the hand-drawn flipper plate's frames (its two
+# faces and its axle, turning) give each frame's shape; its faces become tinted stone,
+# bevelled and grained, with a glyph inlaid in the front face that foreshortens as it turns.
+FROG_GLYPH = [  # a frog seen from above: the blue spinners charge the frog kickback
+    ".oo....oo.",
+    "oJJo..oJJo",
+    "oJJooooJJo",
+    ".oJJJJJJo.",
+    ".oJJooJJo.",
+    "oJJJJJJJJo",
+    "oJoJJJJoJo",
+    "oo.oJJo.oo",
+    "...o..o...",
+    "..........",
+]
+SPIRIT_GLYPH = [  # a spirit's spiral, curling in: the red spinner lights the spirit lamps
+    ".oooooooo.",
+    "oJJJJJJJJo",
+    "oJooooooJo",
+    "oJoJJJJoJo",
+    "oJoJooJoJo",
+    "oJoJoJJoJo",
+    "oJoJoooooo",
+    "oJoJJJJJJo",
+    "oJoooooooo",
+    "oo........",
+]
+STONE_TINTS = {
+    "blue": [(40, 52, 80), (62, 80, 116), (90, 108, 148), (126, 144, 182), (168, 182, 210)],
+    "red": [(74, 36, 34), (110, 54, 46), (144, 76, 62), (180, 106, 88), (212, 144, 122)],
+}
+INLAYS = {"frog": ((60, 200, 130), (24, 110, 70)), "spirit": ((246, 206, 96), (150, 104, 30))}
+PLATE_AXLE = {(184, 192, 192), (248, 248, 248), (0, 0, 0)}
+PLATE_FRONT = (248, 112, 112)  # the plate's light face: the glyph's on this one
+PLATE_EDGE = (248, 56, 0)
+
+
+def stone_spinner(tint, glyph_name):
     sheet = Image.open(SRC / "flipper.png").convert("RGBA")
+    ramp = STONE_TINTS[tint]
+    glyph = FROG_GLYPH if glyph_name == "frog" else SPIRIT_GLYPH
+    inlay, inlay_dark = INLAYS[glyph_name]
+    fw = sheet.height  # square frames
     out = sheet.copy()
-    for y in range(sheet.height):
-        for x in range(sheet.width):
-            r, g, b, a = sheet.getpixel((x, y))
-            if not a:
-                continue
-            h, s, v = colorsys.rgb_to_hsv(r / 255, g / 255, b / 255)
-            if s > 0.3 and (h < 0.08 or h > 0.9):  # the reds
-                r2, g2, b2 = colorsys.hsv_to_rgb(0.62, s, v)
-                out.putpixel((x, y), (round(r2 * 255), round(g2 * 255), round(b2 * 255), a))
+    rng = random.Random(7)
+    grain = {(u, v): rng.random() for u in range(fw) for v in range(64)}
+    for f in range(sheet.width // fw):
+        face = [(x, y) for y in range(fw) for x in range(f * fw, f * fw + fw)
+                if sheet.getpixel((x, y))[3] and sheet.getpixel((x, y))[:3] not in PLATE_AXLE]
+        if not face:
+            continue
+        x0 = min(x for x, _ in face)
+        x1 = max(x for x, _ in face)
+        y0 = min(y for _, y in face)
+        y1 = max(y for _, y in face)
+        w, h = x1 - x0 + 1, y1 - y0 + 1
+        front = sum(1 for x, y in face if sheet.getpixel((x, y))[:3] == PLATE_FRONT) > len(face) // 3
+        base = 2 if front else 1  # the front face catches the light; the back's in shade
+        for x, y in face:
+            u, v = x - x0, (y - y0) / max(h - 1, 1)
+            k = base
+            if y == y0:
+                k += 1  # the bevel's top edge, lit
+            elif y == y1:
+                k -= 1  # ...and its foot, in shadow
+            if sheet.getpixel((x, y))[:3] == PLATE_EDGE:
+                k = base + 2  # the edge facing the light
+            if grain[(u, int(v * 15))] < 0.12:
+                k -= 1  # a fleck in the stone
+            col = ramp[max(0, min(len(ramp) - 1, k))]
+            # the glyph, inlaid in the front face, squashed with it as it turns away
+            if front and h >= 5 and 0 < y - y0 < h - 1:
+                gx = u - (w - len(glyph[0])) // 2
+                gy = int(v * len(glyph))
+                if 0 <= gx < len(glyph[0]) and 0 <= gy < len(glyph):
+                    c = glyph[gy][gx]
+                    if c == "J":
+                        col = inlay
+                    elif c == "o":
+                        col = inlay_dark if h >= 9 else col
+            out.putpixel((x, y), col + (255,))
     return out
 
 
@@ -687,7 +912,8 @@ def claw_swipe():
 # frames to draw over them when they're hit, like the torches' stone buttons
 GOLD_BUTTONS = {
     "spike_button": (110, 179, 117, 185),   # beside the idol pit's spikes
-    "jaguar_button": (70, 266, 79, 274),    # on the left inlane wall's tip
+    "dart_button": (70, 266, 79, 274),      # on the left inlane wall's tip: fires the poison darts
+    "skull_button": (154, 209, 160, 215),   # at the foot of the skull's lane: brings the jaguars out
 }
 PRESS_SHADOW = (112, 72, 8, 255)
 BUTTON_GLOW = (255, 248, 168)  # lit, its gold blends halfway to this
@@ -788,6 +1014,55 @@ def skull_pieces():
     return top, Image.open(SRC / "skulllower.png").convert("RGBA")
 
 
+def skull_shine(top):
+    """Where the crystal skull catches the light: its brightest facets, as white and
+    pale-blue glints (one frame for each of the top's two), for the game to brighten as a
+    light passes over it."""
+    lums = sorted({sum(p[:3]) for p in top.get_flattened_data() if p[3]})
+    hot, warm = lums[int(len(lums) * 0.85)], lums[int(len(lums) * 0.65)]
+    out = Image.new("RGBA", top.size, T)
+    for y in range(top.height):
+        for x in range(top.width):
+            p = top.getpixel((x, y))
+            if not p[3] or y > top.height * 0.5:
+                continue  # only the crystal dome, not its teeth
+            if sum(p[:3]) >= hot:
+                out.putpixel((x, y), (255, 255, 255, 255))
+            elif sum(p[:3]) >= warm:
+                out.putpixel((x, y), (170, 230, 255, 150))
+    return out
+
+
+SHIMMER_FRAMES = 6
+
+
+def skull_shimmer(top):
+    """A glint running diagonally across the crystal dome, the way light sweeps over the
+    rail emerald's facets: SHIMMER_FRAMES frames across, one row for each of the top's two
+    frames (jaws shut, open). The game plays it once as the spotlight comes onto the skull
+    or leaves it."""
+    fw, h = top.width // 2, top.height
+    out = Image.new("RGBA", (fw * SHIMMER_FRAMES, h * 2), T)
+    for row in range(2):
+        frame = top.crop((row * fw, 0, row * fw + fw, h))
+        box = frame.getbbox()
+        span = (box[2] - box[0]) + (h * 0.5 - box[1]) * 0.6  # across the dome, corner to corner
+        for f in range(SHIMMER_FRAMES):
+            band = box[0] + 1 + (span - 2) * f / (SHIMMER_FRAMES - 1)
+            for y in range(h):
+                if y > h * 0.5:
+                    break  # only the crystal dome, not its teeth
+                for x in range(fw):
+                    if not frame.getpixel((x, y))[3]:
+                        continue
+                    d = abs(x + (y - box[1]) * 0.6 - band)
+                    if d < 1.0:
+                        out.putpixel((f * fw + x, row * h + y), (255, 255, 255, 235))
+                    elif d < 2.2:
+                        out.putpixel((f * fw + x, row * h + y), (170, 230, 255, 140))
+    return out
+
+
 # ---------- the temple's gems, lit ----------
 
 GEM_BLUE = (20, 124, 199)
@@ -832,44 +1107,678 @@ def temple_gems():
 
 # ---------- the plunger's spring ----------
 
-SPRING_W = 12
-SPRING_TALL = 12  # at rest (art pixels)
-SPRING_SHORT = 4  # pulled all the way down
+SPRING_W = 14
+SPRING_TALL = 36  # at rest (art pixels)
+SPRING_SHORT = 6  # pulled all the way down: squashed flat
+
+
+# The slingshots at rest: the lit art (bumperleftlightup.png, which the basemap has painted
+# in) with its glowing face and gold rim dimmed, laid over the basemap's lit ones; the lit
+# sprite flashes over it as one kicks. Its shadow on the floor stays as it is.
+SLING_DIM = {
+    (0x6c, 0xab, 0xc4): (0x4c, 0x80, 0xa2),  # the face
+    (0xf8, 0xf8, 0xf8): (0x9c, 0xc0, 0xd4),  # its shine
+    (0x77, 0xd1, 0xca): (0x5a, 0x9c, 0xaa),  # ...and its glint
+    (0xfc, 0xc3, 0x47): (0x56, 0x78, 0x9a),  # the rim: no gold (the gold is it lighting up)
+}
+
+
+def sling_unlit(lit):
+    out = lit.copy()
+    px = out.load()
+    for y in range(out.height):
+        for x in range(out.width):
+            p = px[x, y]
+            if p[3] and p[:3] in SLING_DIM:
+                px[x, y] = SLING_DIM[p[:3]] + (p[3],)
+    return out
+
+
+# ---------- the travel totem ----------
+
+TOTEM_W, TOTEM_H = 26, 22  # each frame: the pole, and what stands out from it (ears, beak, wings)
+TOTEM_POLE = 16            # the pole's width
+TOTEM_RY = 3               # the half-height of each drum's top face
+TOTEM_TOP = 3              # rows above the drum's top face, for what rises off it (the bear's ears)
+
+# The carving round each drum, as if unrolled flat: a row at a time from just under its top
+# face's front edge, each row following it round so the carving curves with the wood.
+# . bare wood, K black formline, R red, G teal, W white, Y yellow, N green, O beak
+TOTEM_CARVINGS = [
+    [  # the bear, at the foot
+        "..RRRR....RRRR..",
+        ".RKKKKR..RKKKKR.",
+        ".KWWKKKK.KKKWWK.",  # formline eyes: a white lid over a black pupil
+        ".KWKKKK..KKKKWK.",
+        "..KKKK.GG.KKKK..",
+        "......GKKG......",  # his snout, teal, black nostrils
+        ".RR...GGGG...RR.",  # red cheeks
+        "..KKKKKKKKKKKK..",
+        "..KWKWKWKWKWKWK.",  # bared teeth
+        "...KRRRRRRRRK...",
+        "....KKKKKKKK....",
+        "GGGGGGGGGGGGGGGG",  # a teal band round its foot
+        "KKKKKKKKKKKKKKKK",
+    ],
+    [  # the raven: eyes either side of a long beak carved out from its face
+        "KKKKKKKKKKKKKKKK",
+        "..RRR......RRR..",
+        ".KKKKK....KKKKK.",
+        ".KWWKK....KKWWK.",
+        ".KKKK......KKKK.",
+        "..GG........GG..",
+        ".GKKG......GKKG.",  # its wings, folded at its sides
+        ".GKKG......GKKG.",
+        ".GGGG......GGGG.",
+        "................",
+        "..RRRRRRRRRRRR..",
+        "..KKKKKKKKKKKK..",
+        "................",
+    ],
+    [  # Xatu, at the top: great staring eyes, its little hooked beak, red and yellow bands
+        ".WWWWW....WWWWW.",
+        "WWWKKWW..WWKKWWW",
+        "WWKKKKW..WKKKKWW",
+        "WWKKKWW..WWKKKWW",
+        ".WWWWW.OO.WWWWW.",
+        ".......OOO......",
+        ".......OO.......",
+        "................",
+        "RRRRRRRRRRRRRRRR",
+        "YYYYYYYYYYYYYYYY",
+        "KKKKKKKKKKKKKKKK",
+        "YYYYYYYYYYYYYYYY",
+        "RRRRRRRRRRRRRRRR",
+    ],
+]
+
+
+def _ramp(rgb, steps=5):
+    """A pixel-art shading ramp for one colour: lighter steps warmer and yellower, darker
+    ones cooler and toward purple, light to dark"""
+    h, l, s_ = colorsys.rgb_to_hls(*[c / 255 for c in rgb])
+    out = []
+    for i in range(steps):
+        k = i / (steps - 1)  # 0 lightest .. 1 darkest
+        dl = 0.22 - 0.5 * k
+        hue = h + (0.03 if dl > 0 else -0.04) * abs(dl) * 2.5  # light toward yellow, shadow toward blue
+        r, g, b_ = colorsys.hls_to_rgb(hue % 1.0, min(0.94, max(0.06, l + dl)), min(1.0, s_ * (1.05 - 0.15 * k)))
+        out.append((int(r * 255), int(g * 255), int(b_ * 255), 255))
+    return out
+
+
+def totem_heads():
+    """The totem pole a jaguar's hits build (Scripts/totem.gd), Pacific Northwest style:
+    three drums of carved red cedar, each a cylinder seen a little from above like the
+    idol tower's drums. Every colour has its own shading ramp (warmer in the light, cooler
+    in the shade), lit from the upper left round the cylinder, a rim of reflected light
+    down its far edge, a shadow under the lip of the top face. Carved and painted in black
+    formline, red and teal: a bear at the foot, its ears standing up off the top; a raven,
+    its beak jutting out over its chest and casting a shadow; and on top Xatu, green,
+    staring, wings spread wide either side like a thunderbird's."""
+    ink = (24, 16, 20, 255)
+    base = {".": (176, 104, 58), "K": (40, 32, 38), "R": (214, 58, 44), "G": (52, 170, 156),
+            "W": (240, 232, 214), "Y": (246, 196, 40), "N": (86, 184, 82), "O": (238, 170, 40)}
+    ramps = {k: _ramp(v) for k, v in base.items()}
+    green_wood = _ramp((86, 184, 82))
+    fw, h, pw, ry, top_pad = TOTEM_W, TOTEM_H, TOTEM_POLE, TOTEM_RY, TOTEM_TOP
+    x_pole = (fw - pw) // 2
+    top_c = top_pad + ry
+    bottom_c = h - 1 - ry
+    sheet = Image.new("RGBA", (fw * 3, h), T)
+
+    def light(u):  # lit from the upper left, round the cylinder: 0 lit .. 4 deep shade
+        n = (u, math.sqrt(max(0.0, 1 - u * u)))
+        lam = max(0.0, n[0] * -0.55 + n[1] * 0.83)
+        step = 4 - int(round(lam * 4.2))
+        if u > 0.82:
+            step = max(step - 1, 1)  # a rim of light bounced back off its far edge
+        return max(0, min(4, step))
+
+    for f in range(3):
+        img = Image.new("RGBA", (fw, h), T)
+        px = img.load()
+        wood = green_wood if f == 2 else ramps["."]
+        carving = TOTEM_CARVINGS[f]
+
+        if f == 2:  # Xatu's wings, spread wide either side like a thunderbird's: white, in layers of
+            # feathers, banded red and tipped black, the far wing in shade
+            feather = _ramp((240, 234, 222))
+            for side in (-1, 1):
+                for i in range(1, x_pole + 1):
+                    x = x_pole - i if side < 0 else x_pole + pw - 1 + i
+                    y0 = top_c - 1 + i // 2
+                    y1 = top_c + 11 - (i + 1) // 2
+                    shade = 1 if side < 0 else 2
+                    for y in range(y0, y1 + 1):
+                        if y == y0 or y == y1 or i == x_pole:
+                            px[x, y] = ink
+                        elif y >= y1 - 1:
+                            px[x, y] = ramps["K"][1]  # black tips
+                        elif y >= y1 - 3:
+                            px[x, y] = ramps["R"][shade]  # a red band
+                        elif (y - y0 + i) % 3 == 0:
+                            px[x, y] = feather[shade + 1]  # the edge of each feather over the next
+                        else:
+                            px[x, y] = feather[shade - 1 if y < y0 + 2 else shade]
+
+        if f == 0:  # the bear's round ears, standing up off its top face, red inside
+            for ex in (x_pole + 1, x_pole + pw - 5):
+                ear = [".oo.", "oRco", "occo"]
+                for dy, row in enumerate(ear):
+                    for dx, ch in enumerate(row):
+                        y = top_c - ry - 2 + dy
+                        if ch == "o":
+                            px[ex + dx, y] = ink
+                        elif ch == "R":
+                            px[ex + dx, y] = ramps["R"][1]
+                        elif ch == "c":
+                            px[ex + dx, y] = wood[1 if dx < 2 else 2]
+
+        for xx in range(pw):
+            x = x_pole + xx
+            u = (xx + 0.5 - pw / 2) / (pw / 2)
+            arc = ry * math.sqrt(max(0.0, 1 - u * u))
+            y_top = int(round(top_c - arc))
+            y_front = int(round(top_c + arc))
+            y_bottom = int(round(bottom_c + arc))
+            step = light(u)
+            for y in range(y_top, y_bottom + 1):
+                if y == y_top or y == y_bottom or xx in (0, pw - 1):
+                    px[x, y] = ink
+                elif y < y_front:  # the top face, catching the light from above
+                    px[x, y] = wood[0] if u < 0.25 and y < top_c else wood[1 if u < 0.6 else 2]
+                elif y == y_front:
+                    px[x, y] = wood[max(0, step - 1)]  # its lip, catching the light
+                elif y == y_front + 1:
+                    px[x, y] = wood[min(4, step + 1)]  # the shadow under the lip
+                else:
+                    px[x, y] = wood[step]
+            for row, line in enumerate(carving):
+                y = y_front + 1 + row
+                key = line[xx]
+                if key == "." or y >= y_bottom or xx in (0, pw - 1):
+                    continue
+                if key == "K":
+                    px[x, y] = ramps["K"][min(4, 1 + step // 2)]
+                elif key == "W":
+                    px[x, y] = ramps["W"][min(2, step // 2)]  # white paint stays bright, just greying into the shade
+                else:
+                    px[x, y] = ramps[key][min(4, step + (1 if row == 0 else 0))]
+
+        if f == 1:  # the raven's beak, jutting out from between its eyes, down over its chest
+            beak = _ramp((40, 32, 38))
+            cx = x_pole + pw // 2
+            y0 = top_c + ry + 3
+            for k, half in enumerate((1, 1, 2, 2, 2, 1, 1, 0)):
+                y = y0 + k
+                for x in range(cx - half - 1, cx + half + 1):
+                    edge = x in (cx - half - 1, cx + half)
+                    px[x, y] = ink if edge else (beak[0] if x < cx else beak[2])
+                if k < 6:
+                    px[cx + half + 1, y + 1] = ramps["."][4]  # its shadow, cast down on the chest
+            px[cx - 1, y0 + 1] = ramps["R"][0]  # a red nostril line along it
+        sheet.paste(img, (f * fw, 0))
+    return sheet
+
+
+def totem_door():
+    """The trap door the totem stands on (Scripts/totem.gd): a round stone hatch in the wall
+    top, shut, then open on the dark below that the heads drop into"""
+    ink = (16, 22, 36, 255)
+    stone = [(150, 140, 120, 255), (120, 110, 94, 255), (92, 84, 72, 255)]
+    w, h = 20, 8
+    sheet = Image.new("RGBA", (w * 2, h), T)
+    px = sheet.load()
+    for f in range(2):
+        for y in range(h):
+            for x in range(w):
+                u = (x + 0.5 - w / 2) / (w / 2)
+                v = (y + 0.5 - h / 2) / (h / 2)
+                r = u * u + v * v
+                if r > 1.0:
+                    continue
+                edge = r > 0.62
+                if edge:
+                    px[f * w + x, y] = ink if r > 0.86 else stone[2]
+                elif f == 0:
+                    # shut: a slab, split down the middle where it opens
+                    px[f * w + x, y] = ink if x in (w // 2 - 1, w // 2) and abs(v) < 0.6 else (stone[0] if v < 0 else stone[1])
+                else:
+                    px[f * w + x, y] = (6, 6, 10, 255) if v > -0.2 else (24, 22, 30, 255)  # open: the dark below
+    return sheet
+
+
+# ---------- the road arrows ----------
+
+# The two ways the road goes in Travel mode (Scripts/journey.gd), inlaid in the floor at
+# the foot of each rail's lane and pointing up it: dark stone, and lit gold while the
+# road's open. Each is drawn at its own angle, pixel by pixel, so it stays crisp.
+ROAD_ARROWS = {"left": (-0.46, -0.89), "right": (0.457, -0.89)}  # up each lane (the rails' entry directions)
+ROAD_ARROW_SIZE = 21
+
+
+def road_arrow(direction):
+    """Two chevrons, one behind the other, pointing up a lane"""
+    ink = (20, 24, 36, 255)
+    looks = [
+        [(64, 70, 88, 255), (96, 104, 120, 255), (44, 48, 62, 255)],     # dark: inlaid stone
+        [(248, 204, 0, 255), (255, 244, 170, 255), (184, 120, 12, 255)],  # lit: gold
+    ]
+    n = ROAD_ARROW_SIZE
+    def chevron(tip):  # a fat V pointing up, its tip at local y = tip
+        return [(0.0, tip), (6.5, tip + 6.5), (6.5, tip + 10.0), (0.0, tip + 3.5), (-6.5, tip + 10.0), (-6.5, tip + 6.5)]
+    shapes = [chevron(-8.0), chevron(-1.0)]
+    dx, dy = direction
+    length = math.hypot(dx, dy)
+    dx, dy = dx / length, dy / length
+    def to_local(x, y):  # local up runs along the direction; local right is (-dy, dx)
+        return (x * -dy + y * dx, -(x * dx + y * dy))
+    def inside(poly, x, y):
+        hit = False
+        for i in range(len(poly)):
+            (ax, ay), (bx, by) = poly[i], poly[i - 1]
+            if (ay > y) != (by > y) and x < (bx - ax) * (y - ay) / (by - ay) + ax:
+                hit = not hit
+        return hit
+    filled = set()
+    for y in range(n):
+        for x in range(n):
+            lx, ly = to_local(x + 0.5 - n / 2, y + 0.5 - n / 2)
+            if any(inside(shape, lx, ly) for shape in shapes):
+                filled.add((x, y))
+    sheet = Image.new("RGBA", (n * 2, n), T)
+    px = sheet.load()
+    for f, (fill, light, dark) in enumerate(looks):
+        for (x, y) in filled:
+            lit_edge = (x - 1, y) not in filled or (x, y - 1) not in filled
+            dark_edge = (x + 1, y) not in filled or (x, y + 1) not in filled
+            px[f * n + x, y] = light if lit_edge and not dark_edge else (dark if dark_edge and not lit_edge else fill)
+        for y in range(n):
+            for x in range(n):
+                if (x, y) not in filled and any((x + ox, y + oy) in filled for ox, oy in ((1, 0), (-1, 0), (0, 1), (0, -1))):
+                    px[f * n + x, y] = ink
+    return sheet
+
+
+# ---------- things that flutter down ----------
+
+FLUTTER_SIZE = (7, 4)  # each piece's frame
+
+
+def _flutter_sheet(shapes, palettes):
+    """Small pieces, a frame each: every shape in every palette (light, mid, dark)"""
+    w, h = FLUTTER_SIZE
+    sheet = Image.new("RGBA", (w * len(shapes) * len(palettes), h), T)
+    i = 0
+    for palette in palettes:
+        for shape in shapes:
+            for y, row in enumerate(shape):
+                for x, ch in enumerate(row):
+                    if ch in "123":
+                        sheet.putpixel((i * w + x, y), palette[int(ch) - 1])
+            i += 1
+    return sheet
+
+
+def feathers():
+    """Feathers knocked off a warrior's headdress (Scripts/warriors.gd): quetzal green, red,
+    blue and gold, each with its darker quill"""
+    shapes = [
+        ["..1....", ".1122..", "1122223", ".33...."],
+        [".......", "1112223", ".122333", "......."],
+        ["...11..", ".11223.", "1223...", "3......"],
+    ]
+    palettes = [
+        [(120, 230, 150, 255), (40, 170, 100, 255), (20, 96, 60, 255)],
+        [(255, 140, 110, 255), (214, 52, 40, 255), (120, 24, 20, 255)],
+        [(130, 190, 255, 255), (48, 112, 220, 255), (24, 52, 130, 255)],
+        [(255, 236, 140, 255), (240, 186, 24, 255), (150, 96, 10, 255)],
+    ]
+    return _flutter_sheet(shapes, palettes)
+
+
+def leaves():
+    """Scraps of palm frond shaken loose (Scripts/palms.gd), in the fronds' greens"""
+    shapes = [
+        ["..12...", ".1223..", "12233..", ".33...."],
+        [".......", "1122333", ".12233.", "......."],
+        ["...12..", "..123..", ".1233..", "33....."],
+    ]
+    palettes = [
+        [(120, 214, 180, 255), (40, 160, 140, 255), (20, 96, 92, 255)],
+        [(150, 226, 150, 255), (70, 176, 110, 255), (30, 110, 74, 255)],
+    ]
+    return _flutter_sheet(shapes, palettes)
+
+
+def aztec_border():
+    """A band of dark carved stone with a meander cut along it, in the table's own wall
+    stone so it sits quietly round the screen: laid along the top and bottom of the screen
+    when a phone's held sideways (Scripts/hud.gd). One repeat of it; it tiles across."""
+    ink, gold, gold_d = (16, 20, 30, 255), (92, 112, 124, 255), (62, 76, 90, 255)  # (the meander and lip: wall stone)
+    stone, stone_d = (36, 44, 58, 255), (30, 37, 50, 255)
+    key = ["XXXXXXX.", "X.....X.", "X.XXX.X.", "X.X...X.", "X.XXXXX.", "X......."]
+    w, h = len(key[0]), len(key) + 4
+    img = Image.new("RGBA", (w, h), T)
+    for x in range(w):
+        img.putpixel((x, 0), ink)
+        img.putpixel((x, 1), gold)
+        img.putpixel((x, h - 2), gold_d)
+        img.putpixel((x, h - 1), ink)
+        for y, row in enumerate(key):
+            lit = row[x] == "X"
+            below = y + 1 < len(key) and key[y + 1][x] == "X"
+            img.putpixel((x, y + 2), (gold if not below else gold) if lit else (stone if y < 3 else stone_d))
+            if lit and not below and y + 3 < h - 2:
+                pass
+    return img
+
+
+# The centre face, hand-drawn (Sprites/tlaloc.png): two 64x64 frames, mouth shut with his
+# eyes yellow, mouth open with them red. His eyes are lifted off it to be their own sprites
+# (they follow the ball, roll, blaze, get shot out: Scripts/table_features.gd)
+TLALOC_EYES = [(23, 23), (35, 23)]  # each eye's 6x6 box, top left, in the shut frame
+TLALOC_RED_UP = 1                   # the open frame's red eyes sit a pixel higher
+TLALOC_SOCKET = (48, 51, 57, 255)
+
+
+def tlaloc_face():
+    face = Image.open("Sprites/tlaloc.png").convert("RGBA")
+    sockets = face.copy()
+    eyes = Image.new("RGBA", (12, 6), T)
+    coloured = lambda p: p[3] and max(p[:3]) - min(p[:3]) > 40  # the eyes: the only colour in the grey stone
+    for f in range(2):
+        dy = -TLALOC_RED_UP if f == 1 else 0
+        for i, (x0, y0) in enumerate(TLALOC_EYES):
+            for y in range(6):
+                for x in range(6):
+                    at = (f * 64 + x0 + x, y0 + dy + y)
+                    p = face.getpixel(at)
+                    if coloured(p):
+                        if i == 0:
+                            eyes.putpixel((f * 6 + x, y), p)  # the left eye stands for both
+                        sockets.putpixel(at, TLALOC_SOCKET)
+    return sockets, eyes
 
 
 def spring_sheet():
-    """The plunger: a gold cap on a steel coil, one frame for each pixel it's pulled down,
-    from at rest to fully pulled, each standing on the frame's bottom edge."""
-    ink, gold, gold_d = (20, 24, 36, 255), (248, 208, 0, 255), (200, 138, 16, 255)
-    light, mid, dark = (214, 224, 232, 255), (142, 158, 172, 255), (74, 86, 102, 255)
+    """The plunger, drawn round like a real one: a gold cap seen a little from above (its lit
+    top face, then its side turning from a bright edge on the left into shadow on the right),
+    casting a shadow onto a steel coil. The coil's a helix: each loop's front wire bows down
+    across the front, lit from the left like a cylinder with a dark underside, and its back
+    wire shows darker through the gaps, slanting the other way; the rod's dark between them.
+    One frame for each pixel it's pulled down, its loops closing up, each frame standing on
+    its bottom edge."""
+    ink = (20, 24, 36, 255)
+    shine, gold_l, gold, gold_d, gold_dd = (255, 252, 214, 255), (255, 232, 120, 255), (248, 200, 0, 255), (196, 132, 12, 255), (122, 76, 8, 255)
+    steel = [(246, 250, 255, 255), (206, 216, 228, 255), (156, 170, 186, 255), (108, 122, 140, 255), (70, 80, 98, 255)]  # lit -> shade
+    under, back, gap = (52, 60, 76, 255), (84, 94, 112, 255), (30, 34, 46, 255)
+    loops = 8.0
     frames = []
+    w = SPRING_W
+    c0, c1 = 3, w - 4  # the coil's inside, across (its ink edges either side)
+
+    def lit(ramp, u):  # a cylinder lit from the upper left: brightest a third of the way in
+        k = (u + 1.0) / 2.0
+        return ramp[0] if abs(k - 0.28) < 0.12 else ramp[min(len(ramp) - 1, 1 + int(abs(k - 0.28) * (len(ramp) - 1) / 0.72 * 1.4))]
+
     for tall in range(SPRING_TALL, SPRING_SHORT - 1, -1):
-        img = Image.new("RGBA", (SPRING_W, SPRING_TALL), T)
+        img = Image.new("RGBA", (w, SPRING_TALL), T)
         top = SPRING_TALL - tall
-        for x in range(1, SPRING_W - 1):  # the cap
+        # the cap: its top face...
+        for x in range(3, w - 3):
             img.putpixel((x, top), ink)
-            img.putpixel((x, top + 1), gold if x < SPRING_W - 3 else gold_d)
-            img.putpixel((x, top + 2), ink)
-        img.putpixel((0, top + 1), ink)
-        img.putpixel((SPRING_W - 1, top + 1), ink)
+        img.putpixel((2, top + 1), ink)
+        img.putpixel((w - 3, top + 1), ink)
+        for x in range(3, w - 3):
+            img.putpixel((x, top + 1), shine if x in (4, 5) else (gold_l if x < w - 5 else gold))
+        # ...and its round side
+        img.putpixel((1, top + 2), ink)
+        img.putpixel((w - 2, top + 2), ink)
+        side = [gold_l, shine, gold_l] + [gold] * (w - 9) + [gold_d, gold_dd]  # lit at the left, round into shadow
+        for x in range(2, w - 2):
+            img.putpixel((x, top + 2), side[x - 2])
         coil = tall - 3
-        loops = 4
+        pitch = coil / loops
+        y0 = top + 3
+        # the dark inside, then the back of each loop, then its front wire over them
         for r in range(coil):
-            y = top + 3 + r
-            front = (r * loops / max(coil, 1)) % 1.0 < 0.5
-            if front:
-                img.putpixel((2, y), ink)
-                img.putpixel((SPRING_W - 3, y), ink)
-                for x in range(3, SPRING_W - 3):
-                    img.putpixel((x, y), light if x < 6 else mid)
-            else:
-                for x in range(3, SPRING_W - 3):
-                    img.putpixel((x, y), dark)
+            img.putpixel((c0 - 1, y0 + r), ink)
+            img.putpixel((c1 + 1, y0 + r), ink)
+            for x in range(c0, c1 + 1):
+                img.putpixel((x, y0 + r), gap)
+        bow = [0] + [1] * (c1 - c0 - 1) + [0]  # the front wire bows down across the middle
+        k = 0
+        while k * pitch < coil:
+            ys = int(k * pitch + 0.5)
+            if pitch >= 2.5:
+                for i, x in enumerate(range(c0, c1 + 1)):
+                    yb = ys + 1 - bow[i] + int(pitch) - 2  # the back wire, bowing the other way
+                    if y0 + yb < y0 + coil and yb > ys + bow[i]:
+                        img.putpixel((x, y0 + yb), back)
+            for i, x in enumerate(range(c0, c1 + 1)):
+                u = (x - c0 + 0.5) / (c1 - c0 + 1) * 2.0 - 1.0
+                yf = ys + (bow[i] if pitch >= 2.5 else 0)
+                if yf < coil:
+                    img.putpixel((x, y0 + yf), lit(steel, u))
+                if pitch >= 2.5 and yf + 1 < coil and bow[i]:
+                    img.putpixel((x, y0 + yf + 1), steel[4] if u > -0.3 else steel[3])  # its underside
+            # where the wire wraps round the sides it stands proud of the coil
+            if ys < coil:
+                img.putpixel((c0 - 1, y0 + ys), steel[1])
+                img.putpixel((c1 + 1, y0 + ys), steel[4])
+                img.putpixel((c0 - 2, y0 + ys), ink)
+                img.putpixel((c1 + 2, y0 + ys), ink)
+            k += 1
+        if coil > 1:
+            for x in range(c0 - 1, c1 + 2):  # the cap's shadow, cast down onto the coil
+                if img.getpixel((x, y0)) != ink:
+                    r_, g_, b_, _ = img.getpixel((x, y0))
+                    img.putpixel((x, y0), (r_ * 3 // 5, g_ * 3 // 5, b_ * 3 // 4, 255))
         frames.append(img)
     sheet = Image.new("RGBA", (SPRING_W * len(frames), SPRING_TALL), T)
     for i, f in enumerate(frames):
         sheet.paste(f, (i * SPRING_W, 0))
     return sheet
+
+
+# ---------- the poison dart trap ----------
+
+# A poison dart seen from the table's view, point down: red feather flights, a cane shaft,
+# a point wet with green poison. Falling, all of it; stuck in the floor, the point's buried
+# and there's a little dark hole round the shaft.
+DART_FALLING = [
+    ".R.R.",
+    "RRrRR",
+    "RRrRR",
+    ".RrR.",
+    "..r..",
+    "..W..",
+    "..W..",
+    "..W..",
+    "..B..",
+    "..W..",
+    "..W..",
+    "..W..",
+    "..g..",
+    "..G..",
+    "..P..",
+]
+DART_STUCK = DART_FALLING[:10] + [".kok."]
+DART_SHADOW = [".kkk.", "kkkkk", ".kkk."]
+
+
+def dart_trap():
+    """The poison dart trap's darts: one falling (point down), one stuck upright in the
+    floor (two frames: still, and quivering a pixel when the ball knocks it), and the
+    shadow a falling one throws on the floor."""
+    key = {"R": (210, 50, 40, 255), "r": (140, 30, 30, 255), "W": (204, 168, 96, 255),
+           "B": (120, 80, 40, 255), "g": (40, 140, 50, 255), "G": (90, 230, 90, 255),
+           "P": (200, 255, 170, 255), "o": (16, 12, 18, 255), "k": (10, 8, 20, 120)}
+
+    def draw(rows, img=None, dx=0, x0=0):
+        if img is None:
+            img = Image.new("RGBA", (len(rows[0]), len(rows)), T)
+        for y, row in enumerate(rows):
+            for x, c in enumerate(row):
+                if c in key and 0 <= x + dx < len(row):
+                    img.putpixel((x0 + x + dx * (y < len(rows) - 3), y), key[c])
+        return img
+
+    falling = draw(DART_FALLING)
+    w, h = len(DART_STUCK[0]), len(DART_STUCK)
+    stuck = Image.new("RGBA", (w * 2, h), T)
+    draw(DART_STUCK, stuck)
+    draw(DART_STUCK, stuck, dx=1, x0=w)  # quivering: its top leans a pixel over
+    shadow = draw(DART_SHADOW)
+    return falling, stuck, shadow
+
+
+# ---------- the lava pit ----------
+
+LAVA_FRAMES = 4
+LAVA_TOP = 404  # art pixels: the lava's own glow starts here
+
+def lava_layers():
+    """The lava in the drain, from the hand-drawn lava.png (the lava reference layer, at
+    the table's size): its translucent glow over the drain and its edges on its own (the
+    game breathes it), and its solid pixels, the embers and the lava's edge along the
+    bottom, in frames: embers flicker and drift up a pixel, the edge shimmers."""
+    import random
+
+    lava = Image.open(SRC / "lava.png").convert("RGBA")
+    w, h = lava.size
+    glow = Image.new("RGBA", (w, h), T)
+    solid = []
+    for y in range(h):
+        for x in range(w):
+            p = lava.getpixel((x, y))
+            if not p[3] or y < LAVA_TOP:
+                continue  # (above it, the glow it threw on the flippers, which showed through them)
+            if p[3] < 255:
+                glow.putpixel((x, y), p)
+            else:
+                solid.append((x, y, p))
+    rng = random.Random(7)
+    bright = (255, 150, 60, 255)
+    box = lava.getbbox()
+    frames = Image.new("RGBA", ((box[2] - box[0]) * LAVA_FRAMES, box[3] - box[1]), T)
+    fw = box[2] - box[0]
+    for f in range(LAVA_FRAMES):
+        for x, y, p in solid:
+            edge = y >= h - 3  # the lava's edge along the bottom
+            if edge:
+                col = bright if (x + f) % 4 == 0 else p
+                frames.putpixel((f * fw + x - box[0], y - box[1]), col)
+                continue
+            phase = (rng.random() + f / LAVA_FRAMES) % 1.0  # each ember on its own beat
+            if phase < 0.2:
+                continue  # flickered out
+            ny = y - (1 if phase > 0.6 else 0)
+            frames.putpixel((f * fw + x - box[0], ny - box[1]), bright if phase > 0.85 else p)
+        rng = random.Random(7)  # the same embers, frame to frame
+    return glow, frames, box
+
+
+# ---------- the warriors' hole in the arena ----------
+
+HOLE_SIZE = (24, 16)
+
+
+COVER_SUN = [  # a sun, its rays all round, carved on the arena's cover
+    "X...X...X",
+    ".X.XXX.X.",
+    "..XX.XX..",
+    "XXX...XXX",
+    "..XX.XX..",
+    ".X.XXX.X.",
+    "X...X...X",
+]
+HOLE_FLIP = [1.0, 0.72, 0.42, 0.16, 0.0, -0.16, -0.42, -0.72, -1.0]  # how much of the cover faces up, sun side (+) or underside (-): it turns right over, like the frog spinner
+
+
+def arena_hole():
+    """A round stone tablet set in the middle of the warriors' arena, a cover over the hole
+    they jump down into. It turns right over on its middle like the frog spinner: the sun
+    carved on its face squashing edge-on as it opens (the dark hole showing either side of
+    it), and on round to its plain underside as it shuts, or back the other way
+    (Scripts/warriors.gd)."""
+    w, h = HOLE_SIZE
+    ink, rim, stone, stone_l, carve = (20, 24, 36, 255), (84, 90, 100, 255), (112, 118, 128, 255), (148, 154, 160, 255), (58, 62, 72, 255)
+    under, under_d, brace = (92, 98, 108, 255), (74, 80, 90, 255), (60, 64, 74, 255)
+    edge_l, edge_d = (170, 176, 182, 255), (70, 74, 84, 255)
+    pit, pit_d = (34, 26, 30, 255), (16, 12, 18, 255)
+    out = Image.new("RGBA", (w * len(HOLE_FLIP), h), T)
+    cx, cy = (w - 1) / 2, (h - 1) / 2
+    inset = 0.86  # the cover all but fills the hole
+    for f, face in enumerate(HOLE_FLIP):
+        k = abs(face)
+        for y in range(h):
+            for x in range(w):
+                r = ((x - cx) / (w / 2)) ** 2 + ((y - cy) / (h / 2)) ** 2
+                if r > 1.0:
+                    continue
+                if r > 0.8:
+                    c = ink
+                else:
+                    c = pit if y < cy else pit_d
+                    across = ((x - cx) / ((w / 2) * inset)) ** 2
+                    if across <= 1.0:
+                        half = (h / 2) * inset * max(k, 0.0)
+                        dy = y - cy
+                        if k < 0.1:
+                            # edge-on: just its thickness, lit along the top
+                            if -1.0 <= dy < 0.0:
+                                c = edge_l
+                            elif 0.0 <= dy < 1.0:
+                                c = edge_d
+                        elif dy * dy <= half * half * (1.0 - across):
+                            if face > 0:
+                                c = stone_l if dy < -half * 0.4 else stone
+                            else:
+                                c = under if dy < 0 else under_d
+                                if abs(x - cx) < 0.6 or abs(dy) < 0.6:
+                                    c = brace  # the braces across its underside
+                        elif 0.0 <= dy - half * (1.0 - across) ** 0.5 < 1.5 and k < 1.0:
+                            c = edge_d  # its edge, showing below as it turns
+                out.putpixel((f * w + x, y), c)
+        if face >= 0.6:  # the sun carved on the cover, squashed with it as it turns
+            sun = COVER_SUN
+            gx0 = int(cx - len(sun[0]) / 2 + 0.5)
+            for gy, row in enumerate(sun):
+                y = int(cy + (gy - (len(sun) - 1) / 2) * face + 0.5)
+                for gx, ch in enumerate(row):
+                    if ch == "X":
+                        out.putpixel((f * w + gx0 + gx, y), carve)
+                        below = sun[gy + 1][gx] if gy + 1 < len(sun) else "."
+                        if below != "X" and face == 1.0 and y + 1 < h:
+                            px = out.getpixel((f * w + gx0 + gx, y + 1))
+                            if px[:3] in (stone[:3], stone_l[:3]):
+                                out.putpixel((f * w + gx0 + gx, y + 1), (176, 182, 188, 255))  # the groove's lit lip
+    return out
+
+
+# ---------- inside the temple ----------
+
+def temple_interior():
+    """What shows through the golden temple's windows: the dark of its inside, lit warm
+    from above (only inside the windows, the holes the temple art encloses; the rest is
+    left clear so the temple, and the ball racing round under it, show as they are)."""
+    import numpy as np
+    from scipy import ndimage
+
+    temple = np.array(Image.open(LAYERS / "temple.png").convert("RGBA"))
+    solid = temple[:, :, 3] > 0
+    holes = ndimage.binary_fill_holes(solid) & ~solid
+    out = Image.new("RGBA", (temple.shape[1], temple.shape[0]), T)
+    glow, dusk, dark = (126, 78, 34, 255), (70, 40, 30, 255), (40, 22, 26, 255)
+    for y, x in zip(*np.nonzero(holes)):
+        above = 0  # how far down from the window's top edge
+        while y - above - 1 >= 0 and holes[y - above - 1, x]:
+            above += 1
+        out.putpixel((int(x), int(y)), glow if above == 0 else (dusk if above < 3 else dark))
+    return out
 
 
 # ---------- the floor roulette ----------
@@ -928,25 +1837,74 @@ def roulette_art():
 
 # ---------- more table pieces ----------
 
+IDOL_TURN_FRAMES = 8
+IDOL_DEPTH = 0.6  # how deep the idol is, front to back, as a share of its width
+
+
 def idol_spin():
-    """The golden idol turning on its tower: face on, three-quarters, side on, three-quarters
-    the other way (redrawn narrower from idol.png's first frame, on the same pixel grid)."""
+    """The golden idol turning round on its tower, in depth: each row of it is a slice
+    whose front shrinks as its side swings into view (shaded, as it turns from the light)
+    and then the back comes round, plain where the face was. Eight frames, a full turn,
+    on the table's pixel grid (built from idol.png's first frame), a row for each city's
+    idol."""
+    import math
+
     idol = Image.open("Sprites/table/idol.png").convert("RGBA")
-    size = idol.height
-    front = idol.crop((0, 0, size, size))
-    frames = []
-    for w in (size, 13, 6, 13):
-        f = Image.new("RGBA", (size, size), T)
-        x0 = (size - w) // 2
-        for x in range(w):
-            sx = int((x + 0.5) * size / w)
-            for y in range(size):
-                f.putpixel((x0 + x, y), front.getpixel((sx, y)))
-        frames.append(f)
-    frames[3] = frames[3].transpose(Image.FLIP_LEFT_RIGHT)
-    out = Image.new("RGBA", (size * 4, size), T)
-    for i, f in enumerate(frames):
-        out.paste(f, (i * size, 0))
+    size = 22  # tools/make_tiki_idol.py's frames
+    cities = idol.height // size
+    sheet = Image.new("RGBA", (size * IDOL_TURN_FRAMES, size * cities), T)
+    for city in range(cities):
+        sheet.paste(_idol_turning(idol.crop((0, city * size, size, (city + 1) * size)), size), (0, city * size))
+    return sheet
+
+
+def _idol_turning(front, size):
+    import math
+    gold, dark = (248, 192, 0, 255), (176, 112, 0, 255)
+    face_rows = range(3, 18)  # the jewel, the face and the pectoral (tools/make_tiki_idol.py)
+    rows = []
+    for y in range(size):
+        xs = [x for x in range(size) if front.getpixel((x, y))[3]]
+        if not xs:
+            continue
+        l, r = min(xs), max(xs)
+        inner = [front.getpixel((x, y)) for x in range(l + 1, r)]
+        ink = front.getpixel((l, y))
+        # the back: the face's eyes, jewel and brow smoothed into plain gold, a seam down the middle
+        # the back of his head and body: plain gold, shaded at the sides
+        back = list(inner)
+        if y in face_rows:
+            back = [dark if i in (0, len(inner) - 1) else gold for i in range(len(inner))]
+        if back and y < 18:
+            back[len(back) // 2] = dark
+        rows.append((y, inner, back, ink))
+
+    def shade(p, k):
+        return (int(p[0] * k), int(p[1] * k), int(p[2] * k), 255)
+
+    out = Image.new("RGBA", (size * IDOL_TURN_FRAMES, size), T)
+    centre = size / 2
+    for f in range(IDOL_TURN_FRAMES):
+        angle = 2 * math.pi * f / IDOL_TURN_FRAMES
+        c, s_ = math.cos(angle), math.sin(angle)
+        for y, inner, back, ink in rows:
+            w = len(inner)
+            if w == 0:
+                continue
+            depth = max(1, round(w * IDOL_DEPTH))
+            fw = round(w * abs(c))
+            sw = round(depth * abs(s_))
+            tex = inner if c >= 0 else back[::-1]
+            face = [shade(tex[min(w - 1, int((i + 0.5) * w / fw))], 0.75 + 0.25 * abs(c)) for i in range(fw)] if fw else []
+            edge = inner[0] if s_ > 0 else inner[-1]  # his sides (jade ear-spools and all), whichever way he faces
+            side = [shade(edge, 0.62)] * sw
+            body = side + face if s_ > 0 else face + side
+            total = len(body) + 2
+            x0 = int(round(centre - total / 2))
+            for i, p in enumerate([ink] + body + [ink]):
+                x = x0 + i
+                if 0 <= x < size:
+                    out.putpixel((f * size + x, y), p)
     return out
 
 
@@ -976,39 +1934,62 @@ def blood_heart():
     return out
 
 
-EMERALD = [
-    "....ooooo....",
-    "...oLWWLGo...",
-    "..oLWLLGGGo..",
-    ".oLLLLGGGGDo.",
-    "oMMMMMMMMMMMo",
-    "oMGGGGGGDDDDo",
-    ".oMGGGGDDDDo.",
-    "..oMGGDDDDo..",
-    "...oMGDDDo...",
-    "....oMDDo....",
-    ".....oDo.....",
-    "......o......",
-]
+EMERALD_SIZE = 15
+EMERALD_FRAMES = 4
 
 
 def rail_gem():
-    """A cut emerald hovering up the left rail: table and crown facets catching the light,
-    a dark pavilion, plain then glinting; and its shadow."""
-    key = {"o": (14, 40, 30, 255), "W": (240, 255, 245, 255), "L": (160, 250, 196, 255),
-           "G": (40, 200, 120, 255), "M": (90, 224, 150, 255), "D": (16, 112, 72, 255)}
-    w, h = len(EMERALD[0]), len(EMERALD)
-    out = Image.new("RGBA", (w * 2, h), T)
-    for f in range(2):
-        for y, row in enumerate(EMERALD):
-            for x, c in enumerate(row):
-                if c in key:
-                    out.putpixel((f * w + x, y), key[c])
-        if f == 1:
-            for x, y in ((4, 1), (3, 1), (5, 1), (4, 0), (4, 2), (9, 5)):
-                out.putpixel((w + x, y), (255, 255, 255, 255))
-    shadow = Image.new("RGBA", (9, 3), T)
-    for x, y in [(x, 1) for x in range(9)] + [(x, 0) for x in range(2, 7)] + [(x, 2) for x in range(2, 7)]:
+    """A cut emerald hovering up the left rail, juicy: a flat table, a ring of crown facets
+    and a deep pavilion of facets narrowing to a point, light sweeping across them over
+    four frames (with a twinkle on the bright one); and its shadow."""
+    import math
+
+    n = EMERALD_SIZE
+    cx = (n - 1) / 2
+    girdle = 5
+    ink = (8, 40, 26, 255)
+    shades = [(10, 80, 50), (20, 125, 78), (36, 178, 104), (96, 230, 150), (190, 255, 214)]
+    out = Image.new("RGBA", (n * EMERALD_FRAMES, n), T)
+
+    def half_width(y):
+        if y < 1:
+            return -1
+        if y <= girdle:  # the crown flares out from the table to the girdle
+            return 3 + (y - 1) * 4 / (girdle - 1)
+        return (n - 1 - y) * 7 / (n - 1 - girdle)  # the pavilion narrows to its point
+
+    for f in range(EMERALD_FRAMES):
+        sweep = -cx + f * (n + 4) / EMERALD_FRAMES  # where the light is, across the gem
+        for y in range(n):
+            hw = half_width(y)
+            for x in range(n):
+                dx = x - cx
+                if hw < 0 or abs(dx) > hw + 0.4:
+                    continue
+                if abs(abs(dx) - hw) < 0.9 or y == 1:
+                    out.putpixel((f * n + x, y), ink)
+                    continue
+                if y <= girdle:
+                    facet = 2 if abs(dx) < 2.5 and y <= 2 else (3 if (int(dx + cx) // 3) % 2 else 2)
+                    if y == girdle:
+                        facet = 1
+                else:
+                    t = dx / max(hw, 1)
+                    facet = 1 + (int((t + 1) * 2.5) % 2)
+                    if abs(t) < 0.25:
+                        facet = 0
+                lit = math.exp(-((dx - sweep) ** 2) / 6.0)  # the sweep brightens what it crosses
+                k = min(4, facet + round(lit * 2))
+                out.putpixel((f * n + x, y), shades[k] + (255,))
+        # a twinkle where the light catches
+        tx = int(round(cx + sweep * 0.6))
+        if 2 <= tx <= n - 3:
+            for ddx, ddy in ((0, 0), (1, 0), (-1, 0), (0, 1), (0, -1)):
+                px, py = tx + ddx, 3 + ddy
+                if out.getpixel((f * n + px, py))[3]:
+                    out.putpixel((f * n + px, py), (255, 255, 255, 255))
+    shadow = Image.new("RGBA", (11, 3), T)
+    for x, y in [(x, 1) for x in range(11)] + [(x, 0) for x in range(2, 9)] + [(x, 2) for x in range(2, 9)]:
         shadow.putpixel((x, y), (10, 12, 20, 110))
     return out, shadow
 
@@ -1067,6 +2048,9 @@ def write_table_geometry(palms, gems):
               "const GOLD_BUTTONS := {"]
     lines += ['	"%s": Vector2(%s, %s),' % (n, (b[0] + b[2]) / 2, (b[1] + b[3]) / 2) for n, b in GOLD_BUTTONS.items()]
     lines += ["}", "",
+              "## The carved glyphs on the walls: each one's top-left corner in Sprites/table/runes.png",
+              "## (7x7, art pixels); they flash colours as you score (Scripts/lighting.gd)",
+              "const RUNES := ["] + ["\tVector2(%d, %d)," % spot for spot in RUNE_SPOTS] + ["]", "",
               "## The centre of the temple's ring of gems (art pixels)",
               "const TEMPLE_RING_CENTRE := Vector2(%s, %s)" % TEMPLE_RING[0], "",
               "## The temple's ring gems in order round the ring: [centre (art pixels), its strip in",
@@ -1090,7 +2074,12 @@ def main():
     keep_clear = SPRITE_BOXES + [(17, 15, 52, 50), (156, 14, 256, 110), (0, 0, 256, 1)]  # sprites, the stone face, the temple
     border(base, walls)
     details(base, walls, keep_clear)
+    RUNES.save("Sprites/table/runes.png")
     jaguar_slots(base)
+    jaguar_scratches(base, walls)
+    paw_prints(base, walls)  # up to the jaguars' button
+    carve(base, DART_RUNE, *DART_RUNE_AT, "carve")  # over the dart trap's button: a skull and crossbones
+    front_walls(walls).save("Sprites/table/front_walls.png")
     beige_apron(base, walls)
     palm = {p[:3] for p in Image.open(SRC / "leaves.png").convert("RGBA").get_flattened_data() if p[3]}
     for y in range(base.height):
@@ -1100,6 +2089,7 @@ def main():
                 bottom_decor.putpixel((x, y), T)  # the palms are sprites of their own
     for name, box in GOLD_BUTTONS.items():
         gold_button(base, box).save("Sprites/table/%s.png" % name)
+    fire_button().save("Sprites/table/fire_button.png")
     palms, palm_boxes = palm_layer(stacked)
     palms.save("Sprites/map_palms.png")
     gems_lit, gems = temple_gems()
@@ -1125,14 +2115,25 @@ def main():
     for name in ("paddle_left.png", "paddle_right.png"):
         Image.open(SRC / name).convert("RGBA").save(name)
     torch_sheet().save("Sprites/table/torch.png")
-    blue_flipper().save("Sprites/table/blue_flipper.png")
+    stone_spinner("blue", "frog").save("Sprites/table/blue_flipper.png")
+    stone_spinner("red", "spirit").save("Sprites/table/red_flipper.png")
     jaguar_head().save("Sprites/table/wall_jaguar.png")
     Image.open(SRC / "magicWhirl.png").convert("RGBA").save("Sprites/table/whirl.png")
     Image.open(SRC / "warrior.png").convert("RGBA").save("Sprites/table/warrior.png")
     skull_top, skull_jaw = skull_pieces()
     skull_top.save("Sprites/table/skull_top.png")
+    skull_shine(skull_top).save("Sprites/table/skull_shine.png")
+    skull_shimmer(skull_top).save("Sprites/table/skull_shimmer.png")
     skull_jaw.save("Sprites/table/skull_jaw.png")
     spring_sheet().save("Sprites/table/spring.png")
+    totem_heads().save("Sprites/table/totem_heads.png")
+    totem_door().save("Sprites/table/totem_door.png")
+    aztec_border().save("Sprites/table/aztec_border.png")
+    dart_rune_lit().save("Sprites/table/dart_rune_lit.png")
+    feathers().save("Sprites/table/feathers.png")
+    leaves().save("Sprites/table/leaves.png")
+    for side, direction in ROAD_ARROWS.items():
+        road_arrow(direction).save("Sprites/table/road_arrow_%s.png" % side)
     gem, gem_shadow = rail_gem()
     gem.save("Sprites/table/rail_gem.png")
     gem_shadow.save("Sprites/table/rail_gem_shadow.png")
@@ -1140,6 +2141,16 @@ def main():
     blood_heart().save("Sprites/table/blood_heart.png")
     spirit_lamp().save("Sprites/table/spirit_lamp.png")
     shard().save("Sprites/table/shard.png")
+    temple_interior().save("Sprites/table/temple_interior.png")
+    arena_hole().save("Sprites/table/arena_hole.png")
+    dart_falling, dart_stuck, dart_shadow = dart_trap()
+    dart_falling.save("Sprites/table/dart_falling.png")
+    dart_stuck.save("Sprites/table/dart_stuck.png")
+    dart_shadow.save("Sprites/table/dart_shadow.png")
+    lava_glow, lava_frames, lava_box = lava_layers()
+    lava_glow.save("Sprites/table/lava_glow.png")
+    lava_frames.save("Sprites/table/lava_embers.png")
+    print("lava embers box", lava_box)
     reel, reel_border, reel_doors = roulette_art()
     reel.save("Sprites/table/roulette_pictures.png")
     reel_border.save("Sprites/table/roulette_border.png")
@@ -1148,13 +2159,13 @@ def main():
     leaf_bit().save("Sprites/table/leaf_bit.png")
     for name, out in (("spinningtower", "tower_drum"), ("spikes", "spikes"), ("torchbutton", "torch_button")):
         Image.open(SRC / ("%s.png" % name)).convert("RGBA").save("Sprites/table/%s.png" % out)
-    Image.open(SRC / "eyeless.png").convert("RGBA").save("Sprites/face_sockets.png")
-    eyes = Image.new("RGBA", (12, 6), T)
-    eyes.paste(Image.open(SRC / "yelloweye.png").convert("RGBA"), (0, 0))
-    eyes.paste(Image.open(SRC / "redeye.png").convert("RGBA"), (6, 0))
+    sockets, eyes = tlaloc_face()
+    sockets.save("Sprites/face_sockets.png")
     eyes.save("Sprites/table/face_eye.png")
     for side, name in (("left", "bumperleftlightup"), ("right", "bumperrightlightup")):
-        Image.open(SRC / ("%s.png" % name)).convert("RGBA").save("Sprites/table/sling_%s_lit.png" % side)
+        lit = Image.open(SRC / ("%s.png" % name)).convert("RGBA")
+        lit.save("Sprites/table/sling_%s_lit.png" % side)
+        sling_unlit(lit).save("Sprites/table/sling_%s.png" % side)
     print("wrote the table and its sprites")
 
 

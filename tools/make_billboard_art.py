@@ -215,6 +215,37 @@ def el_dorado():
     return scene
 
 
+def road():
+    """Travel: a white stone road (a sacbe) running off across the jungle at dusk to a
+    pyramid on the horizon, torches burning along it"""
+    c = Canvas(W, H)
+    sky(c, [(0, C('#2a1e4a')), (6, C('#5a2e5e')), (12, C('#b0506a')), (17, C('#f09858'))])
+    # the jungle's far edge, and the pyramid where the road's headed
+    for x in range(W):
+        h = 20 + 1.5 * math.sin(x / 3.1) + 0.8 * math.cos(x / 1.7)
+        for y in range(int(h), H):
+            c.set(x, y, C('#24503e') if y > h + 1 else C('#3a6e52'))
+    top = pyramid(c, 32, 21, [(2, 6), (2, 5), (2, 4)], C('#e8c890'), C('#b08858'), C('#6a4a30'))
+    c.rect(31, top - 2, 32, top - 1, C('#8a5a34'))
+    # the road: wide at our feet, narrowing to the pyramid's foot
+    for y in range(21, H):
+        k = (y - 21) / (H - 1 - 21)
+        half = 1.0 + k * 17.0
+        for x in range(int(round(32 - half)), int(round(32 + half))):
+            edge = x < 32 - half + 1.2 or x >= 32 + half - 1.2
+            row = int((k * k) * 9)  # the paving's rows, closer together toward the horizon
+            seam = int((k * k) * 9 * 2) % 2 == 0 and (x + row) % 4 == 0
+            c.set(x, y, C('#8a7a62') if edge else (C('#c8b898') if seam else (C('#f0e6cc') if row % 2 == 0 else C('#e0d4b4'))))
+    # torches either side of it, smaller as they go
+    for y, d, size in ((37, 21, 2), (30, 13, 1), (25, 7, 1)):
+        for side in (-1, 1):
+            x = 32 + side * d
+            c.rect(x, y - size * 2, x, y, C('#6a4020'))
+            c.set(x, y - size * 2 - 1, C('#f8d000'))
+            if size > 1:
+                c.set(x, y - size * 2 - 2, C('#f08030'))
+    return c.image()
+
 def sunburst(dark, light):
     """A symmetric sunburst backdrop for the prize, relic and ball pictures."""
     c = Canvas(W, H)
@@ -253,25 +284,26 @@ def main():
     cities = [tenochtitlan(), teotihuacan(), chichen_itza(), palenque()]
     relics = frames_of("Sprites/table/relics.png", 8)[4:]
     ball_sheet = Image.open("Sprites/ball_spin.png").convert("RGBA")
-    balls = [ball_sheet.crop((0, t * 20, 20, (t + 1) * 20)) for t in range(4)]
+    size = ball_sheet.height // 4  # one row (and its first frame) per ball upgrade
+    balls = [ball_sheet.crop((0, t * size, size, (t + 1) * size)) for t in range(4)]
     prizes = [
         coin_pile(1),                                                      # offering
         coin_pile(2),                                                      # treasure
         framed(frames_of("Sprites/table/kickback_frog.png", 3)[1], 2),     # kickback
         framed(frames_of("Sprites/table/spirit.png", 3)[0], 2),            # water spirit
-        framed(frames_of("Sprites/table/wall_jaguar.png", 3)[0], 1),       # travel
+        road(),                                                            # travel
     ]
     pictures = cities + [el_dorado()] + prizes
     pictures += [framed(r, 3) for r in relics]
     pictures += [framed(b, 2) for b in balls]
     sheet = Image.open("Sprites/table/spirits.png").convert("RGBA")
-    for row in range(sheet.height // 14):
-        spirit = sheet.crop((0, row * 14, 18, row * 14 + 14))
-        pictures.append(framed(spirit, 2, backdrop=(C('#123a4a'), C('#1a5a6a'))))
+    for row in range(sheet.height // 22):  # tools/make_spirit_sprites.py: 26x22 each
+        spirit = sheet.crop((0, row * 22, 26, row * 22 + 22))
+        pictures.append(framed(spirit, 1, backdrop=(C('#123a4a'), C('#1a5a6a'))))
     divine = Image.open("Sprites/table/spirits_awakened.png").convert("RGBA")
-    for row in range(divine.height // 18):
-        form = divine.crop((0, row * 18, 22, row * 18 + 18))
-        pictures.append(framed(form, 2, backdrop=(C('#6a3a10'), C('#a8681c'))))
+    for row in range(divine.height // 26):  # 30x26 each
+        form = divine.crop((0, row * 26, 30, row * 26 + 26))
+        pictures.append(framed(form, 1, backdrop=(C('#6a3a10'), C('#a8681c'))))
     strip(pictures).save(OUT)
     print("wrote", OUT, len(pictures), "pictures")
 

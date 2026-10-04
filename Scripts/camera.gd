@@ -28,14 +28,17 @@ const MAX_LOOK_AHEAD := 150.0
 const LOOK_EASE := 3.0
 const PLUNGER_LANE_X := 655.0
 const PLUNGER_SHIFT := 48.0
-## Side to side it holds still on the table's middle once the ball's out of the launch
-## lane, and only moves up and down: it swings right for the launch lane, and for the right
-## rail up into the golden temple (and while the ball's inside it). The left rail's outer
-## curve runs past the edge of a phone's view, so it eases left just enough to keep a ball
-## out there in sight.
-const CENTRE_X := 360.0
+## Side to side it holds still once the ball's out of the launch lane, flush with the
+## table's left edge so the border down that side is in view, and only moves up and down: it
+## swings right for the launch lane, and for the right rail up into the golden temple (and
+## while the ball's inside it).
 const RIGHT_X := 720.0     # as far right as the limits allow
-const KEEP_IN_VIEW := 34.0 # how close to the view's edge a ball may come
+const TABLE_BOTTOM := 1280
+const PHONE_ZOOM := 1.12
+const DESKTOP_FOLLOW := 2.2   # how much faster the desktop view catches up
+const DESKTOP_DRAG := 0.45    # ...and how much smaller the band the ball roams before it moves
+const DESKTOP_WIDTH := 655.0  # scene units across the desktop view shows: the playfield, short of the launch tube
+const REST_LEFT_EDGE := 0.0  # at rest the view's left edge: the table's own, border and all
 const SHRINE := Rect2(439, 42, 281, 290)  # inside the golden temple
 ## A nudge jolts the table a few pixels the way it was pushed, and settles back
 const NUDGE_JOLT := 9.0
@@ -56,6 +59,8 @@ func _ready() -> void:
 	position_smoothing_enabled = true
 	position_smoothing_speed = FOLLOW_SPEED
 	PinballEvents.rumble.connect(func(strength: float): _shake = maxf(_shake, strength))
+	_set_view(GameManager.desktop_view)  # (after the defaults above, which it adjusts)
+	PinballEvents.view_changed.connect(_set_view)
 	PinballEvents.nudged.connect(func(direction: Vector2): _jolt = -direction * NUDGE_JOLT)
 
 func _process(dt):
@@ -75,16 +80,31 @@ func _process(dt):
 	global_position.x = _view_x(target)
 	if first:
 		reset_smoothing()
+	# with bands along the top and bottom of the screen, it can go that far past the table's
+	# ends, so all of the table shows between them
+	var band := int(ceilf(GameManager.screen_band / zoom.y))
+	limit_top = -band
+	limit_bottom = TABLE_BOTTOM + band
 	_shake *= exp(-SHAKE_DECAY * dt)
 	_jolt *= exp(-NUDGE_SETTLE * dt)
 	offset = _jolt + (Vector2(randf_range(-1.0, 1.0), randf_range(-1.0, 1.0)) * _shake if _shake > 0.3 else Vector2.ZERO)
+
+# Phone: the whole table's width (but the launch tube) in its tall window. Desktop: zoomed in
+# just enough that the playfield's width fills the squarer window, the tube hidden off its edge
+func _set_view(desktop: bool) -> void:
+	var z := PHONE_ZOOM if not desktop else 720.0 / DESKTOP_WIDTH
+	zoom = Vector2(z, z)
+	# zoomed in, less of the table's in view: it starts following sooner and catches up faster
+	position_smoothing_speed = FOLLOW_SPEED * (DESKTOP_FOLLOW if desktop else 1.0)
+	drag_top_margin = DRAG_TOP * (DESKTOP_DRAG if desktop else 1.0)
+	drag_bottom_margin = DRAG_BOTTOM * (DESKTOP_DRAG if desktop else 1.0)
 
 func _view_x(target: Node2D) -> float:
 	var at := target.global_position
 	if at.x > PLUNGER_LANE_X or SHRINE.has_point(at) or _on_right_rail(target):
 		return RIGHT_X
 	var half := get_viewport_rect().size.x / (2.0 * zoom.x)
-	return minf(CENTRE_X, at.x + half - KEEP_IN_VIEW)
+	return half + REST_LEFT_EDGE
 
 func _on_right_rail(target: Node2D) -> bool:
 	var features := get_tree().current_scene.get_node_or_null(^"TableFeatures")

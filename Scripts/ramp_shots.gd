@@ -67,11 +67,8 @@ func _ramp_made(side: String) -> void:
 		features._award(ARROW_POINTS[arrows[kind]], SHOT_AT[side] + Vector2(0, -40))
 		arrows[kind] += 1
 		PinballEvents.arrows_changed.emit(kind, arrows[kind])
-		PinballEvents.toast.emit("%s arrow %d/%d" % [kind.capitalize(), arrows[kind], MAX_ARROWS])
 		if kind == "awaken" and arrows[kind] == MAX_ARROWS:
 			features.awakening.light()
-	else:
-		PinballEvents.toast.emit("Ramp!" if _combo == 1 else "Combo x%d!" % _combo)
 	var pitch := 1.0 + 0.12 * (_combo - 1)
 	AudioSfx.play("ramp", 0.0, Vector2(pitch, pitch))
 	PinballEvents.ramp_made.emit(side, _combo)

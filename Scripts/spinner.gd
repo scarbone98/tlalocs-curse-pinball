@@ -5,20 +5,20 @@ extends Node2D
 ## to a stop, scoring every turn.
 ##
 ## As on Pokemon Pinball Ruby & Sapphire, how fast the ball goes up the lane charges the
-## kickback (one hard shot can fill it), and the lane pays jade beads like Ruby's coin
-## orbit: 1, then 5, then 10 a pass as its level climbs, each level fading back down if
+## kickback (one hard shot can fill it), and the lane pays like Ruby's coin orbit:
+## 1000, then 2500, then 5000 a pass as its level climbs, each level fading back down if
 ## the lane goes unshot for a while.
 
 const FLIPPER := preload("res://Sprites/table/blue_flipper.png")  # tools/make_table.py
 
-const PLATES := [Vector2(164.5, 386), Vector2(164.5, 456), Vector2(170, 525)]  # top to bottom
+const PLATES := [Vector2(171.5, 393), Vector2(164.5, 456), Vector2(170, 525)]  # top to bottom, as in the layout mock-up
 const SENSOR_SIZE := Vector2(58, 14)  # the full width of the lane, so every ball through it counts
 const FRAMES := 15  # one full turn
 const TURNS_PER_SPEED := 1.0 / 150.0  # turns per second for each unit of ball speed
 const MAX_TURNS_PER_SECOND := 14.0
 const FRICTION := 1.2  # turns per second lost each second: they spin down slowly
 const TURN_POINTS := 100
-const BEADS := [1, 5, 10]                 # a pass at each level
+const PASS_POINTS := [1000, 2500, 5000]   # a pass at each level
 const BEAD_LEVEL_SECONDS := [60.0, 30.0, 15.0]  # how long each level lasts before fading a step
 const PASS_COOLDOWN := 0.8  # one trip up (or down) the lane pays once, however many plates it turns
 
@@ -34,7 +34,10 @@ var _pass_cooldown := 0.0
 
 func _ready() -> void:
 	for at in PLATES:
-		_sprites.append(features._sprite(FLIPPER, FRAMES, at))
+		var plate: AnimatedSprite2D = features._sprite(FLIPPER, FRAMES, at)
+		plate.z_index = 2  # the ball (z 1) passes under the plates
+		plate.z_as_relative = false
+		_sprites.append(plate)
 		_rates.append(0.0)
 		_turned.append(0.0)
 		_scored.append(0)
@@ -58,10 +61,8 @@ func _on_ball_through(body: Node, index: int) -> void:
 		return
 	_pass_cooldown = PASS_COOLDOWN
 	features.kickback.add_speed_charge(speed)
-	var beads: int = BEADS[bead_level]
-	GameManager.add_beads(beads)
-	PinballEvents.toast.emit("+%d jade" % beads)
-	bead_level = mini(bead_level + 1, BEADS.size() - 1)
+	features._award(PASS_POINTS[bead_level], PLATES[index])
+	bead_level = mini(bead_level + 1, PASS_POINTS.size() - 1)
 	_bead_left = BEAD_LEVEL_SECONDS[bead_level]
 
 func _physics_process(delta: float) -> void:
