@@ -40,7 +40,8 @@ const Lighting := preload("res://Scripts/lighting.gd")
 const Sacrifices := preload("res://Scripts/sacrifices.gd")
 const SpiritLane := preload("res://Scripts/spirit_lane.gd")
 const DartTrap := preload("res://Scripts/dart_trap.gd")
-const DebugView := preload("res://Scripts/debug_view.gd")  # F3: colliders and rails drawn over the table
+const DebugView := preload("res://Scripts/debug_view.gd")
+const OrbitGuide := preload("res://Scripts/orbit_guide.gd")  # F3: colliders and rails drawn over the table
 const Effects := preload("res://Scripts/effects.gd")
 const TableLife := preload("res://Scripts/table_life.gd")
 const Music := preload("res://Scripts/music.gd")
@@ -112,6 +113,7 @@ var journey: Node2D
 var dart_trap: Node2D  # Scripts/dart_trap.gd
 var warriors: Node2D   # Scripts/warriors.gd
 var torch_lane: Node2D  # Scripts/torches.gd
+var orbit_guide: Node2D  # Scripts/orbit_guide.gd
 var temple: Node2D
 var awakening: Node2D
 var hatchling: Node2D
@@ -167,7 +169,7 @@ func _ready() -> void:
 	skull = CrystalSkull.new()
 	idol_tower = IdolTower.new()
 	spinner = Spinner.new()
-	for mode in [ramps, rails, kickback, spirit, journey, temple, spinner, Torches.new(), Temple.new(), idol_tower, skull, awakening, hatchling, Warriors.new(), Nudge.new(), Palms.new(), Plunger.new(), FloorRoulette.new(), Sacrifices.new(), SpiritLane.new(), DartTrap.new(), Lighting.new(), DebugView.new()]:
+	for mode in [ramps, rails, kickback, spirit, journey, temple, spinner, Torches.new(), Temple.new(), idol_tower, skull, awakening, hatchling, Warriors.new(), Nudge.new(), Palms.new(), Plunger.new(), FloorRoulette.new(), Sacrifices.new(), SpiritLane.new(), DartTrap.new(), OrbitGuide.new(), Lighting.new(), DebugView.new()]:
 		mode.features = self
 		add_child(mode)
 	add_child(Effects.new())

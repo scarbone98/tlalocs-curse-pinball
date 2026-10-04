@@ -10,6 +10,8 @@ extends Node
 ##              the dashed lines of the track's middle (ENTRY_LATERAL)
 ##   green      each rail's track, the line a riding ball is carried along
 ##   white      one-way walls, the tick on the side they let balls through from
+##   light blue the left orbit's guide line: a fast ball running round the orbit's wall is
+##              carried along it (Scripts/orbit_guide.gd)
 ## Each ball shows its velocity, and its state: on a rail (which, and how fast), or not,
 ## and in a rail mouth, how well it lines up with the way up.
 
@@ -22,6 +24,7 @@ const OFF := Color(0.6, 0.6, 0.6, 0.4)
 const ENTRY := Color(1.0, 0.55, 0.1, 0.9)
 const TRACK := Color(0.3, 1.0, 0.3, 0.9)
 const ONE_WAY := Color(1.0, 1.0, 1.0, 0.95)
+const ORBIT := Color(0.45, 0.85, 1.0, 0.9)
 
 var features: Node2D  # TableFeatures
 var _on := false
@@ -77,6 +80,8 @@ func _draw_all() -> void:
 	for node in scene.find_children("*", "CollisionPolygon2D", true, false):
 		_draw_polygon(node as CollisionPolygon2D)
 	_draw_rails()
+	if features.orbit_guide:
+		_canvas.draw_polyline(features.orbit_guide._curve.get_baked_points(), ORBIT, 2.0)
 	for ball in get_tree().get_nodes_in_group("ball"):
 		_draw_ball(ball as RigidBody2D)
 
@@ -161,12 +166,13 @@ func _draw_rails() -> void:
 
 func _draw_ball(ball: RigidBody2D) -> void:
 	var p := ball.global_position
-	var riding: bool = features.rails != null and features.rails._rides.has(ball)
+	var riding: bool = (features.rails != null and features.rails._rides.has(ball)) \
+		or (features.orbit_guide != null and features.orbit_guide.carrying(ball))
 	_canvas.draw_arc(p, 14.0, 0.0, TAU, 20, TRACK if riding else Color.WHITE, 2.0)
 	_canvas.draw_line(p, p + ball.linear_velocity * 0.08, Color.WHITE, 2.0)
 
 func _status() -> String:
-	var lines := ["DEBUG (F3)", "magenta walls  cyan rail walls  yellow sensors", "orange rail mouths  green rail tracks"]
+	var lines := ["DEBUG (F3)", "magenta walls  cyan rail walls  yellow sensors", "orange rail mouths  green rail tracks  blue orbit guide"]
 	var rails: Node2D = features.rails
 	for ball in get_tree().get_nodes_in_group("ball"):
 		var b := ball as RigidBody2D
@@ -174,6 +180,8 @@ func _status() -> String:
 		if rails and rails._rides.has(b):
 			var ride = rails._rides[b]
 			text += "  ON RAIL %s  along %d  speed %d" % [ride.path, ride.offset, ride.speed]
+		elif features.orbit_guide and features.orbit_guide.carrying(b):
+			text += "  ON ORBIT GUIDE"
 		elif rails:
 			for opening: String in Rails.ENTRIES:
 				var rect: Rect2 = Rails.ENTRY_AREAS[opening]

@@ -27,6 +27,7 @@ const BUTTONS := [Vector2(71.0, 658.4), Vector2(86.4, 721.6), Vector2(117.9, 784
 const SEQUENCE_GAP := 1.5  # each button in the run up the lane must follow the last within this
 const FIRE_BUTTON := preload("res://Sprites/table/fire_button.png")  # tools/make_table.py
 const FIRE_AT := Vector2(198, 286)  # up past the lane's top palm, below the wall's shadow where the lane bends over the top
+const FIRE_RADIUS := 30.0    # it's out on the floor a little way off the ball's line round the bend
 const FIRE_WINDOW := 2.0      # after a run up the three, the fire button must come within this
 const FIRE_POINTS := 100
 const INFERNO_POINTS := 30000
@@ -126,7 +127,7 @@ func _ready() -> void:
 	fire_sensor.monitorable = false
 	var fire_shape := CollisionShape2D.new()
 	var fire_circle := CircleShape2D.new()
-	fire_circle.radius = BUTTON_RADIUS
+	fire_circle.radius = FIRE_RADIUS
 	fire_shape.shape = fire_circle
 	fire_sensor.add_child(fire_shape)
 	fire_sensor.body_entered.connect(_on_fire_button)

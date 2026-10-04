@@ -32,6 +32,8 @@ const HOP_STAGGER := 0.2
 const ARENA_RADIUS := 95.0
 const STEP_EVERY := 0.18
 const FLASH_SECONDS := 0.12
+const RECOIL := 9.0          # scene units a warrior is knocked back, away from the ball that hit it...
+const RECOIL_RETURN := 60.0  # ...and how fast it steps back to its place
 const STUNG_SECONDS := 12.0  # a warrior stung by a dart stays down the hole this long
 const OUT_COUNTS := [1, 2, 3, 3]  # how many hop back out together after an absence (the rest straggle)
 const STRAGGLE_SECONDS := Vector2(6.0, 18.0)
@@ -62,6 +64,8 @@ var _away_wait := 60.0
 var _away_left := 0.0
 var _hole: AnimatedSprite2D
 var _hopping := 0  # warriors mid-hop
+var _recoil: Array[Vector2] = []  # each one knocked back off its place by a hit
+var _home: Array[Vector2] = []    # where each one's sprite sits on its warrior
 var _stung_left: Array[float] = []  # each one down the hole on its own after a dart, this much longer
 var _solo: Array[bool] = []  # each one hopping on its own (the formation leaves it be)
 var _rest_left := 0.0
@@ -84,6 +88,8 @@ func _ready() -> void:
 		_glance_wait.append(randf_range(GLANCE_EVERY.x, GLANCE_EVERY.y))
 		_glance_left.append(0.0)
 		_stung_left.append(0.0)
+		_recoil.append(Vector2.ZERO)
+		_home.append(sprite.position)
 		_solo.append(false)
 		(warrior as Area2D).body_entered.connect(_on_touch.bind(_sprites.size() - 1))
 	_hole = features._sprite(HOLE, 2, CENTRE)  # under the warriors (they're drawn after the table's features)
@@ -160,11 +166,18 @@ func _hop_solo(i: int, out_of_hole: bool) -> void:
 
 func _on_touch(body: Node, index: int) -> void:
 	if body.is_in_group("ball"):
+		# it's knocked back a little, away from the ball, and steps back after
+		var away := ((_warriors[index] as Node2D).global_position - (body as Node2D).global_position).normalized()
+		_recoil[index] = away * RECOIL
 		_flash_left[index] = FLASH_SECONDS
 		_sprites[index].frame = FLASHING
 
 func _physics_process(delta: float) -> void:
 	_clock += delta
+	for i in _sprites.size():
+		if _recoil[i] != Vector2.ZERO:
+			_recoil[i] = _recoil[i].move_toward(Vector2.ZERO, RECOIL_RETURN * delta)
+		_sprites[i].position = _home[i] + _recoil[i]
 	for i in _warriors.size():
 		if _stung_left[i] > 0.0:
 			_stung_left[i] -= delta
