@@ -55,7 +55,6 @@ const GEM_HOVER := 4.0    # art pixels it floats over its shadow
 const GEM_BOB_SECONDS := 1.4
 const GEM_REACH := 26.0
 const GEM_POINTS := 5000
-const GEM_BEADS := 5
 const GEM_RETURN_SECONDS := 20.0
 
 var features: Node2D  # TableFeatures
@@ -224,9 +223,8 @@ func _take_gem() -> void:
 	_gem_shadow.hide()
 	_gem_left = GEM_RETURN_SECONDS
 	features._award(GEM_POINTS, _gem.position)
-	GameManager.add_beads(GEM_BEADS)
 	PinballEvents.effect.emit("sparks", _gem.position)
-	PinballEvents.toast.emit("Rail emerald! +%d jade" % GEM_BEADS)
+	PinballEvents.toast.emit("Rail emerald!")
 	AudioSfx.play("catch")
 
 func _physics_process(delta: float) -> void:

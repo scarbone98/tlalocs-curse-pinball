@@ -95,6 +95,8 @@ func _ready() -> void:
 		_lamp(lamp, Color(1.0, 0.8, 0.3), 4)
 	for lamp: AnimatedSprite2D in features.spirit_lane._lamps:
 		_lamp(lamp, Color(0.4, 0.9, 1.0), 1)
+	for frog: AnimatedSprite2D in features.kickback.frogs:
+		_lamp(frog, Color(0.4, 1.0, 0.6), 1)  # awake (or leaping): its jade glows
 	for eye: Sprite2D in features._face_eyes:
 		_eye_lights.append(_light(eye.global_position, EYE_YELLOW, 0.8, EYE_SIZE))
 	_gutter_sparks()

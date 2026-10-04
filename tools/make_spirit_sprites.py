@@ -1,18 +1,16 @@
 """Generate the spirits for the Spirit Codex: Sprites/table/spirits.png.
 
 Sixteen spirits, four per city (three common and a rare), like Pokemon Pinball's
-Pokemon by map location. Each is 18x14 at the table art's native resolution, drawn
-as its left half and mirrored so it's exactly symmetrical. One row per spirit, three
+Pokemon by map location. Each is 26x22 at the table art's native resolution, drawn
+front-on in a Mesoamerican codex style as its left half and mirrored so it's exactly
+symmetrical. One row per spirit, three
 frames each: resting, blinking, and struck (washed out in gold, as the ajolote is).
-
-The ajolote is the table's original water spirit (tools/make_mode_sprites.py), padded
-to the same size.
 
 Also writes Sprites/table/offering.png, the sacred offering (a jade bead in a gold
 ring, two frames as it glints) that appears on the table during an Awakening, and
 Sprites/table/spirits_awakened.png: each spirit's divine form after the
 Awakening, like Pokemon Pinball's evolutions. It's the spirit brightened, outlined in
-gold and wrapped in an aura, 22x18, two frames as the aura pulses.
+gold and wrapped in an aura, 30x26, two frames as the aura pulses.
 
 Run from the repo root:  python3 tools/make_spirit_sprites.py
 """
@@ -21,11 +19,10 @@ from pathlib import Path
 from PIL import Image
 
 from pixel_art import Canvas, asymmetry
-import make_mode_sprites as mode_sprites
 
 OUT = Path("Sprites/table/spirits.png")
 AWAKENED_OUT = Path("Sprites/table/spirits_awakened.png")
-W, H = 18, 14
+W, H = 26, 22
 AW, AH = W + 4, H + 4
 T = (0, 0, 0, 0)
 
@@ -44,67 +41,393 @@ PALETTE = {
     "U": rgb("#2c67a4"), "V": rgb("#5a3a7a"), "v": rgb("#9a7ac0"), "P": rgb("#e88aa0"),
 }
 
-# Left halves, 9 columns each; column 8 sits against the centre line.
+# Left halves, 13 columns each (column 12 sits against the centre line): front-on
+# figures in the manner of the Mesoamerican codices, heavy outlines and flat jade,
+# turquoise, red and gold, crests and plumes, ringed eyes, ear-spools and collars.
 SPIRITS = {
+    "ajolote": [
+        ".............",
+        "..oo.........",
+        ".oPPo..o.....",
+        ".oPRPooPo....",
+        "..oPRPPRPo...",
+        "...oPPPPPoooo",
+        "....ooTTTTTTT",
+        "...oTTTTTTTTT",
+        "..oTTwwwTTTTT",
+        "..oTwkkwTTTTT",
+        "..oTwkkwTTTTt",
+        "..oTTwwTTTTtt",
+        "...oTTTTTTttt",
+        "....oTTTTTTRR",
+        ".....oTTTTTTT",
+        "....oTtoTTTTT",
+        "...oTto.oTTTT",
+        "...oo...oTtTT",
+        ".........oTTT",
+        "..........oTT",
+        "...........oT",
+        "............o",
+    ],
     "xolo": [
-        "o........", "oo.......", "oGo....oo", "oGPo..oDD", "oGPGooGGG", ".oGGGGGGG", ".oGGgGGGG",
-        ".oGkwGGGG", ".oGkkGGGG", "..oGGGggg", "...oGggDD", "....oggPP", ".....oooo", ".........",
+        "..o..........",
+        "..oo.........",
+        "..oGo........",
+        "..oGPo.......",
+        "..oGPGo......",
+        "..oGPGGo.oooo",
+        "..oGGGGGoGGGG",
+        "...oGGGGGGGGG",
+        "...oGGGGGGGGG",
+        "...oGwwwGGGGG",
+        "...oGwkkGGGGG",
+        "...oGwkkGGGGG",
+        "...oGGGGGGGGg",
+        "....oGGGGGGgg",
+        ".....oGGGGggg",
+        "......oGGggDD",
+        ".......oGgggP",
+        "......oYJYJYJ",
+        "......oYJYJYJ",
+        ".......oGGGGG",
+        "........oGGGG",
+        ".........oooo",
     ],
     "heron": [
-        ".......oo", "......oWo", "......oWW", ".....oWWW", ".....oWkW", "......oWY", "......oWY",
-        ".....oWWY", "..oooWWWW", ".oWWWWWWW", ".oggWWWWW", "..oggWWWW", "...oooOOo", ".......O.",
+        "..........ooo",
+        ".........oWWW",
+        "........oWWWW",
+        "........oWkWW",
+        "........oWWWY",
+        ".........oWWY",
+        "..........oWY",
+        "..........oWW",
+        "..........oWW",
+        "oo.......oWWW",
+        "oWoo....oWWWW",
+        "oWWWoo.oWWWWW",
+        ".oWWWWoWWWWWW",
+        ".oggWWWWWWWWW",
+        "..oggWWWWWWWW",
+        "...oggWWWWWWW",
+        "....oogWWWWWW",
+        "......ooWWWWW",
+        "........ooWWW",
+        "..........oYo",
+        "..........oY.",
+        ".........oYY.",
     ],
     "eagle": [
-        ".........", "......ooo", ".....oYYY", ".....oYkY", "oo....oYO", "oBoo..oBB", "oBBBooBBB",
-        ".oBbBBBBB", ".obBbBBBB", "..obBbBBB", "...oobBBB", ".....oBBB", ".....oYoY", "......o.o",
+        "...........oo",
+        "..........oYY",
+        ".........oYYY",
+        ".........oYkY",
+        ".........oBYO",
+        "oo........oBO",
+        "oBo......oBBB",
+        "oBBoo...oBBBB",
+        "obBBBooobBBBB",
+        ".obBBBBbBBBBB",
+        ".obbBBBBbBBBB",
+        "..obbBBBBbBBB",
+        "..obbbBBBBBBB",
+        "...obbbBBBBBY",
+        "....oobbBBBYY",
+        "......oobBBYY",
+        "........oBBBB",
+        "........obBbB",
+        ".........obbo",
+        ".........oYo.",
+        ".........oY..",
+        "........oYY..",
     ],
     "butterfly": [
-        ".oo......", "oOOoo..o.", "oOYOOo..o", "oOYYOOo.o", "oOOOOOOoD", ".oOOOOOoD", "..oooooDD",
-        "..oTTToDD", ".oTtTTToD", ".oTTTTToD", "..oTTToD.", "...ooo...", ".........", ".........",
+        ".oo..........",
+        "oOOoo........",
+        "oOYYOoo......",
+        "oOYkYOOoo...o",
+        "oOYYYOOOOo.o.",
+        "oOOOOOJJOOooD",
+        "oOOOOJEEJOOoD",
+        ".oOOOJEEJOOoD",
+        ".oOOOOJJOOOoD",
+        "..oOOOOOOOOoD",
+        "...ooooooooDD",
+        "...oTTTTTToDD",
+        "..oTTttTTTToD",
+        "..oTtYYtTTToD",
+        "..oTtYYtTTToD",
+        "...oTttTTToDD",
+        "....oTTTToDD.",
+        ".....ooooDD..",
+        "..........oD.",
+        "...........o.",
+        ".............",
+        ".............",
     ],
     "owl": [
-        "..o......", "..oo.....", "..oBo....", "..oBBoooo", ".oBBBBBBB", ".oBbbbBBB", ".oBbYYYbB",
-        ".oBYkkYbB", ".oBYkwYbO", ".oBbYYbBO", ".oBBBBBbb", "..oBbBbBb", "...oBBBBB", "....ooooo",
+        "...o.........",
+        "...oo........",
+        "...oBo.......",
+        "...oBBo......",
+        "..oBBBBoooooo",
+        "..oBBBBBBBBBB",
+        "..oBYYYYBBBBB",
+        ".oBYOOOOYBBBB",
+        ".oBYOwwOYBBBB",
+        ".oBYOwkkOYBBB",
+        ".oBYOwkkOYBBO",
+        ".oBBYOOOOYBOO",
+        ".oBBBYYYYBBBO",
+        ".oBBbBBBBBBBB",
+        ".oBbBbCbCbCbC",
+        ".oBbBbbCbCbCb",
+        ".oBbBbCbCbCbC",
+        "..oBbBbbCbCbC",
+        "...oBBBBBBBBB",
+        "....ooooOoOoO",
+        "........O.O.O",
+        ".............",
     ],
     "coyote": [
-        ".o.......", ".oo......", ".oBo.....", ".obBo....", ".obBBo...", "..oBBBooo", "..oBBBBBB",
-        "..oBkBBBB", "..oBBBBBC", "...oBBBCC", "....oBCCC", ".....oCCD", "......oCC", ".......oo",
+        ".o...........",
+        ".oo..........",
+        ".oBo.........",
+        ".oRBo........",
+        ".oRBBo.......",
+        ".oRRBBo......",
+        ".oRRBBBoooooo",
+        "..oRBBBBBBBBB",
+        "..oBBBBBBBBBB",
+        "..oBBwwwBBBBB",
+        "..oBBwkkBBBBB",
+        "..JBBBBBBBBBC",
+        ".oEJBBBBBBBCC",
+        ".oJoBBBBBBCCC",
+        "..o.oBBBBBCCC",
+        ".....oBBBCCCC",
+        "......oBBCCCD",
+        ".......oBCCDD",
+        "........oCCCC",
+        ".........oCRR",
+        "..........ooo",
+        ".............",
     ],
     "feathered_serpent": [
-        "oJ..J..J.", "oJJoJJoJJ", ".oJJJJJJJ", "..oJEEEEE", "..oEETTTT", "..oETkwTT", "..oETkkTT",
-        "...oTTTTT", "...oTTTYY", "....oTTTT", ".....oTRR", "......oR.", "......R..", ".........",
+        "oE...E...E...",
+        "oEE.oEE.oEE.E",
+        ".oEEoEEEoEEoE",
+        "..oEJEEJEEJEE",
+        "...oJJJJJJJJJ",
+        "...oYRYRYRYRY",
+        "...oTTTTTTTTT",
+        "..oTTTTTTTTTT",
+        "..oTwwwTTTTTT",
+        "..oTwkkwTTTTT",
+        "..oTwkkwTTTTT",
+        "..oTTwwTTTTTT",
+        "..oTTTTTTTTtt",
+        "...oTTTTTTttt",
+        "...oTTTTTtttt",
+        "....oTTTTtoot",
+        "....oTTTToRRo",
+        ".....oTTTWRRR",
+        ".....oTTTW.RR",
+        "......oTTToRR",
+        ".......ooo.oR",
+        "...........oR",
     ],
     "iguana": [
-        ".......oo", "......oJJ", "......oJk", "......oJJ", "..oo..oJE", ".oJJooJJE", "..ooJJJJE",
-        "....oJJJE", "....oJJJE", "..ooJJJJE", ".oJJooJJE", "..oo..oJE", ".......oJ", "........o",
+        "...........oo",
+        "..........oJJ",
+        ".........oJEE",
+        "........oJEEE",
+        "....o..oJEEEE",
+        "...oJooJEkwEE",
+        "...oJJJEEEEEE",
+        "....oJJEEEEEE",
+        ".....oJJEEEEE",
+        "......oJEEEEY",
+        ".....ooJEEEYY",
+        "....oJJJEEEEE",
+        "...oJJoJEEEEE",
+        "...oo.oJEEEEE",
+        "......oJEEEYY",
+        "......oJEEEEE",
+        "......oJJEEEE",
+        ".......oJEEEE",
+        "........oJEEE",
+        ".........oJEE",
+        "..........oJE",
+        "...........oo",
     ],
     "bat": [
-        ".........", "oo.....o.", "oVo...oVo", "oVVo..oVV", "oVVVooVVV", ".oVVVVVRV", ".oVvVVVVV",
-        "..oVvVVVW", "...oVvoVV", "....oo.oV", ".......oo", ".........", ".........", ".........",
+        ".............",
+        "o............",
+        "oVo........o.",
+        "oVVo......oVo",
+        "oVVVo.....oVV",
+        "oVvVVo...oVVV",
+        "oVvvVVoooVVVV",
+        ".oVvvVVVVVwVV",
+        ".oVvvvVVVVkVV",
+        ".oVvvvVVVVVVR",
+        "..oVvvvVVVVVR",
+        "..oVvvvVVVoVV",
+        "...oVvvVVVoWo",
+        "...oVvvVVVVVV",
+        "....oVvoVVVVV",
+        "....oVo.oVVVV",
+        ".....o...oVVV",
+        "..........oVV",
+        "...........oV",
+        "............o",
+        ".............",
+        ".............",
     ],
     "rattlesnake": [
-        "......ooo", ".....oBBB", ".....oBkB", "......oBR", "...oooBBB", "..oBbBBbB", ".oBbBooBb",
-        ".oBBo..oB", ".oBbo..oB", ".oBBBooBb", "..obBBbBB", "...oooBBB", "......oYY", ".......oo",
+        "..........ooo",
+        ".........oBBB",
+        "........oBBBB",
+        "........oBkBB",
+        ".........oBBR",
+        "..........oBR",
+        ".......oooBBB",
+        ".....ooBbBBbB",
+        "....oBbYbBbYb",
+        "...oBbYYYbBYY",
+        "...oBbbYbBbbY",
+        "..oBBbBbBBbBb",
+        "..oBbYbBooooo",
+        "..oBYYYbBbBbB",
+        "..oBbYbBbYbBb",
+        "...oBbBbYYYbB",
+        "....oBBBbYbBB",
+        ".....oooBBBBB",
+        "........ooooo",
+        ".............",
+        ".............",
+        ".............",
     ],
     "sun_macaw": [
-        "......ooo", ".....oRRR", ".....oRRR", ".....oWkR", ".....oWWR", "oo....oDD", "oUoo..oRD",
-        "oUYRooRRR", ".oUYRRRRR", ".oUYRRRRR", "..oUYRRRR", "...ooRRRR", "......oRR", ".......oR",
+        "..........ooo",
+        ".........oRRR",
+        "........oRRRR",
+        "........oWkRR",
+        "........oWWRD",
+        ".........oWDD",
+        "oo........oRR",
+        "oUoo.....oRRR",
+        "oUYRoo..oRRRR",
+        ".oUYRRooRRRRR",
+        ".oUYYRRRRRRRR",
+        "..oUYRRRRRRRR",
+        "..oUUYYRRRRRR",
+        "...oUUYRRRRRR",
+        "....ooUYRRRRR",
+        "......ooRRRRR",
+        "........oRRRR",
+        ".........oRRR",
+        "..........oRU",
+        "..........oUU",
+        "...........oU",
+        "............o",
     ],
     "howler_monkey": [
-        ".........", "....ooooo", "...oBBBBB", "..oBBBBBB", ".oBBBbbbb", "oCoBbkwbb", "oCoBbkkbb",
-        ".ooBbbbbD", "...oBbbbb", "...oBbRRR", "....oBRrr", ".....oBBB", "......ooo", ".........",
+        ".............",
+        ".....oooooooo",
+        "....oBBBBBBBB",
+        "...oBBBBBBBBB",
+        "..oBBBrrrrrrr",
+        ".oBBBrCCCCCCC",
+        ".oBBrCCCCCCCC",
+        "oCoBrCwwwCCCC",
+        "oCoBrCwkkCCCC",
+        "oCoBrCwkkCCCC",
+        ".ooBrCCCCCCCC",
+        "...oBrCCCCCCD",
+        "...oBrCCCCCDD",
+        "...oBBrCCCCCC",
+        "....oBrCCrrrr",
+        "....oBBrrRRRR",
+        ".....oBBrRrRR",
+        ".....oBBBrrrr",
+        "......oBBBBBB",
+        ".......oBBBBB",
+        "........ooooo",
+        ".............",
     ],
     "hummingbird": [
-        ".........", "oo.......", "oEoo.....", "oEEEo..oo", ".oEEEooJJ", "..oEEoJkJ", "...ooJJJR",
-        "....oJRRR", ".....oRRR", "......oJJ", ".......oD", ".......oD", ".......oD", ".........",
+        "oo...........",
+        "oEoo.........",
+        "oEEEoo.......",
+        ".oEJEEoo.....",
+        ".oEJJEEEo....",
+        "..oEJJEEEo...",
+        "..oEEJJEEEooo",
+        "...oEEJJEoJJJ",
+        "....oEEEoJJJJ",
+        ".....ooooJkJJ",
+        "........oJJJJ",
+        "........oJRRR",
+        "........oRRRR",
+        "........oRRRY",
+        ".........oJJJ",
+        ".........oJJJ",
+        "..........oJD",
+        "..........ooD",
+        "...........oD",
+        "............D",
+        ".............",
+        ".............",
     ],
     "tapir": [
-        ".........", "..oo.....", ".oWGo....", ".oGGGoooo", "..oGGGGGG", "..oGkwGGG", "..oGkkGGG",
-        "...oGGGGG", "....oGGGG", ".....oGgg", "......ogg", "......ogg", "......ogD", ".......oo",
+        ".............",
+        "...oo........",
+        "..oWGo.......",
+        "..oGGGo......",
+        "...oGGGoooooo",
+        "...oGGGGGGGGG",
+        "...oGGGGGGGGG",
+        "...oGwwGGGGGG",
+        "...oGwkGGGGGG",
+        "...oGGGGGGGGG",
+        "....oGGGGGGGg",
+        ".....oGGGGGgg",
+        "......oGGGggg",
+        ".......oGgggg",
+        "........oGggg",
+        "........oGggg",
+        ".........oggg",
+        ".........oggD",
+        "..........ogD",
+        "..........oDD",
+        "...........oo",
+        ".............",
     ],
     "quetzal": [
-        "......ooo", ".....oEEE", ".....oEEE", ".....oEkY", "....oEEEE", "...oEJEEE", "..oEJJRRR",
-        "..oEJRRRR", "...oERRRR", "....oRRRR", "......oJJ", ".....oJ.o", ".....oJ..", "......o..",
+        "..........o.o",
+        ".........oEoE",
+        "........oEEEE",
+        "........oEEEE",
+        "........oEkEY",
+        "........oEEEY",
+        ".....ooooEEEE",
+        "...ooEEEJEEEE",
+        "..oEEEJJJEEEE",
+        ".oEEJJJJEERRR",
+        ".oEJJJJEERRRR",
+        "..oJJJEERRRRR",
+        "...oJEERRRRRR",
+        "....ooERRRRRR",
+        "......oRRRRRR",
+        ".......oJEEEJ",
+        "........oEEJE",
+        "........oEJEE",
+        ".........oJEJ",
+        ".........oEJE",
+        "..........oEJ",
+        "...........oE",
     ],
 }
 
@@ -181,36 +504,21 @@ def offering(glint):
     return c.image()
 
 
-def ajolote_frames():
-    """The original water spirit, padded from 18x12 to 18x14."""
-    rows = mode_sprites.SPIRIT
-    frames = []
-    for key in (mode_sprites.SPIRIT_KEY, mode_sprites.SPIRIT_KEY_ALT, mode_sprites.SPIRIT_KEY_HIT):
-        img = Image.new("RGBA", (W, H), T)
-        img.alpha_composite(mode_sprites.from_rows(rows, key), (0, 1))
-        frames.append(img)
-    return frames
-
-
 def main():
     sheet = Image.new("RGBA", (W * 3, H * len(ORDER)), T)
     divine = Image.new("RGBA", (AW * 2, AH * len(ORDER)), T)
     for row, (name, _city, _rare) in enumerate(ORDER):
-        if name == "ajolote":
-            frames = ajolote_frames()
-        else:
-            half = SPIRITS[name]
-            assert len(half) == H and all(len(r) == 9 for r in half), name
-            rest = from_half(half)
-            frames = [rest, from_half(half, blink=True), struck(rest)]
-            for f in frames:
-                assert asymmetry(f) == 0, name
+        half = SPIRITS[name]
+        assert len(half) == H and all(len(r) == W // 2 for r in half), name
+        rest = from_half(half)
+        frames = [rest, from_half(half, blink=True), struck(rest)]
+        for f in frames:
+            assert asymmetry(f) == 0, name
         for i, frame in enumerate(frames):
             sheet.paste(frame, (i * W, row * H))
         for i in range(2):
             form = awakened(frames[0], i == 1)
-            # the ajolote keeps its original art's highlight on one side
-            assert name == "ajolote" or asymmetry(form) == 0, name
+            assert asymmetry(form) == 0, name
             divine.paste(form, (i * AW, row * AH))
     sheet.save(OUT)
     divine.save(AWAKENED_OUT)

@@ -1,9 +1,9 @@
 extends Node2D
 ## The six torches lining the left lane in two rows (the hand-drawn torch.png, placed as
-## in Sprites/exampleLayout.png), with a stone button (torchbutton.png) set in the lane
-## between each pair. Unlit they only smoulder. A ball rolling down the lane presses the
-## buttons as it goes, and the first unlit pair it passes catches with a flare (one pair a
-## trip down the lane), then burns for a while before dying back. Light all six before any goes out and the torches
+## in Sprites/exampleLayout.png), with three stone buttons (torchbutton.png) set along the
+## lane between them. Unlit they only smoulder and throw no light. Roll over all three
+## buttons in order going up the lane, bottom to top, each soon after the last, and the
+## next pair up catches with a flare, then burns for a while before dying back. Light all six before any goes out and the torches
 ## blaze up and hold a ball saver for a while, like Pokemon Pinball's Pikachu saver:
 ## drain in that time and the ball comes back. When it runs out they die back to embers.
 
@@ -20,7 +20,8 @@ const PAIRS := [
 # beside the stone face (scene units)
 const DECOR := [Vector2(40, 870), Vector2(612, 858), Vector2(40, 1135), Vector2(632, 1105), Vector2(165, 105), Vector2(35, 300)]
 # The stone buttons in the lane, one per pair (scene units, from the layout mock-up)
-const BUTTONS := [Vector2(84.4, 715.5), Vector2(112.5, 772.8), Vector2(143.4, 824.2)]
+const BUTTONS := [Vector2(72, 694), Vector2(112.5, 772.8), Vector2(152, 851)]  # top to bottom, spread along the lane
+const SEQUENCE_GAP := 1.5  # each button in the run up the lane must follow the last within this
 const BUTTON_RADIUS := 22.0
 const PRESSED_SECONDS := 0.35
 enum { BUTTON_UP, BUTTON_DOWN }
@@ -43,6 +44,8 @@ var _burn_left := [0.0, 0.0, 0.0]
 var _cooldown := [0.0, 0.0, 0.0]
 var _buttons: Array[AnimatedSprite2D] = []
 var _trip_left := 0.0
+var _expect := 2         # the button the run up the lane needs next: bottom (2), then 1, then top (0)
+var _since_press := 0.0
 var _ablaze_left := 0.0
 var _rest_left := 0.0
 
@@ -97,6 +100,7 @@ func _ready() -> void:
 func _physics_process(delta: float) -> void:
 	_rest_left = maxf(_rest_left - delta, 0.0)
 	_trip_left = maxf(_trip_left - delta, 0.0)
+	_since_press += delta
 	for i in _cooldown.size():
 		_cooldown[i] = maxf(_cooldown[i] - delta, 0.0)
 	for i in _lit.size():
@@ -119,16 +123,34 @@ func _play(pair: int, anim: StringName) -> void:
 	for torch in _torches[pair]:
 		torch.play(anim)
 
-func _on_button(body: Node, next: int) -> void:
-	if _cooldown[next] > 0.0 or not features._is_ball_on_playfield(body):
+func _on_button(body: Node, button: int) -> void:
+	if _cooldown[button] > 0.0 or not features._is_ball_on_playfield(body):
 		return
-	_cooldown[next] = PASS_COOLDOWN
-	_buttons[next].frame = BUTTON_DOWN
-	get_tree().create_timer(PRESSED_SECONDS, false).timeout.connect(func(): _buttons[next].frame = BUTTON_UP)
-	AudioSfx.play("spinner", 0.0, Vector2.ONE * 0.6)
-	if _rest_left > 0.0 or _ablaze_left > 0.0 or _lit[next] or _trip_left > 0.0:
-		_burn_left[next] = BURN_SECONDS if _lit[next] else _burn_left[next]
-		features._award(RELIGHT_POINTS, BUTTONS[next])
+	_cooldown[button] = PASS_COOLDOWN
+	_buttons[button].frame = BUTTON_DOWN
+	get_tree().create_timer(PRESSED_SECONDS, false).timeout.connect(func(): _buttons[button].frame = BUTTON_UP)
+	# the run up the lane: bottom, middle, top, each soon after the last
+	var in_time := _since_press <= SEQUENCE_GAP
+	_since_press = 0.0
+	if button == _expect and (button == BUTTONS.size() - 1 or in_time):
+		_expect -= 1
+	else:
+		_expect = BUTTONS.size() - 2 if button == BUTTONS.size() - 1 else BUTTONS.size() - 1
+	AudioSfx.play("spinner", 0.0, Vector2.ONE * (0.6 + 0.15 * (BUTTONS.size() - 1 - button)))
+	if _expect >= 0:
+		return  # not up the whole lane yet
+	_expect = BUTTONS.size() - 1
+	# the next unlit pair up the lane catches
+	var next := -1
+	for pair in range(_lit.size() - 1, -1, -1):
+		if not _lit[pair]:
+			next = pair
+			break
+	if next < 0 or _rest_left > 0.0 or _ablaze_left > 0.0 or _trip_left > 0.0:
+		for pair in _lit.size():
+			if _lit[pair]:
+				_burn_left[pair] = BURN_SECONDS
+		features._award(RELIGHT_POINTS, BUTTONS[button])
 		return
 	_trip_left = TRIP_SECONDS
 	_lit[next] = true

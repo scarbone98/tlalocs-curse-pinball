@@ -17,7 +17,7 @@ const SCENE_SECONDS := 3.0
 const HOW_TO_PLAY := [
 	"Flippers: tap the left or right side of the screen, or Left / Right.",
 	"Launch: tap Launch (or Space). Bump the table with Shift / Up, or swipe.",
-	"Shoot up the lane under the right rail to light its three spirit lamps and call a spirit. Hit the warriors to break its glyphs, then hit it 3 times to catch it.",
+	"Loop up the lane under the right rail to light its three spirit lamps: the crystal skull opens, and a shot into it calls a spirit. Hit the warriors to break its glyphs, then hit it 3 times to catch it.",
 	"When Tlaloc's curse breaks, a heart rises in his mouth: hit it 3 times to offer it and stop the rain.",
 	"Left rail lights Awaken arrows: with 3, the crystal skull opens its jaws; feed it to awaken a spirit.",
 	"Hit the idol's spinning tower 3 times (top left) to sink it into its pit, then hit the golden idol to claim it.",
@@ -26,7 +26,7 @@ const HOW_TO_PLAY := [
 	"While they're out, fill both jaguars' pips to Travel: a ramp picks the way, then shoot Tlaloc's mouth to go.",
 	"The bottom lanes light the roulette: shoot Tlaloc's mouth to spin it for prizes.",
 	"Catches light bonus lamps; 3 lamps (or all four relics) open El Dorado in Tlaloc's mouth.",
-	"The blue flippers' lane pays jade beads and charges the frog kickback. Spend beads at the crystal skull.",
+	"The blue flippers' lane pays more each pass and charges the frog kickback.",
 	"Hit Tlaloc's face to stir him. Wake him and the storm brings a second ball.",
 ]
 

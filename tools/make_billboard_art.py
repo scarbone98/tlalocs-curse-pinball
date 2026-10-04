@@ -265,13 +265,13 @@ def main():
     pictures += [framed(r, 3) for r in relics]
     pictures += [framed(b, 2) for b in balls]
     sheet = Image.open("Sprites/table/spirits.png").convert("RGBA")
-    for row in range(sheet.height // 14):
-        spirit = sheet.crop((0, row * 14, 18, row * 14 + 14))
-        pictures.append(framed(spirit, 2, backdrop=(C('#123a4a'), C('#1a5a6a'))))
+    for row in range(sheet.height // 22):  # tools/make_spirit_sprites.py: 26x22 each
+        spirit = sheet.crop((0, row * 22, 26, row * 22 + 22))
+        pictures.append(framed(spirit, 1, backdrop=(C('#123a4a'), C('#1a5a6a'))))
     divine = Image.open("Sprites/table/spirits_awakened.png").convert("RGBA")
-    for row in range(divine.height // 18):
-        form = divine.crop((0, row * 18, 22, row * 18 + 18))
-        pictures.append(framed(form, 2, backdrop=(C('#6a3a10'), C('#a8681c'))))
+    for row in range(divine.height // 26):  # 30x26 each
+        form = divine.crop((0, row * 26, 30, row * 26 + 26))
+        pictures.append(framed(form, 1, backdrop=(C('#6a3a10'), C('#a8681c'))))
     strip(pictures).save(OUT)
     print("wrote", OUT, len(pictures), "pictures")
 

@@ -30,10 +30,9 @@ var _objective_label: Label
 var _billboard: Billboard
 var _codex: CodexScreen
 var _pause: Button
-var _status_label: Label   # jade beads and the ball saver, under the balls count
+var _status_label: Label   # the ball saver's countdown while one runs, under the objective
 var _shown_score := 0      # the score rolls up toward the real one rather than jumping
 var _saver_left := 0.0
-var market: Market
 
 ## The score counts up, like Pokemon Pinball Ruby & Sapphire's, quickly enough that a
 ## big award still lands within a second or so
@@ -53,9 +52,6 @@ func _ready() -> void:
 	_build_menu()
 	add_child(ModeBanner.new())
 	add_child(BonusTally.new())
-	market = Market.new()
-	market.add_to_group("market")
-	add_child(market)
 	move_child(_menu, -1)  # the pause menu goes over everything
 
 	# Connect to global events
@@ -66,7 +62,6 @@ func _ready() -> void:
 	PinballEvents.launch_power_changed.connect(_on_launch_power_changed)
 	PinballEvents.game_over.connect(_on_game_over)
 	PinballEvents.objective_changed.connect(_on_objective_changed)
-	PinballEvents.beads_changed.connect(func(_beads): _render_status())
 	PinballEvents.ball_saver_changed.connect(_on_saver_changed)
 	resized.connect(_fit_score)
 
@@ -182,20 +177,20 @@ func _build_objective() -> void:
 	_objective_label.add_theme_font_size_override("font_size", TempleTheme.snap(int(8 * UI_SCALE)))
 	_objective_label.set_anchors_preset(Control.PRESET_TOP_LEFT)
 	_objective_label.offset_left = HUD_LEFT * UI_SCALE
-	_objective_label.offset_top = 58 * UI_SCALE  # under the jade pill
+	_objective_label.offset_top = 34 * UI_SCALE  # under the score
 	_objective_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_objective_label.add_theme_stylebox_override("normal", TempleTheme.pill_box(UI_SCALE))
 	_objective_label.visible = false
 	add_child(_objective_label)
 
-# Jade beads and, while one runs, the ball saver's countdown, under the balls count
+# While one runs, the ball saver's countdown, under the objective
 func _build_status() -> void:
 	_status_label = Label.new()
 	_status_label.theme_type_variation = "HintLabel"
 	_status_label.add_theme_font_size_override("font_size", TempleTheme.snap(int(8 * UI_SCALE)))
 	_status_label.set_anchors_preset(Control.PRESET_TOP_LEFT)
 	_status_label.offset_left = HUD_LEFT * UI_SCALE
-	_status_label.offset_top = 34 * UI_SCALE
+	_status_label.offset_top = 58 * UI_SCALE
 	_status_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_status_label.add_theme_stylebox_override("normal", TempleTheme.pill_box(UI_SCALE))
 	add_child(_status_label)
@@ -206,10 +201,8 @@ func _on_saver_changed(seconds: float) -> void:
 	_render_status()
 
 func _render_status() -> void:
-	var text := "Jade %d" % GameManager.beads
-	if _saver_left > 0.0:
-		text += "   Saver %d" % ceili(_saver_left)
-	_status_label.text = text
+	_status_label.visible = _saver_left > 0.0
+	_status_label.text = "Saver %d" % ceili(_saver_left)
 
 func _process(delta: float) -> void:
 	if _saver_left > 0.0 and not get_tree().paused:

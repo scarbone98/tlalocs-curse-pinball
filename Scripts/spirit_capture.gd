@@ -11,7 +11,7 @@ extends Node2D
 ## runs two minutes and comes with a long ball saver; each catch lights a bonus lamp.
 
 const SPIRITS := preload("res://Sprites/table/spirits.png")  # tools/make_spirit_sprites.py
-const SPIRIT_SIZE := Vector2(18, 14)
+const SPIRIT_SIZE := Vector2(26, 22)
 const WHIRL := preload("res://Sprites/table/whirl.png")  # the hand-drawn magicWhirl.png
 const WHIRL_SECONDS := 0.7
 const TILE := preload("res://Sprites/table/glyph_tile.png")  # tools/make_rs_sprites.py
@@ -79,6 +79,8 @@ func _ready() -> void:
 	_spirit = AnimatedSprite2D.new()
 	_spirit.scale = features.MAP_SCALE
 	_spirit.position = SPAWN_AT
+	_spirit.z_index = 2  # over Tlaloc's face and his mouth's whirl
+	_spirit.z_as_relative = false
 	features.add_child(_spirit)
 	_spirit.hide()
 	for row in TILE_ROWS:

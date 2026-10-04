@@ -3,14 +3,15 @@ extends Node2D
 ## round the ring drawn in the dirt. Each one flashes the moment the ball touches it. Now
 ## and then, and whenever a ball has been rattling about the arena for a moment, they set
 ## off marching round the ring together, turning as they go, and keep going for ten
-## seconds, so a ball can't settle into one spot between them.
+## seconds, so a ball can't settle into one spot between them. Which way they go round,
+## clockwise or against it, is a toss-up each time.
 
 const CENTRE := Vector2(412, 445)     # the ring in the dirt (Sprites/layers/basemap.png)
 const RADIUS := 48.0
 const MARCH_SECONDS := 10.0
 const TURNS_PER_SECOND := 0.35
 const MARCH_EVERY := Vector2(20.0, 35.0)
-const LINGER_SECONDS := 1.5           # a ball this long inside the arena sets them marching
+const LINGER_SECONDS := 0.8           # a ball this long inside the arena sets them marching
 const ARENA_RADIUS := 95.0
 const STEP_EVERY := 0.18
 const FLASH_SECONDS := 0.12
@@ -33,6 +34,7 @@ var _glance_wait: Array[float] = []
 var _glance_left: Array[float] = []
 var _angle := -PI / 2.0
 var _march_left := 0.0
+var _march_way := 1.0  # 1 clockwise, -1 the other way
 var _rest_left := 0.0
 var _linger := 0.0
 var _clock := 0.0
@@ -83,7 +85,7 @@ func _physics_process(delta: float) -> void:
 				_sprites[i].frame = STANDING
 	if _march_left > 0.0:
 		_march_left -= delta
-		_angle += TAU * TURNS_PER_SECOND * delta
+		_angle += TAU * TURNS_PER_SECOND * delta * _march_way
 		_place()
 		var up := int(_clock / STEP_EVERY) % 2 == 1 and _march_left > 0.0
 		var turn := int(_clock * TURN_FPS) % TURN_FRAMES if _march_left > 0.0 else 0
@@ -116,6 +118,7 @@ func _idle(delta: float) -> void:
 
 func _march() -> void:
 	_march_left = MARCH_SECONDS
+	_march_way = 1.0 if randf() < 0.5 else -1.0
 	_linger = 0.0
 	_rest_left = randf_range(MARCH_EVERY.x, MARCH_EVERY.y)
 	AudioSfx.play("roar", 0.0, Vector2.ONE * 0.7)

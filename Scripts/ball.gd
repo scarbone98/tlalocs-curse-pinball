@@ -44,7 +44,7 @@ const PLUNGER_LANE_X := 655.0
 ## Ball search, like a real machine's: a ball that stays inside a small circle this long
 ## (say, pinned between a bumper and a wall) gets knocked back toward the middle of the
 ## table. The flipper area is left alone so a cradled ball stays put.
-@export var stuck_seconds: float = 1.5
+@export var stuck_seconds: float = 0.9
 @export var stuck_radius: float = 40.0
 @export var unstick_speed: float = 700.0
 const UNSTICK_TOWARD := Vector2(340, 760)

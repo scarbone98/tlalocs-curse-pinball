@@ -5,7 +5,7 @@ extends Node2D
 ## catch it for the Spirit Codex. It comes with a short ball saver and lights a bonus lamp.
 
 const SPIRITS := preload("res://Sprites/table/spirits.png")  # tools/make_spirit_sprites.py
-const SPIRIT_SIZE := Vector2(18, 14)
+const SPIRIT_SIZE := Vector2(26, 22)
 
 # Its walk across the open floor, clear of the walls and of Tlaloc's face (scene units)
 const PATH := [
@@ -49,6 +49,8 @@ func _ready() -> void:
 	add_child(_area)
 	_sprite = AnimatedSprite2D.new()
 	_sprite.scale = features.MAP_SCALE
+	_sprite.z_index = 2  # over Tlaloc's face as it wanders past
+	_sprite.z_as_relative = false
 	features.add_child(_sprite)
 	_sprite.hide()
 

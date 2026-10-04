@@ -1,13 +1,14 @@
 extends Node2D
 ## The right lane, running up under the right rail beside the wall: three stone lamps set
-## in its floor (Sprites/table/spirit_lamp.png). Each trip up the lane lights the next one;
-## with all three lit a water spirit rises to catch (Scripts/spirit_capture.gd), and with
+## in its floor (Sprites/table/spirit_lamp.png). Each loop up the lane lights the next one;
+## with all three lit the crystal skull opens its jaws (Scripts/crystal_skull.gd), and a
+## ball it takes then calls up a water spirit to catch (Scripts/spirit_capture.gd); with
 ## Summon arrows lit on the right rail it may be a rare one. The lamps go dark again if
-## the lane goes unshot for a while.
+## the lane goes unshot for a while (unless they've readied the skull).
 
 const LAMP := preload("res://Sprites/table/spirit_lamp.png")  # tools/make_table.py: dark, lit
-const LAMPS_AT := [Vector2(612, 742), Vector2(612, 704), Vector2(612, 666)]  # bottom to top (scene units)
-const SENSOR := Rect2(584, 676, 54, 24)  # across the lane, among the lamps
+const LAMPS_AT := [Vector2(584, 738), Vector2(596, 702), Vector2(607, 666)]  # bottom to top, along the lane's slant (scene units)
+const SENSOR := Rect2(566, 678, 62, 24)  # across the lane, among the lamps
 const PASS_COOLDOWN := 1.0
 const FADE_SECONDS := 40.0  # unshot this long, the lamps go dark
 const LAMP_POINTS := 1000
@@ -16,6 +17,7 @@ const SUMMON_POINTS := 5000
 var features: Node2D  # TableFeatures
 
 var _lamps: Array[AnimatedSprite2D] = []
+var spirit_ready := false  # all three lit: the skull's open for the spirit
 var _lit := 0
 var _cooldown := 0.0
 var _since := 0.0
@@ -49,18 +51,23 @@ func _on_pass(body: Node) -> void:
 	features._award(LAMP_POINTS, LAMPS_AT[_lit - 1])
 	AudioSfx.play("spinner", 0.0, Vector2.ONE * (1.2 + 0.15 * _lit))
 	_render()
-	if _lit == _lamps.size() and not features.mode_running():
-		var rare: bool = features.ramps.arrows["summon"] >= features.ramps.MAX_ARROWS
-		if features.spirit.summon(rare):
-			features._award(SUMMON_POINTS, LAMPS_AT[1])
-			_flash_left = 1.2
-			_lit = 0
+	if _lit == _lamps.size() and not spirit_ready:
+		spirit_ready = true
+		features._award(SUMMON_POINTS, LAMPS_AT[1])
+		_flash_left = 1.2
+
+## The skull took the ball: the spirit rises, and the lamps start again. True if it may be rare.
+func take() -> bool:
+	spirit_ready = false
+	_lit = 0
+	_render()
+	return features.ramps.arrows["summon"] >= features.ramps.MAX_ARROWS
 
 func _physics_process(delta: float) -> void:
 	_clock += delta
 	_cooldown = maxf(_cooldown - delta, 0.0)
 	_since += delta
-	if _lit > 0 and _since >= FADE_SECONDS:
+	if _lit > 0 and not spirit_ready and _since >= FADE_SECONDS:
 		_lit = 0
 		_render()
 	if _flash_left > 0.0:

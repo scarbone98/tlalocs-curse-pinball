@@ -2,9 +2,9 @@ extends Node2D
 ## The crystal skull at the top of the brown lane, right of the arena, in front of the
 ## palms: like Sharpedo and Wailmer on Pokemon Pinball Ruby & Sapphire's fields it eats
 ## a ball shot up the lane and spits it back out, but only with its jaws open. They open
-## when it has something to give: a lit Awakening to start, or the jade market
-## (Scripts/market.gd) when there are beads enough to buy something and it hasn't opened
-## for a while. With its jaws shut it's solid, and the ball bounces off it. It's drawn in
+## when it has something to give: a lit Awakening to start, or a spirit ready to rise once
+## the ball has looped the right lane enough to light its lamps (Scripts/spirit_lane.gd):
+## then a ball it takes calls the spirit up. With its jaws shut it's solid, and the ball bounces off it. It's drawn in
 ## two pieces, the ball between them: over the lower jaw, under the top, so a ball it
 ## takes goes into its mouth. It shuts its jaws on the ball and opens them again to spit
 ## it back out (shaking with it a moment first), and it bobs slowly up and down all the
@@ -21,8 +21,6 @@ const HOLD_SECONDS := 1.0
 const SPIT_VELOCITY := Vector2(-170, 620)  # back down the lane
 const REARM_SECONDS := 1.2
 const EAT_POINTS := 1500
-const EAT_BEADS := 3
-const MARKET_REST := 30.0  # seconds after a visit before the market opens again
 const JAW_RADIUS := 20.0   # the shut jaws the ball bounces off
 enum { CALM, OPEN }  # Sprites/table/skull_top.png: jaws shut, jaws open
 const BOB_SECONDS := 2.4    # one slow bob, a pixel up and back
@@ -41,7 +39,6 @@ var _sprite: AnimatedSprite2D  # the top
 var _jaw: AnimatedSprite2D
 var _held: RigidBody2D
 var _rearm := 0.0
-var _market_rest := 0.0
 var _jaws: CollisionShape2D
 var _chewing := false  # the ball's inside, its jaws shut on it
 var _opening := false  # opening up to spit it out
@@ -78,7 +75,6 @@ func _ready() -> void:
 
 func _physics_process(delta: float) -> void:
 	_rearm = maxf(_rearm - delta, 0.0)
-	_market_rest = maxf(_market_rest - delta, 0.0)
 	_clock += delta
 	_shake_left = maxf(_shake_left - delta, 0.0)
 	_knock_left = maxf(_knock_left - delta, 0.0)
@@ -113,10 +109,9 @@ func _physics_process(delta: float) -> void:
 			_eat(ball)
 			return
 
-## True when a shot into the skull would do something more than pay out (for the lane's arrows)
+## True when a shot into the skull would do something more than pay out: its jaws are open
 func lit() -> bool:
-	return (features.awakening.lit and not features.mode_running()) \
-		or (_market_rest <= 0.0 and GameManager.beads >= Market.WARES[0][2])
+	return not features.mode_running() and (features.awakening.lit or features.spirit_lane.spirit_ready)
 
 func _eat(ball: RigidBody2D) -> void:
 	_held = ball
@@ -141,20 +136,11 @@ func _eat(ball: RigidBody2D) -> void:
 	get_tree().create_timer(HOLD_SECONDS, false).timeout.connect(_decide)
 
 func _decide() -> void:
-	if features.awakening.lit and not features.mode_running():
-		features.awakening.start()
-		_spit()
-		return
-	if _market_rest <= 0.0 and GameManager.beads >= Market.WARES[0][2]:
-		var market: Market = get_tree().get_first_node_in_group("market")
-		if market:
-			_market_rest = MARKET_REST
-			market.features = features
-			market.closed.connect(_spit, CONNECT_ONE_SHOT)
-			market.open()
-			return
-	GameManager.add_beads(EAT_BEADS)
-	PinballEvents.toast.emit("+%d jade" % EAT_BEADS)
+	if not features.mode_running():
+		if features.spirit_lane.spirit_ready:
+			features.spirit.summon(features.spirit_lane.take())  # the spirit the lane's loops earned
+		elif features.awakening.lit:
+			features.awakening.start()
 	_spit()
 
 # It shakes a moment, then opens its jaws, then the ball comes back out

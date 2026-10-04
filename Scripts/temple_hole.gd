@@ -15,10 +15,13 @@ extends Node2D
 const WHIRL := preload("res://Sprites/table/whirl.png")  # the hand-drawn magicWhirl.png, turning over his open mouth
 
 const AT := Vector2(339, 838)  # Tlaloc's mouth, in the centre face (Sprites/face_sockets.png)
-const CATCH_RADIUS := 24.0  # the ball's centre has to come this close
+const CATCH_RADIUS := 36.0  # the ball's centre has to come this close, then it spirals in
 # While his mouth is open the whirl draws a ball that comes near it in, harder the closer it gets
 const PULL_RADIUS := 110.0
 const PULL := 1400.0  # scene units/s² at the mouth, fading to nothing at PULL_RADIUS
+const SWIRL := 900.0  # ...and round it, so the ball's drawn in spiralling, like a whirlpool
+const SPIRAL_SECONDS := 0.7  # a caught ball circles in to the middle of his mouth
+const SPIRAL_TURNS := 1.5
 const HOLD_SECONDS := 1.1
 const REARM_SECONDS := 1.5  # after spitting a ball out, so it can't be caught again at once
 const EJECT_SPEED := 450.0
@@ -31,22 +34,21 @@ enum { MOUTH_SHUT, MOUTH_OPEN }  # the face's frames
 # The roulette's prize tables: each spin of the game draws from the next table, up to
 # the last. [weight, prize] - prizes that can't apply right now pay points instead.
 const PRIZE_TABLES := [
-	[[4, "points_small"], [3, "beads_small"], [3, "saver_short"], [2, "bonus_x"], [1, "kickback"]],
-	[[3, "points_small"], [3, "points_big"], [3, "beads_small"], [2, "saver_short"], [2, "bonus_x"], [2, "kickback"], [1, "spirit"]],
-	[[3, "points_big"], [2, "beads_big"], [2, "saver_long"], [2, "bonus_x"], [2, "kickback"], [2, "spirit"], [1, "upgrade"], [1, "travel"]],
-	[[3, "points_huge"], [2, "beads_big"], [2, "saver_long"], [3, "bonus_x2"], [2, "spirit"], [2, "upgrade"], [2, "travel"], [1, "awaken"], [1, "bonus_lamp"]],
+	[[4, "points_small"], [3, "points_small"], [3, "saver_short"], [2, "bonus_x"], [1, "kickback"]],
+	[[3, "points_small"], [3, "points_big"], [3, "points_small"], [2, "saver_short"], [2, "bonus_x"], [2, "kickback"], [1, "spirit"]],
+	[[3, "points_big"], [2, "points_big"], [2, "saver_long"], [2, "bonus_x"], [2, "kickback"], [2, "spirit"], [1, "upgrade"], [1, "travel"]],
+	[[3, "points_huge"], [2, "points_big"], [2, "saver_long"], [3, "bonus_x2"], [2, "spirit"], [2, "upgrade"], [2, "travel"], [1, "awaken"], [1, "bonus_lamp"]],
 ]
 const SPINS_PER_TABLE := 2
 # What each prize shows on the billboard's reel (Scripts/billboard.gd PRIZES order)
 const PRIZE_PICTURE := {
 	"points_small": "points_small", "points_big": "points_big", "points_huge": "points_big",
-	"beads_small": "points_small", "beads_big": "points_big", "saver_short": "kickback", "saver_long": "kickback",
+	"saver_short": "kickback", "saver_long": "kickback",
 	"bonus_x": "points_big", "bonus_x2": "points_big", "kickback": "kickback", "spirit": "spirit",
 	"upgrade": "points_big", "travel": "travel", "awaken": "spirit", "bonus_lamp": "points_big",
 }
 const PRIZE_CAPTIONS := {
 	"points_small": "Temple offering!", "points_big": "Temple treasure!", "points_huge": "Temple hoard!",
-	"beads_small": "5 jade beads!", "beads_big": "15 jade beads!",
 	"saver_short": "Ball saver 30s!", "saver_long": "Ball saver 60s!",
 	"bonus_x": "Bonus +1!", "bonus_x2": "Bonus +2!", "kickback": "Kickback both sides!",
 	"spirit": "A spirit rises!", "upgrade": "Ball upgrade!", "travel": "The road opens!",
@@ -117,6 +119,7 @@ func _physics_process(delta: float) -> void:
 		# the whirl draws it in, and takes the edge off its speed as it spirals toward the mouth
 		var strength := 1.0 - near / PULL_RADIUS
 		ball.linear_velocity += to_mouth.normalized() * PULL * strength * delta
+		ball.linear_velocity += to_mouth.normalized().orthogonal() * SWIRL * strength * delta
 		ball.linear_velocity *= 1.0 - 0.8 * strength * delta
 
 func _catch(ball: RigidBody2D) -> void:
@@ -124,9 +127,12 @@ func _catch(ball: RigidBody2D) -> void:
 	ball.freeze_mode = RigidBody2D.FREEZE_MODE_KINEMATIC
 	ball.set_deferred("freeze", true)
 	ball.linear_velocity = Vector2.ZERO
+	# whirlpooled in: it circles round and down to the middle of his mouth, and sits there
+	var from := ball.global_position - AT
 	var sink := create_tween().set_process_mode(Tween.TWEEN_PROCESS_PHYSICS)
-	sink.tween_property(ball, "global_position", AT, 0.1)
-	sink.parallel().tween_property(ball.anim, "modulate:a", 0.0, 0.1)  # into his mouth
+	sink.tween_method(func(t: float):
+		ball.global_position = AT + from.rotated(t * TAU * SPIRAL_TURNS) * (1.0 - t),
+		0.0, 1.0, SPIRAL_SECONDS).set_ease(Tween.EASE_IN).set_trans(Tween.TRANS_QUAD)
 	AudioSfx.play("kickback")
 	PinballEvents.rumble.emit(4.0)
 	if _el_dorado_open():
@@ -197,10 +203,6 @@ func _award_prize(prize: String) -> void:
 			features._award(15000, at)
 		"points_huge":
 			features._award(50000, at)
-		"beads_small":
-			GameManager.add_beads(5)
-		"beads_big":
-			GameManager.add_beads(15)
 		"saver_short":
 			GameManager.grant_ball_save(30.0)
 		"saver_long":

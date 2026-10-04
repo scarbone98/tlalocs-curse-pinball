@@ -3,7 +3,8 @@ extends Node2D
 ##  - only the spinner charges it; as on Pokemon Pinball Ruby & Sapphire the charge grows
 ##    with how fast the ball goes through, so one hard shot can fill it
 ##  - it guards one outlane at a time; the flippers move it (left flipper, left outlane)
-##  - saving a ball uses it up, and each new ball starts uncharged
+##  - saving a ball uses it up; each new ball starts with it charged, guarding the left
+##    outlane, so the frogs are always there for the first save
 ##  - the temple roulette and the market can award one that guards both outlanes, like
 ##    Ruby & Sapphire's Pichu: it doesn't get used up, it lasts until the ball drains
 ## The stone frog statue at the guarded outlane wakes up jade when it's ready and leaps
@@ -45,12 +46,12 @@ var charged := false
 var side := 0             # the outlane it guards: 0 left, 1 right
 var both_sides := false   # the roulette's version guards both
 
-var _frogs: Array[AnimatedSprite2D] = []
+var frogs: Array[AnimatedSprite2D] = []  # Scripts/lighting.gd lights an awake one
 var _charge := 0.0
 
 func _ready() -> void:
 	for at in FROG_AT:
-		_frogs.append(features._sprite(FROG, 3, at))
+		frogs.append(features._sprite(FROG, 3, at))
 	for i in KICK_ZONES.size():
 		_add_kick_zone(KICK_ZONES[i], i)
 	var lips := StaticBody2D.new()
@@ -60,6 +61,7 @@ func _ready() -> void:
 		lips.add_child(shape)
 	add_child(lips)
 	PinballEvents.ball_drained.connect(_reset)
+	_reset()
 
 func _add_kick_zone(at: Vector2, index: int) -> void:
 	var area := Area2D.new()
@@ -112,8 +114,9 @@ func charge() -> bool:
 	return true
 
 func _reset() -> void:
-	charged = false
+	charged = true  # a fresh ball starts guarded
 	both_sides = false
+	side = 0
 	_charge = 0.0
 	_render()
 
@@ -121,8 +124,8 @@ func _guards(index: int) -> bool:
 	return charged and (both_sides or side == index)
 
 func _render() -> void:
-	for i in _frogs.size():
-		_frogs[i].frame = AWAKE if _guards(i) else STONE
+	for i in frogs.size():
+		frogs[i].frame = AWAKE if _guards(i) else STONE
 
 func _on_kick_zone_entered(body: Node, index: int) -> void:
 	if not _guards(index) or not features._is_ball_on_playfield(body):
@@ -134,14 +137,14 @@ func _on_kick_zone_entered(body: Node, index: int) -> void:
 		charged = false  # the both-sides frogs keep guarding until the ball drains
 	_carry_out(ball, CARRY_PATHS[index])
 	PinballEvents.kickback_saved.emit()
-	features._award(KICK_POINTS, _frogs[index].global_position)
+	features._award(KICK_POINTS, frogs[index].global_position)
 	PinballEvents.toast.emit("Kickback!")
-	PinballEvents.effect.emit("splash", _frogs[index].global_position)
+	PinballEvents.effect.emit("splash", frogs[index].global_position)
 	PinballEvents.rumble.emit(6.0)
 	AudioSfx.play("kickback")
 
 	_render()
-	_frogs[index].frame = LEAP
+	frogs[index].frame = LEAP
 	get_tree().create_timer(0.3).timeout.connect(_render)
 
 func _carry_out(ball: RigidBody2D, path: Array) -> void:
@@ -156,6 +159,6 @@ func _carry_out(ball: RigidBody2D, path: Array) -> void:
 
 # Each spinner turn flickers the statues so you can see the charge building
 func _blink_frogs() -> void:
-	for frog in _frogs:
+	for frog in frogs:
 		frog.frame = AWAKE
 	get_tree().create_timer(0.08).timeout.connect(_render)
