@@ -48,7 +48,7 @@ const IDOL_RADIUS := 18.0
 const HIT_COOLDOWN := 0.6
 const BUTTON_POINTS := 500
 const SINK_POINTS := 1500
-const CLAIM_POINTS := 25000
+const CLAIM_POINTS := 10000  # the rest, and the bonus, come when it's sacrificed (Scripts/sacrifices.gd)
 const RESET_SECONDS := 12.0
 
 var features: Node2D  # TableFeatures, which owns the shared sprite and scoring helpers
@@ -291,8 +291,7 @@ func _on_idol_hit(body: Node) -> void:
 	_idol.frame = TOPPLED
 	_place.call_deferred()
 	features._award(CLAIM_POINTS, _idol.position)
-	GameManager.add_bonus_multiplier(1)
-	PinballEvents.toast.emit("Golden idol claimed! Bonus +1")
+	features.sacrifices.bring.call_deferred("idol", _idol.position)
 	PinballEvents.effect.emit("gold", _idol.position)
 	PinballEvents.rumble.emit(5.0)
 	AudioSfx.play("upgrade")
