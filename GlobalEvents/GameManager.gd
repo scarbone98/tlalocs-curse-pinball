@@ -35,10 +35,10 @@ var curse_active := false
 var show_title := true  # the title menu opens on load; Play Again goes straight back in
 var extra_ball_bought := false
 
-## Game speed. Normal slows the whole game evenly from Pokemon Pinball's own 1:1 (time
+## Game speed. Normal (0.7) slows the whole game evenly from Pokemon Pinball's own 1:1 (time
 ## itself, so every proportion stays the same); it's the game, and the only speed the arcade
 ## scores. Fast is the 1:1, for fun, unscored.
-const SPEEDS := [["Normal", 0.8], ["Fast (unscored)", 1.0]]
+const SPEEDS := [["Normal", 0.7], ["Fast (unscored)", 1.0]]
 const SCORED_SPEED := 0
 const SETTINGS_PATH := "user://settings.cfg"
 var speed_index := 0
