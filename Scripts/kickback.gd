@@ -20,7 +20,7 @@ const FULL_CHARGE_SPEED := 600.0  # one pass at this speed charges it fully
 const CARRY_UP_SECONDS := 0.18
 const CARRY_OUT_SECONDS := 0.1
 const KICK_POINTS := 500
-const FROG_AT := [Vector2(100, 1162), Vector2(586, 1162)]
+const FROG_AT := [Vector2(88, 1166), Vector2(586, 1166)]  # each squatting on its outlane's green pad
 # Just above each outlane drain, so the kick fires before the ball reaches it
 const KICK_ZONES := [Vector2(90, 1128), Vector2(586, 1131)]
 const KICK_ZONE_SIZE := Vector2(50, 40)
