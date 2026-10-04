@@ -47,6 +47,8 @@ const IDOL_SPOT_BELOW := 46.0  # scene units below the idol its middle falls: on
 const IDOL_GLOW := 1.0
 const SKULL_SPOT_SIZE := 0.9  # a spotlight on the crystal skull while its jaws are open
 const SKULL_GLOW := 0.9
+const WHIRL_GLOW := 0.9
+const WHIRL_BREATH_SECONDS := 2.2  # the whirl's glow breathes a little quicker than the spots
 const SPOT_BREATH_SECONDS := 3.2  # the idol's and skull's spots breathe this slowly...
 const SPOT_BREATH := 0.18         # ...brightening and dimming this much
 const SPOT_BREATH_SIZE := 0.08    # ...and swelling and shrinking this much
@@ -58,6 +60,7 @@ var features: Node2D  # TableFeatures
 var _pools := {}  # size -> its pixel pool
 var _torch_lights: Array[PointLight2D] = []
 var _whirl_light: PointLight2D
+var _whirl_scale := 1.0
 var _sky_light: PointLight2D
 var _lava_glow: Sprite2D
 var _sacrifice_light: PointLight2D
@@ -121,7 +124,8 @@ func _ready() -> void:
 	_skull_light = _light(features.skull._sprite.global_position, Color(0.6, 0.85, 1.0), SKULL_GLOW, SKULL_SPOT_SIZE)  # ...and on the skull, open
 	_idol_spot_scale = _idol_light.texture_scale
 	_skull_spot_scale = _skull_light.texture_scale
-	_whirl_light = _light(features.temple.AT, Color(0.85, 0.45, 1.0), 0.9, 1.4)
+	_whirl_light = _light(features.temple.AT, Color(0.85, 0.45, 1.0), WHIRL_GLOW, 1.4)
+	_whirl_scale = _whirl_light.texture_scale
 	for sprite: AnimatedSprite2D in [features.idol_tower._button, features.journey._button_sprite, features.dart_trap.button_sprite]:
 		var glow := _light(sprite.position, Color(1.0, 0.85, 0.4), BUTTON_GLOW, 0.6)
 		_button_lights.append([sprite, glow, glow.texture_scale])
@@ -227,6 +231,9 @@ func _process(delta: float) -> void:
 		_torch_lights[i].energy = TORCH_BLAZE * (1.0 + FLICKER * waver)
 		_torch_lights[i].texture_scale = _torch_sizes[i] * (1.0 + FLICKER_SIZE * waver)
 	_whirl_light.visible = features.temple._whirl.visible
+	var whirl_breath := sin(_clock * TAU / WHIRL_BREATH_SECONDS)  # the magic whirl's glow breathes too
+	_whirl_light.energy = WHIRL_GLOW * (1.0 + SPOT_BREATH * whirl_breath)
+	_whirl_light.texture_scale = _whirl_scale * (1.0 + SPOT_BREATH_SIZE * whirl_breath)
 	# the sky light drifts after the ball, a dim spot following it about the table
 	var camera := get_viewport().get_camera_2d()
 	var followed: Variant = camera.get("_followed") if camera else null
