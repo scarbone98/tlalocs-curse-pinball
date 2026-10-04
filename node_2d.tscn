@@ -252,7 +252,7 @@ sprite_frames = SubResource("SpriteFrames_2hxjc")
 metadata/_edit_lock_ = true
 
 [node name="Camera2D" type="Camera2D" parent="."]
-zoom = Vector2(1.25, 1.25)
+zoom = Vector2(1.12, 1.12)
 process_callback = 0
 limit_left = 0
 limit_top = 0

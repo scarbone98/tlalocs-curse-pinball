@@ -28,14 +28,11 @@ const MAX_LOOK_AHEAD := 150.0
 const LOOK_EASE := 3.0
 const PLUNGER_LANE_X := 655.0
 const PLUNGER_SHIFT := 48.0
-## Side to side it holds still on the table's middle once the ball's out of the launch
-## lane, and only moves up and down: it swings right for the launch lane, and for the right
-## rail up into the golden temple (and while the ball's inside it). The left rail's outer
-## curve runs past the edge of a phone's view, so it eases left just enough to keep a ball
-## out there in sight.
-const CENTRE_X := 360.0
+## Side to side it holds still against the table's left edge once the ball's out of the
+## launch lane, so the whole left lane is always in view, and only moves up and down: it
+## swings right for the launch lane, and for the right rail up into the golden temple (and
+## while the ball's inside it).
 const RIGHT_X := 720.0     # as far right as the limits allow
-const KEEP_IN_VIEW := 34.0 # how close to the view's edge a ball may come
 const SHRINE := Rect2(439, 42, 281, 290)  # inside the golden temple
 ## A nudge jolts the table a few pixels the way it was pushed, and settles back
 const NUDGE_JOLT := 9.0
@@ -83,8 +80,7 @@ func _view_x(target: Node2D) -> float:
 	var at := target.global_position
 	if at.x > PLUNGER_LANE_X or SHRINE.has_point(at) or _on_right_rail(target):
 		return RIGHT_X
-	var half := get_viewport_rect().size.x / (2.0 * zoom.x)
-	return minf(CENTRE_X, at.x + half - KEEP_IN_VIEW)
+	return get_viewport_rect().size.x / (2.0 * zoom.x)  # the view's left edge on the table's
 
 func _on_right_rail(target: Node2D) -> bool:
 	var features := get_tree().current_scene.get_node_or_null(^"TableFeatures")
