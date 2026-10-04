@@ -10,7 +10,7 @@ extends Node2D
 ## teeth and bounces off. It's drawn in
 ## two pieces, the ball between them: over the lower jaw, under the top, so a ball it
 ## takes goes into its mouth. It shuts its jaws on the ball and opens them again to spit
-## it back out (shaking with it a moment first), and it bobs slowly up and down all the
+## it back out (shaking with it a moment first, then lunging forward after it), and it bobs slowly up and down all the
 ## while, floating, glimmering with mysterious sparkles. A ball that hits its shut teeth
 ## sets them chattering and knocks it back a little, as does one it takes.
 
@@ -34,6 +34,9 @@ const CHATTER_FPS := 14.0
 const KNOCK := 2.0          # art pixels it's knocked back up by a hit
 const KNOCK_SECONDS := 0.15
 const TEETH_KICK := 450.0   # a ball off its shut teeth bounces away this fast
+const LUNGE := 3.0          # art pixels it lunges forward, after the ball, as it spits it out
+const LUNGE_OUT := 0.08
+const LUNGE_BACK := 0.35
 const SNAP_REACH := 75.0    # unlit, it snaps its jaws open at a ball coming up at it from this near
 
 var features: Node2D  # TableFeatures, which owns the shared sprite and scoring helpers
@@ -49,6 +52,7 @@ var _clock := 0.0
 var _shake_left := 0.0
 var _chatter_left := 0.0
 var _knock_left := 0.0
+var _lunge := Vector2.ZERO  # how far it's lunged forward spitting the ball out (art pixels)
 var _snapping := false  # unlit, jaws snapped open at a ball coming up the lane
 var _was_snapping := false
 
@@ -113,7 +117,7 @@ func _physics_process(delta: float) -> void:
 	var lift := -KNOCK if _knock_left > 0.0 else 0.0
 	var shake := (1.0 if int(_clock * 20.0) % 2 == 0 else -1.0) if _shake_left > 0.0 else 0.0
 	for piece in [_sprite, _jaw]:
-		piece.offset = Vector2(shake, bob + lift)
+		piece.offset = Vector2(shake, bob + lift) + _lunge.round()
 	var open := lit()
 	# unlit, it snaps its jaws open at a ball coming up the lane at its mouth
 	_snapping = not open and _held == null and _rearm <= 0.0 and _ball_coming() != null
@@ -215,5 +219,9 @@ func _release() -> void:
 	ball.anim.visible = true
 	ball.freeze = false
 	ball.linear_velocity = SPIT_VELOCITY
+	# it lunges forward after the ball as it spits it, then settles back to its place
+	var lunge := create_tween()
+	lunge.tween_property(self, "_lunge", SPIT_VELOCITY.normalized() * LUNGE, LUNGE_OUT).set_ease(Tween.EASE_OUT)
+	lunge.tween_property(self, "_lunge", Vector2.ZERO, LUNGE_BACK).set_ease(Tween.EASE_IN_OUT).set_trans(Tween.TRANS_SINE)
 	AudioSfx.play("shrine_out")
 	PinballEvents.effect.emit("sparks", MOUTH)
