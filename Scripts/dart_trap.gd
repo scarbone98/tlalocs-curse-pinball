@@ -29,6 +29,7 @@ const PEG_BOUNCE := 0.55      # livelier than the walls: the ball rattles off th
 const HIT_POINTS := 250
 const BREAK_POINTS := 1000    # the second knock snaps it
 const KNOCKS_TO_BREAK := 2
+const BREAK_DELAY := 0.15     # a snapped dart stands this long, for the ball to bounce off it
 const FLAMING_MULTIPLIER := 3  # a flaming dart pays this many times as much
 const HIT_COOLDOWN := 0.15
 const QUIVER_SECONDS := 0.3
@@ -279,7 +280,11 @@ func _on_peg_hit(body: Node, entry: Dictionary) -> void:
 		features._award(BREAK_POINTS * worth, entry.spot)
 		AudioSfx.play("tiki", 0.0, Vector2(1.6, 1.9))  # crack
 		PinballEvents.effect.emit("dust", entry.spot)
-		_remove(entry, false)  # snapped
+		entry.cooldown = 99.0
+		# snapped - but it stands a moment longer, so the ball still bounces off it
+		get_tree().create_timer(BREAK_DELAY, false).timeout.connect(func():
+			if _darts.has(entry):
+				_remove(entry, false))
 		return
 	features._award(HIT_POINTS * worth, entry.spot)
 	AudioSfx.play("bumper", 0.0, Vector2(1.5, 1.8))

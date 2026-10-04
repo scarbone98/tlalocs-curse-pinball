@@ -61,7 +61,6 @@ and the playfield sprites cut from the hand-drawn sheets in tools/source_art/:
   Sprites/table/front_walls.png  the walls along the table's foot, that a ball in a gutter
                               passes behind (a mask for Scripts/ball_mask.gdshader)
   Sprites/table/fire_button.png  the fourth torch button, a flame on it: up, pressed
-  Sprites/table/paw_button.png  the jaguars' button as a gold paw: resting, lit, pressed
   Sprites/table/dart_falling.png, dart_stuck.png, dart_shadow.png  the poison dart trap's
                               darts: falling, stuck in the floor (still, quivering), and
                               the shadow of one falling
@@ -304,74 +303,72 @@ def jaguar_scratches(base, walls):
                     base.putpixel((px, py), (min(255, int(r * f)), min(255, int(g * f)), min(255, int(b * f)), a))
 
 
-# The jaguars' button, as a gold paw: four toe pads over a big pad, shaded gold, inked
-# round. Three frames: resting, lit (glowing pale), pressed (sunk a pixel, darker).
-PAW_W, PAW_H = 13, 12
-PAW_TOES = [(2.2, 5.0), (4.9, 2.3), (8.1, 2.3), (10.8, 5.0)]
-PAW_TOE_R = 1.35
-PAW_PAD = (6.5, 8.7, 3.7, 2.6)  # centre, then radii across and down
-PAW_GOLD = [(120, 70, 0), (200, 130, 8), (248, 196, 24), (255, 236, 130)]
-PAW_OUTLINE = (52, 28, 0)
+# A jaguar's paw prints pressed faintly into the floor, a trail leading up to the gold
+# button that wakes them (art pixels: each print's top-left corner), worn in like the
+# claw marks
+PAW = [
+    "o.o.o",
+    ".....",
+    ".ooo.",
+    "ooooo",
+    ".ooo.",
+]
+PAW_PRINTS = [(137, 231), (145, 219)]
 
 
-def paw_button():
-    import math
-
-    def inside(x, y):
-        cx, cy = x + 0.5, y + 0.5
-        if any(math.hypot(cx - tx, cy - ty) <= PAW_TOE_R for tx, ty in PAW_TOES):
-            return True
-        px, py, rx, ry = PAW_PAD
-        return ((cx - px) / rx) ** 2 + ((cy - py) / ry) ** 2 <= 1.0
-
-    out = Image.new("RGBA", (PAW_W * 3, PAW_H), T)
-    for f in range(3):
-        drop = 1 if f == 2 else 0
-        for y in range(PAW_H):
-            for x in range(PAW_W):
-                if not inside(x, y - drop):
-                    if any(inside(x + dx, y - drop + dy) for dx, dy in ((1, 0), (-1, 0), (0, 1), (0, -1))):
-                        out.putpixel((f * PAW_W + x, y), PAW_OUTLINE + (255,))
-                    continue
-                # lit from the upper left: lighter where the shape's edge above-left is near
-                k = 2
-                if not inside(x - 1, y - drop - 1):
-                    k = 3
-                elif not inside(x + 1, y - drop + 1):
-                    k = 1
-                col = PAW_GOLD[k]
-                if f == 1:
-                    col = tuple(int(c + (g - c) * 0.5) for c, g in zip(col, BUTTON_GLOW))
-                elif f == 2:
-                    col = tuple(int(c * 0.82) for c in col)
-                out.putpixel((f * PAW_W + x, y), col + (255,))
-    return out
+def paw_prints(base, walls):
+    for x0, y0 in PAW_PRINTS:
+        for y, row in enumerate(PAW):
+            for x, c in enumerate(row):
+                px, py = x0 + x, y0 + y
+                if c == "o" and not walls[py][px]:
+                    r, g, b, a = base.getpixel((px, py))
+                    base.putpixel((px, py), (int(r * 0.72), int(g * 0.72), int(b * 0.72), a))
 
 
 # The fourth torch button, up past the left lane's top palm: the stone torch button with
-# a flame on its top face (up, then pressed: sunk a pixel and dimmer)
+# a flame rune carved in its top face in place of its dots (up, then pressed)
 FIRE_GLYPH = [
-    "..R..",
-    ".RYR.",
-    ".RYR.",
-    "RYWYR",
-    ".RYR.",
+    "..o..",
+    "..oo.",
+    ".o.o.",
+    ".o..o",
+    "o...o",
+    ".ooo.",
 ]
-FIRE_COLOURS = {"R": (220, 60, 20), "Y": (250, 170, 40), "W": (255, 240, 160)}
-FIRE_GLYPH_AT = (7, 6)  # in each 20x20 frame, on the slab's top face
+FIRE_GLYPH_AT = (7, 4)  # in each 20x20 frame, on the slab's top face
+FACE_ROWS = range(3, 11)
 
 
 def fire_button():
+    from collections import Counter
     sheet = Image.open("Sprites/table/torch_button.png").convert("RGBA")
     fw = sheet.height
     for f in range(sheet.width // fw):
+        x0 = f * fw
+        face_px = [sheet.getpixel((x0 + x, y)) for y in FACE_ROWS for x in range(fw) if sheet.getpixel((x0 + x, y))[3]]
+        face = Counter(p[:3] for p in face_px).most_common(1)[0][0]
+        lum = sum(face)
+        dots = {p[:3] for p in face_px if 0.6 * lum < sum(p[:3]) < 0.92 * lum}
+        carve = tuple(int(c * 0.62) for c in face)  # cut deep
+        lip = tuple(min(255, int(c * 1.24)) for c in face)
+        # smooth away its dots, then carve the flame in their place
+        for y in FACE_ROWS:
+            for x in range(fw):
+                px = sheet.getpixel((x0 + x, y))
+                if px[3] and px[:3] in dots:
+                    sheet.putpixel((x0 + x, y), face + (255,))
+        oy = FIRE_GLYPH_AT[1] + f  # pressed, the face is a pixel lower
         for y, row in enumerate(FIRE_GLYPH):
             for x, c in enumerate(row):
-                if c in FIRE_COLOURS:
-                    col = FIRE_COLOURS[c]
-                    if f == 1:
-                        col = tuple(int(v * 0.75) for v in col)
-                    sheet.putpixel((f * fw + FIRE_GLYPH_AT[0] + x, FIRE_GLYPH_AT[1] + y + f), col + (255,))
+                if c != "o":
+                    continue
+                gx, gy = x0 + FIRE_GLYPH_AT[0] + x, oy + y
+                sheet.putpixel((gx, gy), carve + (255,))
+                below = (gx, gy + 1)
+                if y + 1 >= len(FIRE_GLYPH) or FIRE_GLYPH[y + 1][x] != "o":
+                    if sheet.getpixel(below)[:3] == face:
+                        sheet.putpixel(below, lip + (255,))  # the groove's lit lip
     return sheet
 
 
@@ -1548,6 +1545,7 @@ def main():
     details(base, walls, keep_clear)
     jaguar_slots(base)
     jaguar_scratches(base, walls)
+    paw_prints(base, walls)  # up to the jaguars' button
     front_walls(walls).save("Sprites/table/front_walls.png")
     beige_apron(base, walls)
     palm = {p[:3] for p in Image.open(SRC / "leaves.png").convert("RGBA").get_flattened_data() if p[3]}
@@ -1558,7 +1556,6 @@ def main():
                 bottom_decor.putpixel((x, y), T)  # the palms are sprites of their own
     for name, box in GOLD_BUTTONS.items():
         gold_button(base, box).save("Sprites/table/%s.png" % name)
-    paw_button().save("Sprites/table/paw_button.png")
     fire_button().save("Sprites/table/fire_button.png")
     palms, palm_boxes = palm_layer(stacked)
     palms.save("Sprites/map_palms.png")
