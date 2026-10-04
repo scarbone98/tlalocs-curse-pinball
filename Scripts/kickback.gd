@@ -3,8 +3,7 @@ extends Node2D
 ##  - only the spinner charges it; as on Pokemon Pinball Ruby & Sapphire the charge grows
 ##    with how fast the ball goes through, so one hard shot can fill it
 ##  - it guards one outlane at a time; the flippers move it (left flipper, left outlane)
-##  - saving a ball uses it up; each new ball starts with it charged, guarding the left
-##    outlane, so the frogs are always there for the first save
+##  - saving a ball uses it up; a new ball starts without it
 ##  - the temple roulette and the market can award one that guards both outlanes, like
 ##    Ruby & Sapphire's Pichu: it doesn't get used up, it lasts until the ball drains
 ## The stone frog statue at the guarded outlane wakes up jade when it's ready, and when it
@@ -117,7 +116,7 @@ func charge() -> bool:
 	return true
 
 func _reset() -> void:
-	charged = true  # a fresh ball starts guarded
+	charged = false  # a fresh ball starts unguarded: the spinner's lane charges the frogs
 	both_sides = false
 	side = 0
 	_charge = 0.0

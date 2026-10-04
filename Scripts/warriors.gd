@@ -5,7 +5,8 @@ extends Node2D
 ## off marching round the ring together, turning as they go, and keep going for ten
 ## seconds, so a ball can't settle into one spot between them. Which way they go round,
 ## clockwise or against it, is a toss-up each time; or instead they patrol, the three of
-## them together, up and down the arena or from side to side, and back to their places. Every so often they're gone
+## of them, up and down the arena or from side to side (the top one going the other way to
+## the other two, so they cross), and back to their places. Every so often they're gone
 ## altogether: the stone tablet in the middle of the arena slides open and one by one they
 ## hop down into the hole beneath it, and the arena stands empty a while before they hop
 ## back out to their places. One stung by a poison dart (Scripts/dart_trap.gd) hops down
@@ -56,6 +57,7 @@ var _march_left := 0.0
 var _march_way := 1.0  # 1 clockwise, -1 the other way (and which way a patrol sets off)
 var _pattern := CIRCLE
 var _offset := Vector2.ZERO  # how far a patrol has taken them off their places
+var _top := 0  # on a patrol, the one at the top goes the other way to the other two
 var _away_wait := 60.0
 var _away_left := 0.0
 var _hole: AnimatedSprite2D
@@ -100,12 +102,14 @@ func _frames() -> SpriteFrames:
 
 func _spot(i: int) -> Vector2:
 	var angle := _angle + TAU * i / _warriors.size()
-	return CENTRE + _offset + Vector2(cos(angle), sin(angle)) * RADIUS
+	var offset := -_offset if i == _top else _offset  # the top one goes the other way
+	return CENTRE + offset + Vector2(cos(angle), sin(angle)) * RADIUS
 
 func _place() -> void:
 	for i in _warriors.size():
 		if not _solo[i]:
 			_warriors[i].global_position = _spot(i)
+
 
 ## The warriors a dart could hit: standing in the arena (index -> where)
 func targets() -> Dictionary:
@@ -194,7 +198,10 @@ func _physics_process(delta: float) -> void:
 		for i in _sprites.size():
 			_sprites[i].offset.y = -1.0 if up else 0.0  # they bob a pixel as they march
 			if _flash_left[i] <= 0.0:
-				_sprites[i].frame = turn
+				var facing := turn
+				if i == _top and _pattern != CIRCLE and _march_left > 0.0:
+					facing = (turn + 2) % TURN_FRAMES  # heading the other way: front for back, side for side
+				_sprites[i].frame = facing
 		return
 	# now and then they leave the arena empty for a while
 	if _hopping > 0:
@@ -286,6 +293,10 @@ func _march() -> void:
 	_march_left = MARCH_SECONDS
 	_march_way = 1.0 if randf() < 0.5 else -1.0
 	_pattern = [CIRCLE, UP_DOWN, LEFT_RIGHT].pick_random()
+	# the one highest up the arena now patrols against the other two
+	for i in _warriors.size():
+		if _spot(i).y < _spot(_top).y:
+			_top = i
 	_linger = 0.0
 	_rest_left = randf_range(MARCH_EVERY.x, MARCH_EVERY.y)
 	AudioSfx.play("roar", 0.0, Vector2.ONE * 0.7)
