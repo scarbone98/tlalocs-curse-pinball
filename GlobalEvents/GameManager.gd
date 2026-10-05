@@ -233,6 +233,16 @@ func apply_view() -> void:
 	window.content_scale_size = DESKTOP_CANVAS if desktop_view else PHONE_CANVAS
 	window.content_scale_aspect = Window.CONTENT_SCALE_ASPECT_KEEP if desktop_view else Window.CONTENT_SCALE_ASPECT_KEEP_WIDTH
 	PinballEvents.view_changed.emit(desktop_view)
+	_tell_arcade_shape()
+
+## In the arcade the game sits in a frame the page sizes: this tells it the shape the view wants,
+## so the desktop view fills the screen instead of sitting small in a frame cut for a phone
+func _tell_arcade_shape() -> void:
+	if not OS.has_feature("web"):
+		return
+	var canvas := DESKTOP_CANVAS if desktop_view else PHONE_CANVAS
+	var script := "window.parent && window.parent !== window && window.parent.postMessage({ type: 'ASPECT_RATIO', ratio: %f }, '*');" % (float(canvas.x) / canvas.y)
+	JavaScriptBridge.eval(script)
 
 func toggle_night() -> void:
 	night = not night
